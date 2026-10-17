@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Users,
   X,
-  Sparkles,
   Settings,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
@@ -25,7 +24,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, role, hasPermission, activeFarm } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const navigation = [
     {
@@ -162,23 +161,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
         </nav>
-
-        {/* Bottom User Role Badge & Farm info */}
-        <div className="border-t border-border p-4">
-          <div className="rounded-xl bg-surface-muted p-3">
-            <div className="flex items-center justify-between text-xs text-muted mb-1">
-              <span>Rôle actif</span>
-              <Sparkles className="h-3.5 w-3.5 text-accent" />
-            </div>
-            <div className="font-bold text-xs text-foreground truncate">
-              {role?.name || (user?.roles.includes("ROLE_ADMIN") ? "Administrateur" : "Utilisateur")}
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted truncate">
-              <span className="h-1.5 w-1.5 rounded-full bg-success"></span>
-              {activeFarm?.name || "Aucune ferme"}
-            </div>
-          </div>
-        </div>
       </aside>
     </>
   );

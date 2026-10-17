@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Building2,
   Save,
@@ -13,8 +12,6 @@ import {
   Tag,
   Layers,
   Sparkles,
-  Users,
-  ShieldCheck,
   Settings,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
@@ -119,31 +116,6 @@ export default function FarmSettingsPage() {
 
   return (
     <Shell>
-      {/* Settings Navigation Tabs */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
-        <Link
-          href="/settings/farm"
-          className="flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-xs"
-        >
-          <Building2 className="h-4 w-4" />
-          <span>Exploitation</span>
-        </Link>
-        <Link
-          href="/settings/members"
-          className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-        >
-          <Users className="h-4 w-4" />
-          <span>Utilisateurs & Employés</span>
-        </Link>
-        <Link
-          href="/settings/roles"
-          className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-        >
-          <ShieldCheck className="h-4 w-4" />
-          <span>Rôles & Permissions</span>
-        </Link>
-      </div>
-
       {/* Page Header */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
