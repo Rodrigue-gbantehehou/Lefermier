@@ -1,0 +1,1129 @@
+{
+    "info": {
+        "_postman_id": "lefermier-api-v1",
+        "name": "Lefermier API - Logiciel Avicole",
+        "description": "Collection complète de l'API REST Symfony 8 du logiciel de gestion avicole Lefermier (Marché béninois et ouest-africain). Devises en FCFA (XOF), identifiants ULID Crockford Base32.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "01. Authentification",
+            "item": [
+                {
+                    "name": "01. Inscription (Register)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('jwt_token', json.data.token);",
+                                    "    pm.environment.set('farm_id', json.data.farm.id);",
+                                    "    console.log('JWT Token & Farm ID enregistrés avec succès dans l’environnement !');",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"eleveur@lefermier.bj\",\n    \"password\": \"MonPassSecurise2026!\",\n    \"firstName\": \"Comlan\",\n    \"lastName\": \"Agossou\",\n    \"phone\": \"+22997667788\",\n    \"organizationName\": \"Aviculture Moderne du Bénin\",\n    \"farmName\": \"Ferme Avicole Zinvié 1\",\n    \"productionType\": \"MIXED\",\n    \"locationCity\": \"Zinvié\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/register",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Connexion (Login)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('jwt_token', json.token);",
+                                    "    console.log('Nouveau JWT Token enregistré !');",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"eleveur@lefermier.bj\",\n    \"password\": \"MonPassSecurise2026!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Mon Profil & Mes Fermes (Me)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "me"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "02. Exploitations & Bâtiments",
+            "item": [
+                {
+                    "name": "01. Liste de mes exploitations",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Détail de la ferme",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Créer un bâtiment d'élevage",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('building_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Poulailler A1 - Pondeuses\",\n    \"type\": \"POULTRY_HOUSE\",\n    \"capacity\": 1500,\n    \"surfaceArea\": 180.5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/buildings",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "buildings"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Liste des bâtiments",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/buildings",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "buildings"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Créer une exploitation",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwt_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Ferme Avicole Calavi 2\",\n    \"productionType\": \"LAYER\",\n    \"locationCity\": \"Calavi\",\n    \"code\": \"FRM-CAL2\",\n    \"currency\": \"XOF\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/farms",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms"
+                            ]
+                        },
+                        "description": "Création d'une nouvelle exploitation par le propriétaire (multi-exploitations). Assigne automatiquement le rôle OWNER."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "03. Bandes & Effectifs",
+            "item": [
+                {
+                    "name": "01. Créer une bande de pondeuses",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('flock_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"BND-2026-001\",\n    \"name\": \"Isa Brown Lot 1\",\n    \"poultryType\": \"LAYER\",\n    \"strain\": \"Isa Brown\",\n    \"initialQuantity\": 1000,\n    \"initialAgeDays\": 1,\n    \"startDate\": \"2026-08-15\",\n    \"buildingId\": \"{{building_id}}\",\n    \"notes\": \"Poussins reçus du couvoir Vano\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/flocks",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "flocks"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Liste des bandes de la ferme",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/flocks?status=ACTIVE",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "flocks"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "ACTIVE"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Fiche détaillée d'une bande",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Enregistrer une mortalité ou sortie",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"MORTALITY\",\n    \"quantity\": 5,\n    \"movementDate\": \"2026-10-17\",\n    \"reason\": \"Coccidiose suspectée, isolement effectué\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}/movements",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}",
+                                "movements"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "05. Historique des mouvements de la bande",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}/movements",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}",
+                                "movements"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "04. Alimentation & Stocks",
+            "item": [
+                {
+                    "name": "01. Créer un article en stock",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('item_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Aliment Ponte 50kg\",\n    \"category\": \"FEED\",\n    \"unit\": \"BAG_50KG\",\n    \"initialStock\": 30,\n    \"alertThreshold\": 20,\n    \"unitPrice\": 18500,\n    \"notes\": \"Provenderie Vano\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/inventory",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "inventory"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Liste des stocks (Filtres alertes)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/inventory?category=FEED",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "inventory"
+                            ],
+                            "query": [
+                                {
+                                    "key": "category",
+                                    "value": "FEED"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Enregistrer une consommation d'aliment (FEEDING)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"FEEDING\",\n    \"quantity\": 2,\n    \"unit\": \"BAG_50KG\",\n    \"movementDate\": \"2026-10-17\",\n    \"flockId\": \"{{flock_id}}\",\n    \"reason\": \"Rationnement journalier lot 1\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/inventory/{{item_id}}/movements",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "inventory",
+                                "{{item_id}}",
+                                "movements"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Historique des mouvements de stock",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/inventory/{{item_id}}/movements",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "inventory",
+                                "{{item_id}}",
+                                "movements"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "05. Production d'Œufs",
+            "item": [
+                {
+                    "name": "01. Enregistrer une collecte d'œufs",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('egg_production_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"productionDate\": \"2026-10-17\",\n    \"session\": \"ALL_DAY\",\n    \"goodEggs\": 850,\n    \"crackedEggs\": 12,\n    \"dirtyEggs\": 8,\n    \"deformedEggs\": 2,\n    \"notes\": \"Collecte complète de la journée\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}/egg-productions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}",
+                                "egg-productions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Liste des collectes de la bande (avec synthèse)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}/egg-productions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}",
+                                "egg-productions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Détail d'une collecte",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/egg-productions/{{egg_production_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "egg-productions",
+                                "{{egg_production_id}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Modifier une collecte d'œufs",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"goodEggs\": 860,\n    \"crackedEggs\": 10,\n    \"dirtyEggs\": 6,\n    \"deformedEggs\": 2,\n    \"notes\": \"Recomptage du soir\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/egg-productions/{{egg_production_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "egg-productions",
+                                "{{egg_production_id}}"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "06. Finances & Ventes",
+            "item": [
+                {
+                    "name": "01. Créer un contact (Client Dantokpa)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('contact_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Mme Ayaba Dossou\",\n    \"type\": \"CLIENT\",\n    \"phone\": \"+22997554433\",\n    \"city\": \"Cotonou (Dantokpa)\",\n    \"notes\": \"Grossiste en plateaux d’œufs, paiement MoMo MTN\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/contacts",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "contacts"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Liste des contacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/contacts?type=CLIENT",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "contacts"
+                            ],
+                            "query": [
+                                {
+                                    "key": "type",
+                                    "value": "CLIENT"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Enregistrer une recette (Vente d'œufs en FCFA)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set('transaction_id', json.data.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"INCOME\",\n    \"category\": \"EGG_SALE\",\n    \"amount\": 220000,\n    \"transactionDate\": \"2026-10-17\",\n    \"paymentMethod\": \"MTN_MOMO\",\n    \"reference\": \"MOMO-97554433-01\",\n    \"description\": \"Vente de 100 plateaux d'œufs à Mme Ayaba\",\n    \"contactId\": \"{{contact_id}}\",\n    \"flockId\": \"{{flock_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/transactions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "transactions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Enregistrer une dépense (Achat d'aliment en FCFA)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"EXPENSE\",\n    \"category\": \"FEED_PURCHASE\",\n    \"amount\": 185000,\n    \"transactionDate\": \"2026-10-17\",\n    \"paymentMethod\": \"BANK_TRANSFER\",\n    \"reference\": \"VIR-BOA-8849\",\n    \"description\": \"Achat de 10 sacs aliment ponte 50kg\",\n    \"flockId\": \"{{flock_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/transactions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "transactions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "05. Liste des transactions & Synthèse trésorerie",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/transactions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "transactions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "06. Rentabilité financière de la bande (Marge brute)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/flocks/{{flock_id}}/transactions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "flocks",
+                                "{{flock_id}}",
+                                "transactions"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "07. Tableau de Bord (Dashboard)",
+            "item": [
+                {
+                    "name": "01. Dashboard consolidé de l'exploitation",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/dashboard",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "08. Clés API Développeur",
+            "item": [
+                {
+                    "name": "01. Lister les clés API",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/api-keys",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "api-keys"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Créer une clé API (lef_live_...)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set(\"api_key\", json.data.rawKey);",
+                                    "    pm.environment.set(\"api_key_id\", json.data.id);",
+                                    "    console.log(\"Nouvelle clé API générée et enregistrée :\", json.data.maskedKey);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Capteur Connecté IoT Poulailler A\",\n    \"environment\": \"live\",\n    \"scopes\": [\"*\"],\n    \"expiresInDays\": 90\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/api-keys",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "api-keys"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Tester appel Dashboard avec X-API-KEY (Machine)",
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "X-API-KEY",
+                                "value": "{{api_key}}"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/dashboard",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Révoquer une clé API",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/api-keys/{{api_key_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "api-keys",
+                                "{{api_key_id}}"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "09. Matrice des Rôles & Permissions",
+            "item": [
+                {
+                    "name": "01. Dictionnaire des 22 permissions système",
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/permissions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "permissions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "02. Lister les rôles de l'agence",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/roles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "roles"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "03. Créer un rôle personnalisé",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    pm.environment.set(\"role_id\", json.data.id);",
+                                    "    console.log(\"Rôle personnalisé créé :\", json.data.name);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Superviseur Ponte Matin\",\n    \"code\": \"SUPERVISEUR_PONTE\",\n    \"description\": \"Chargé du ramassage et tri des œufs au lever du jour\",\n    \"permissions\": [\"egg:view\", \"egg:create\", \"flock:view\", \"dashboard:view\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/roles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "roles"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "04. Modifier un rôle personnalisé",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"permissions\": [\"egg:view\", \"egg:create\", \"flock:view\", \"flock:movement\", \"dashboard:view\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/roles/{{role_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "roles",
+                                "{{role_id}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "05. Supprimer un rôle personnalisé",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/farms/{{farm_id}}/roles/{{role_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "farms",
+                                "{{farm_id}}",
+                                "roles",
+                                "{{role_id}}"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

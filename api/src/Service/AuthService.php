@@ -1,0 +1,129 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service;
+
+use App\Dto\Auth\RegisterRequestDto;
+use App\Entity\Farm;
+use App\Entity\FarmMembership;
+use App\Entity\Organization;
+use App\Entity\User;
+use App\Enum\FarmRole;
+use App\Exception\EmailAlreadyExistsException;
+use App\Repository\OrganizationRepository;
+use App\Repository\UserRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\String\Slugger\SluggerInterface;
+
+class AuthService
+{
+    public function __construct(
+        private readonly UserRepository $userRepository,
+        private readonly OrganizationRepository $organizationRepository,
+        private readonly UserPasswordHasherInterface $passwordHasher,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly JWTTokenManagerInterface $jwtManager,
+        private readonly SluggerInterface $slugger,
+    ) {
+    }
+
+    /**
+     * @return array{token: string, user: User, farm: ?Farm}
+     */
+    public function register(RegisterRequestDto $dto): array
+    {
+        $normalizedEmail = mb_strtolower(trim($dto->email));
+
+        if ($this->userRepository->findOneBy(['email' => $normalizedEmail]) !== null) {
+            throw new EmailAlreadyExistsException($normalizedEmail);
+        }
+
+        return $this->entityManager->wrapInTransaction(function () use ($dto, $normalizedEmail): array {
+            // 1. Création de l'utilisateur
+            $user = new User($normalizedEmail, $dto->firstName, $dto->lastName);
+            $user->setPhone($dto->phone);
+            $hashedPassword = $this->passwordHasher->hashPassword($user, $dto->password);
+            $user->setPassword($hashedPassword);
+            $this->entityManager->persist($user);
+
+            $farm = null;
+
+            // 2. Création de l'exploitation uniquement si farmName a été spécifié (rétro-compatibilité)
+            if (!empty($dto->farmName)) {
+                $orgName = $dto->organizationName ?: $dto->farmName;
+                $baseSlug = $this->slugger->slug($orgName)->lower()->toString();
+                if ($baseSlug === '') {
+                    $baseSlug = 'organisation';
+                }
+
+                $uniqueSlug = $baseSlug;
+                $counter = 1;
+                while ($this->organizationRepository->findOneBy(['slug' => $uniqueSlug]) !== null) {
+                    $uniqueSlug = sprintf('%s-%d', $baseSlug, $counter++);
+                }
+
+                $organization = new Organization($orgName, $uniqueSlug);
+                $this->entityManager->persist($organization);
+
+                $farm = new Farm($organization, $dto->farmName, $dto->productionType ?? \App\Enum\ProductionType::MIXED);
+                $farm->setLocationCity($dto->locationCity);
+                $this->entityManager->persist($farm);
+
+                $membership = new FarmMembership($farm, $user, FarmRole::OWNER);
+                $this->entityManager->persist($membership);
+            }
+
+            $this->entityManager->flush();
+
+            // 3. Génération immédiate du jeton JWT
+            $token = $this->jwtManager->create($user);
+
+            return [
+                'token' => $token,
+                'user' => $user,
+                'farm' => $farm,
+            ];
+        });
+    }
+
+    /**
+     * Retourne la vue complète du profil et des exploitations autorisées.
+     *
+     * @return array<string, mixed>
+     */
+    public function getUserProfile(User $user): array
+    {
+        $farms = [];
+        foreach ($user->getFarmMemberships() as $membership) {
+            if ($membership->isActive()) {
+                $farm = $membership->getFarm();
+                $farms[] = [
+                    'id' => $farm->getId()?->toBase32(),
+                    'name' => $farm->getName(),
+                    'code' => $farm->getCode(),
+                    'productionType' => $farm->getProductionType()->value,
+                    'currency' => $farm->getCurrency(),
+                    'locationCity' => $farm->getLocationCity(),
+                    'locationCountry' => $farm->getLocationCountry(),
+                    'role' => $membership->getRole()->value,
+                    'roleName' => $membership->getRoleDefinition()?->getName() ?? $membership->getRole()->value,
+                    'permissions' => $membership->getPermissions(),
+                ];
+            }
+        }
+
+        return [
+            'id' => $user->getId()?->toBase32(),
+            'email' => $user->getEmail(),
+            'firstName' => $user->getFirstName(),
+            'lastName' => $user->getLastName(),
+            'fullName' => $user->getFullName(),
+            'phone' => $user->getPhone(),
+            'roles' => $user->getRoles(),
+            'farms' => $farms,
+        ];
+    }
+}

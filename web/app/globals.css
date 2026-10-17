@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--bg-main);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-muted: var(--bg-surface-muted);
+  --color-surface-elevated: var(--bg-surface-elevated);
+
+  --color-foreground: var(--text-primary);
+  --color-muted: var(--text-muted);
+
+  --color-border: var(--border-color);
+
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-primary-soft: var(--brand-primary-soft);
+  --color-primary-foreground: #ffffff;
+
+  --color-accent: var(--brand-accent);
+  --color-accent-hover: var(--brand-accent-hover);
+  --color-accent-soft: var(--brand-accent-soft);
+  --color-accent-foreground: #ffffff;
+
+  --color-success: var(--status-success);
+  --color-success-soft: var(--status-success-soft);
+  --color-warning: var(--status-warning);
+  --color-warning-soft: var(--status-warning-soft);
+  --color-danger: var(--status-danger);
+  --color-danger-soft: var(--status-danger-soft);
+  --color-info: var(--status-info);
+  --color-info-soft: var(--status-info-soft);
+}
+
+@layer base {
+  /* TOKENS CENTRAUX — DEFAUT CLAIR ET DISCRET (AUCUN FOND NOIR PAR DEFAUT) */
+  :root {
+    --bg-main: #f6f8f6;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f1f4f1;
+    --bg-surface-muted: #eef2ee;
+    --bg-surface-elevated: #ffffff;
+
+    --text-primary: #202923;
+    --text-muted: #657168;
+
+    --border-color: #dfe6e0;
+
+    --brand-primary: #245c43;
+    --brand-primary-hover: #194832;
+    --brand-primary-soft: #e8f2ec;
+
+    --brand-accent: #dda64b;
+    --brand-accent-hover: #c48e37;
+    --brand-accent-soft: #fbf4e8;
+
+    --status-success: #237a4b;
+    --status-success-soft: #eaf5ee;
+    --status-warning: #946200;
+    --status-warning-soft: #fbf5e6;
+    --status-danger: #b4232c;
+    --status-danger-soft: #fdebed;
+    --status-info: #2463a6;
+    --status-info-soft: #ebf3fa;
+  }
+
+  /* Mode sombre (activable uniquement de façon explicite par le toggle) */
+  .dark {
+    --bg-main: #0f1713;
+    --bg-surface: #16221c;
+    --bg-surface-hover: #1c2b24;
+    --bg-surface-muted: #1a2921;
+    --bg-surface-elevated: #1e2e26;
+
+    --text-primary: #f1f5f2;
+    --text-muted: #98a79d;
+
+    --border-color: #24382c;
+
+    --brand-primary: #2e7555;
+    --brand-primary-hover: #3b916b;
+    --brand-primary-soft: #162b20;
+
+    --brand-accent: #e5b058;
+    --brand-accent-hover: #f0be6b;
+    --brand-accent-soft: #2e2617;
+
+    --status-success: #2fa163;
+    --status-success-soft: #142e20;
+    --status-warning: #d99b1a;
+    --status-warning-soft: #2e2410;
+    --status-danger: #e2434e;
+    --status-danger-soft: #301417;
+    --status-info: #3b8cd9;
+    --status-info-soft: #122538;
+  }
+
+  * {
+    border-color: var(--border-color);
+  }
+
+  html,
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+/* Animations d'alerte subtile */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s infinite ease-in-out;
+}

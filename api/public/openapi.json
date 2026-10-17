@@ -1,0 +1,2551 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Lefermier API — Logiciel de Gestion Avicole Professionnel",
+        "version": "1.0.0",
+        "description": "API REST haute performance pour la gestion intégrale d'exploitations avicoles modernes au Bénin et en Afrique de l'Ouest.\n\n### Caractéristiques Principales\n* **Devises régionales** : Tous les montants financiers sont exprimés en Francs CFA (XOF) sous forme d'entiers stricts (`BIGINT`, sans décimales).\n* **Identifiants ULID** : Clés primaires en Crockford Base32 de 26 caractères (ordonnancement chronologique naturel, indexation B-Tree optimisée sous MySQL 8.4).\n* **Isolation Multi-Tenant** : Cloisonnement strict des données par exploitation (`Farm`) avec contrôle d'accès basé sur les rôles (`FarmRole`: `OWNER`, `FARM_MANAGER`, `PRODUCTION_LEAD`, `STOCK_KEEPER`, `ACCOUNTANT`, `VET_CONSULTANT`).\n* **Paiements Locaux** : Prise en charge native de MTN Mobile Money (`MTN_MOMO`), Moov Money (`MOOV_MONEY`), Celtiis Cash (`CELTIIS_CASH`), Espèces (`CASH`), Virements bancaires et Chèques.\n* **Standard Zootechnique Ouest-Africain** : Conversion automatique des œufs en plateaux/alvéoles standard de 30 unités (`traysCount = goodEggs / 30`) et calcul du taux de ponte journalier en temps réel.",
+        "contact": {
+            "name": "Équipe Technique Lefermier",
+            "email": "tech@lefermier.bj",
+            "url": "https://lefermier.bj"
+        },
+        "license": {
+            "name": "Propriétaire — Tous droits réservés",
+            "url": "https://lefermier.bj/legal"
+        }
+    },
+    "servers": [
+        {
+            "url": "http://127.0.0.1:8000",
+            "description": "Serveur Local de Développement (Symfony 8)"
+        },
+        {
+            "url": "https://api.lefermier.bj",
+            "description": "Serveur de Production (Bénin & UEMOA)"
+        }
+    ],
+    "tags": [
+        {
+            "name": "01. Authentification & Profil",
+            "description": "Inscription du fermier, connexion JWT 4096-bit RSA et profil utilisateur"
+        },
+        {
+            "name": "02. Exploitations & Bâtiments",
+            "description": "Gestion des fermes, bâtiments (poulaillers, magasins de stockage) et capacités"
+        },
+        {
+            "name": "03. Bandes & Effectifs",
+            "description": "Gestion des lots de volailles (pondeuses, poulets de chair, reproducteurs), âges dynamiques et mouvements d'effectif"
+        },
+        {
+            "name": "04. Alimentation & Stocks",
+            "description": "Gestion des intrants (aliments, vaccins, litières), alertes de stock bas et valorisation globale en FCFA"
+        },
+        {
+            "name": "05. Production d'Œufs",
+            "description": "Collectes journalières (matin/midi/soir), tri qualitatif (fêlés, cassés), conversion en alvéoles de 30 et taux de ponte"
+        },
+        {
+            "name": "06. Finances & Ventes",
+            "description": "Facturation, dépenses, créances, intégration MTN MoMo / Moov / Celtiis et marges par bande"
+        },
+        {
+            "name": "07. Tableau de Bord & Indicateurs KPI",
+            "description": "Consolidation en temps réel pour le chef d'exploitation et masquage selon les prérogatives des rôles"
+        },
+        {
+            "name": "08. Clés API Développeur",
+            "description": "Gestion des clés API sécurisées (lef_live_... / lef_test_...) pour automates IoT, capteurs connectés et partenaires externes"
+        },
+        {
+            "name": "09. Matrice des Rôles & Permissions",
+            "description": "Gestion de la matrice des rôles dynamiques et permissions granulaires par agence / exploitation"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Jeton JWT généré par `POST /api/auth/login` ou `POST /api/auth/register`. Doit être fourni dans l'en-tête `Authorization: Bearer <token>`."
+            },
+            "apiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-KEY",
+                "description": "Clé API développeur (ex: lef_live_...). Alternative acceptée : `Authorization: ApiKey lef_live_...`."
+            }
+        },
+        "schemas": {
+            "ApiSuccessResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "example": "success"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Opération effectuée avec succès."
+                    },
+                    "data": {
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "status",
+                    "data"
+                ]
+            },
+            "ApiErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "integer",
+                        "example": 422
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Une erreur de validation zootechnique est survenue."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "example": {
+                            "quantity": "La quantité doit être supérieure à zéro."
+                        }
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-10-17T12:30:00Z"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "required": [
+                    "email",
+                    "password",
+                    "firstName",
+                    "lastName"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "eleveur@lefermier.bj"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 8,
+                        "example": "MonPassSecurise2026!"
+                    },
+                    "firstName": {
+                        "type": "string",
+                        "example": "Comlan"
+                    },
+                    "lastName": {
+                        "type": "string",
+                        "example": "Agossou"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+22997667788"
+                    },
+                    "organizationName": {
+                        "type": "string",
+                        "example": "Aviculture Moderne du Bénin",
+                        "nullable": true
+                    },
+                    "farmName": {
+                        "type": "string",
+                        "example": "Ferme Avicole Zinvié 1",
+                        "nullable": true
+                    },
+                    "productionType": {
+                        "type": "string",
+                        "enum": [
+                            "BROILER",
+                            "LAYER",
+                            "BREEDER",
+                            "MIXED"
+                        ],
+                        "example": "MIXED"
+                    },
+                    "locationCity": {
+                        "type": "string",
+                        "example": "Zinvié"
+                    }
+                }
+            },
+            "LoginRequest": {
+                "type": "object",
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "eleveur@lefermier.bj"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "example": "MonPassSecurise2026!"
+                    }
+                }
+            },
+            "AuthResponse": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "user": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "example": "01JME0ABCDEF12345678901234"
+                            },
+                            "email": {
+                                "type": "string",
+                                "example": "eleveur@lefermier.bj"
+                            },
+                            "firstName": {
+                                "type": "string",
+                                "example": "Comlan"
+                            },
+                            "lastName": {
+                                "type": "string",
+                                "example": "Agossou"
+                            },
+                            "phone": {
+                                "type": "string",
+                                "example": "+22997667788"
+                            }
+                        }
+                    },
+                    "farm": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "example": "01JME0BCDEF123456789012345"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Ferme Avicole Zinvié 1"
+                            },
+                            "productionType": {
+                                "type": "string",
+                                "example": "MIXED"
+                            },
+                            "role": {
+                                "type": "string",
+                                "example": "OWNER"
+                            }
+                        }
+                    }
+                }
+            },
+            "FarmResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0BCDEF123456789012345"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Ferme Avicole Zinvié 1"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "ferme-avicole-zinvie-1"
+                    },
+                    "locationCity": {
+                        "type": "string",
+                        "example": "Zinvié"
+                    },
+                    "locationDepartment": {
+                        "type": "string",
+                        "example": "Atlantique"
+                    },
+                    "locationCountry": {
+                        "type": "string",
+                        "example": "Bénin"
+                    },
+                    "productionType": {
+                        "type": "string",
+                        "enum": [
+                            "BROILER",
+                            "LAYER",
+                            "BREEDER",
+                            "MIXED"
+                        ],
+                        "example": "MIXED"
+                    },
+                    "totalCapacity": {
+                        "type": "integer",
+                        "example": 5000
+                    },
+                    "currencyCode": {
+                        "type": "string",
+                        "example": "XOF"
+                    },
+                    "activeFlocksCount": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "activeBuildingsCount": {
+                        "type": "integer",
+                        "example": 3
+                    }
+                }
+            },
+            "CreateBuildingRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "type",
+                    "capacity"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Bâtiment Pondeuses A"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "POULTRY_HOUSE",
+                            "FEED_STORAGE",
+                            "EGG_STORAGE",
+                            "EQUIPMENT_SHED",
+                            "ISOLATION_QUARANTINE",
+                            "OTHER"
+                        ],
+                        "example": "POULTRY_HOUSE"
+                    },
+                    "capacity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "example": 2500
+                    },
+                    "surfaceAreaSquareMeters": {
+                        "type": "number",
+                        "example": 250.5
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Bâtiment semi-ouvert avec brasseurs d'air et abreuvoirs automatiques"
+                    }
+                }
+            },
+            "BuildingResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0CDEF1234567890123456"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Bâtiment Pondeuses A"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "POULTRY_HOUSE"
+                    },
+                    "capacity": {
+                        "type": "integer",
+                        "example": 2500
+                    },
+                    "surfaceAreaSquareMeters": {
+                        "type": "number",
+                        "example": 250.5
+                    },
+                    "isOccupied": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                }
+            },
+            "CreateFlockRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "type",
+                    "breed",
+                    "arrivalDate",
+                    "initialQuantity",
+                    "ageInDaysAtArrival",
+                    "costPerUnit"
+                ],
+                "properties": {
+                    "farmId": {
+                        "type": "string",
+                        "example": "01JME0BCDEF123456789012345"
+                    },
+                    "buildingId": {
+                        "type": "string",
+                        "example": "01JME0CDEF1234567890123456"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Bande Pondeuses Lot 1 - ISA Brown"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "BROILER",
+                            "LAYER",
+                            "BREEDER",
+                            "MIXED"
+                        ],
+                        "example": "LAYER"
+                    },
+                    "breed": {
+                        "type": "string",
+                        "example": "ISA Brown"
+                    },
+                    "arrivalDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-05-01"
+                    },
+                    "initialQuantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "example": 1000
+                    },
+                    "ageInDaysAtArrival": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "example": 112
+                    },
+                    "costPerUnit": {
+                        "type": "integer",
+                        "description": "Prix d'achat par sujet en FCFA",
+                        "example": 3500
+                    },
+                    "supplierName": {
+                        "type": "string",
+                        "example": "Couvoir National d'Abomey-Calavi"
+                    },
+                    "expectedDepartureDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2027-10-31"
+                    }
+                }
+            },
+            "FlockResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0DEF12345678901234567"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Bande Pondeuses Lot 1 - ISA Brown"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "LAYER"
+                    },
+                    "breed": {
+                        "type": "string",
+                        "example": "ISA Brown"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ACTIVE",
+                            "DEPLETED",
+                            "SOLD",
+                            "QUARANTINED"
+                        ],
+                        "example": "ACTIVE"
+                    },
+                    "arrivalDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-05-01"
+                    },
+                    "initialQuantity": {
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "currentQuantity": {
+                        "type": "integer",
+                        "example": 985
+                    },
+                    "ageInDays": {
+                        "type": "integer",
+                        "description": "Calculé dynamiquement",
+                        "example": 281
+                    },
+                    "ageInWeeks": {
+                        "type": "integer",
+                        "description": "Calculé dynamiquement",
+                        "example": 40
+                    },
+                    "mortalityRate": {
+                        "type": "number",
+                        "description": "Taux de mortalité cumulé en %",
+                        "example": 1.5
+                    },
+                    "building": {
+                        "$ref": "#/components/schemas/BuildingResponse"
+                    }
+                }
+            },
+            "RecordFlockMovementRequest": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "quantity",
+                    "movementDate"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "MORTALITY",
+                            "SALE",
+                            "CULLING",
+                            "TRANSFER_IN",
+                            "TRANSFER_OUT",
+                            "ADJUSTMENT"
+                        ],
+                        "example": "MORTALITY"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "example": 3
+                    },
+                    "movementDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "example": "Coup de chaleur passager"
+                    },
+                    "unitPrice": {
+                        "type": "integer",
+                        "description": "Prix unitaire de vente en FCFA (si type = SALE)",
+                        "example": 0
+                    }
+                }
+            },
+            "CreateInventoryItemRequest": {
+                "type": "object",
+                "required": [
+                    "farmId",
+                    "name",
+                    "category",
+                    "unitOfMeasure",
+                    "unitCost"
+                ],
+                "properties": {
+                    "farmId": {
+                        "type": "string",
+                        "example": "01JME0BCDEF123456789012345"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Aliment Ponte Haute Performance 50kg"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "FEED",
+                            "MEDICINE",
+                            "VACCINE",
+                            "DISINFECTANT",
+                            "BEDDING",
+                            "EQUIPMENT",
+                            "PACKAGING",
+                            "OTHER"
+                        ],
+                        "example": "FEED"
+                    },
+                    "unitOfMeasure": {
+                        "type": "string",
+                        "enum": [
+                            "KG",
+                            "BAG",
+                            "LITER",
+                            "BOTTLE",
+                            "DOSE",
+                            "PIECE",
+                            "TRAY",
+                            "OTHER"
+                        ],
+                        "example": "BAG"
+                    },
+                    "unitCost": {
+                        "type": "integer",
+                        "description": "Coût unitaire d'achat en FCFA",
+                        "example": 18500
+                    },
+                    "reorderThreshold": {
+                        "type": "number",
+                        "description": "Seuil d'alerte de stock bas",
+                        "example": 10
+                    },
+                    "currentStock": {
+                        "type": "number",
+                        "example": 35
+                    }
+                }
+            },
+            "InventoryItemResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0EFG123456789012345678"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Aliment Ponte Haute Performance 50kg"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "FEED"
+                    },
+                    "unitOfMeasure": {
+                        "type": "string",
+                        "example": "BAG"
+                    },
+                    "unitCost": {
+                        "type": "integer",
+                        "example": 18500
+                    },
+                    "currentStock": {
+                        "type": "number",
+                        "example": 35
+                    },
+                    "reorderThreshold": {
+                        "type": "number",
+                        "example": 10
+                    },
+                    "isLowStock": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "totalValue": {
+                        "type": "integer",
+                        "description": "Valeur stockée en FCFA",
+                        "example": 647500
+                    }
+                }
+            },
+            "RecordStockMovementRequest": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "quantity",
+                    "movementDate"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "IN_PURCHASE",
+                            "IN_INITIAL",
+                            "OUT_CONSUMPTION",
+                            "OUT_MORTALITY_OR_LOSS",
+                            "OUT_SALE",
+                            "ADJUSTMENT"
+                        ],
+                        "example": "OUT_CONSUMPTION"
+                    },
+                    "quantity": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "example": 2
+                    },
+                    "movementDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "unitPrice": {
+                        "type": "integer",
+                        "description": "Coût unitaire en FCFA",
+                        "example": 18500
+                    },
+                    "reference": {
+                        "type": "string",
+                        "example": "DISTRIB-2026-10-17"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "example": "Ration journalière Bande 1"
+                    }
+                }
+            },
+            "RecordEggProductionRequest": {
+                "type": "object",
+                "required": [
+                    "flockId",
+                    "productionDate",
+                    "session",
+                    "goodEggsCount"
+                ],
+                "properties": {
+                    "flockId": {
+                        "type": "string",
+                        "example": "01JME0DEF12345678901234567"
+                    },
+                    "productionDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "session": {
+                        "type": "string",
+                        "enum": [
+                            "MORNING",
+                            "NOON",
+                            "EVENING",
+                            "NIGHT",
+                            "DAILY_CONSOLIDATED"
+                        ],
+                        "example": "MORNING"
+                    },
+                    "goodEggsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 780
+                    },
+                    "crackedEggsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 6
+                    },
+                    "brokenEggsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 2
+                    },
+                    "abnormalEggsCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 1
+                    },
+                    "feedConsumedKg": {
+                        "type": "number",
+                        "minimum": 0,
+                        "example": 115
+                    },
+                    "waterConsumedLiters": {
+                        "type": "number",
+                        "minimum": 0,
+                        "example": 230
+                    },
+                    "notes": {
+                        "type": "string",
+                        "example": "Collecte matinale fluide, ponte vigoureuse"
+                    }
+                }
+            },
+            "EggProductionResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0FGH123456789012345679"
+                    },
+                    "productionDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "session": {
+                        "type": "string",
+                        "example": "MORNING"
+                    },
+                    "totalEggsCount": {
+                        "type": "integer",
+                        "example": 789
+                    },
+                    "goodEggsCount": {
+                        "type": "integer",
+                        "example": 780
+                    },
+                    "crackedEggsCount": {
+                        "type": "integer",
+                        "example": 6
+                    },
+                    "brokenEggsCount": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "abnormalEggsCount": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "traysCount": {
+                        "type": "integer",
+                        "description": "Plateaux complets de 30 œufs",
+                        "example": 26
+                    },
+                    "looseEggsCount": {
+                        "type": "integer",
+                        "description": "Œufs restants hors plateau",
+                        "example": 0
+                    },
+                    "layingRate": {
+                        "type": "number",
+                        "description": "Taux de ponte calculé en %",
+                        "example": 79.19
+                    }
+                }
+            },
+            "CreateContactRequest": {
+                "type": "object",
+                "required": [
+                    "farmId",
+                    "name",
+                    "type",
+                    "phone"
+                ],
+                "properties": {
+                    "farmId": {
+                        "type": "string",
+                        "example": "01JME0BCDEF123456789012345"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Madame Adjovi Dossou (Revendeuse Marché Dantokpa)"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "CLIENT",
+                            "SUPPLIER",
+                            "VET",
+                            "SERVICE_PROVIDER",
+                            "OTHER"
+                        ],
+                        "example": "CLIENT"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+22997112233"
+                    },
+                    "city": {
+                        "type": "string",
+                        "example": "Cotonou"
+                    },
+                    "address": {
+                        "type": "string",
+                        "example": "Sainte Rita, Cotonou"
+                    },
+                    "taxNumber": {
+                        "type": "string",
+                        "description": "Identifiant Fiscal Unique (IFU Bénin)",
+                        "example": "0202111223344"
+                    }
+                }
+            },
+            "CreateTransactionRequest": {
+                "type": "object",
+                "required": [
+                    "farmId",
+                    "type",
+                    "category",
+                    "amount",
+                    "transactionDate",
+                    "paymentMethod"
+                ],
+                "properties": {
+                    "farmId": {
+                        "type": "string",
+                        "example": "01JME0BCDEF123456789012345"
+                    },
+                    "contactId": {
+                        "type": "string",
+                        "example": "01JME0GHI123456789012345680"
+                    },
+                    "flockId": {
+                        "type": "string",
+                        "example": "01JME0DEF12345678901234567"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "EXPENSE",
+                            "REVENUE"
+                        ],
+                        "example": "REVENUE"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "EGG_SALE",
+                            "LIVE_BIRD_SALE",
+                            "MANURE_SALE",
+                            "EQUIPMENT_SALE",
+                            "OTHER_REVENUE",
+                            "FEED_PURCHASE",
+                            "VET_MEDICAL",
+                            "CHICK_PURCHASE",
+                            "EQUIPMENT_PURCHASE",
+                            "ENERGY_WATER",
+                            "BEDDING_PURCHASE",
+                            "SALARY",
+                            "TRANSPORT",
+                            "MAINTENANCE",
+                            "OTHER_EXPENSE"
+                        ],
+                        "example": "EGG_SALE"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "Montant total en FCFA (sans décimale)",
+                        "example": 52000
+                    },
+                    "transactionDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "paymentMethod": {
+                        "type": "string",
+                        "enum": [
+                            "CASH",
+                            "MTN_MOMO",
+                            "MOOV_MONEY",
+                            "CELTIIS_CASH",
+                            "BANK_TRANSFER",
+                            "CHECK",
+                            "CREDIT"
+                        ],
+                        "example": "MTN_MOMO"
+                    },
+                    "paymentReference": {
+                        "type": "string",
+                        "description": "ID de transaction MoMo ou numéro de chèque",
+                        "example": "MTN-REF-20261017-987654"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Vente de 26 plateaux d'œufs frais (2 000 FCFA / plateau)"
+                    }
+                }
+            },
+            "TransactionResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01JME0HIJ123456789012345681"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "REVENUE"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "EGG_SALE"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "FCFA",
+                        "example": 52000
+                    },
+                    "transactionDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-10-17"
+                    },
+                    "paymentMethod": {
+                        "type": "string",
+                        "example": "MTN_MOMO"
+                    },
+                    "paymentReference": {
+                        "type": "string",
+                        "example": "MTN-REF-20261017-987654"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Vente de 26 plateaux d'œufs frais"
+                    }
+                }
+            },
+            "DashboardResponse": {
+                "type": "object",
+                "properties": {
+                    "farm": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "example": "01JME0BCDEF123456789012345"
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "Ferme Avicole Zinvié 1"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "XOF"
+                            }
+                        }
+                    },
+                    "role": {
+                        "type": "string",
+                        "example": "OWNER"
+                    },
+                    "zootechnicalKpis": {
+                        "type": "object",
+                        "properties": {
+                            "totalActiveFlocks": {
+                                "type": "integer",
+                                "example": 2
+                            },
+                            "totalBirdsLiving": {
+                                "type": "integer",
+                                "example": 2985
+                            },
+                            "averageMortalityRate": {
+                                "type": "number",
+                                "example": 0.8
+                            },
+                            "todayEggProduction": {
+                                "type": "object",
+                                "properties": {
+                                    "totalEggs": {
+                                        "type": "integer",
+                                        "example": 789
+                                    },
+                                    "traysCount": {
+                                        "type": "integer",
+                                        "example": 26
+                                    },
+                                    "layingRate": {
+                                        "type": "number",
+                                        "example": 79.19
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "stockKpis": {
+                        "type": "object",
+                        "properties": {
+                            "lowStockCount": {
+                                "type": "integer",
+                                "example": 0
+                            },
+                            "lowStockAlerts": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "totalInventoryValuation": {
+                                "type": "integer",
+                                "description": "Valeur stockée en FCFA",
+                                "example": 1450000
+                            }
+                        }
+                    },
+                    "financialKpis": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Masqué si l'utilisateur est chef d'élevage ou magasinier",
+                        "properties": {
+                            "totalRevenues": {
+                                "type": "integer",
+                                "example": 1580000
+                            },
+                            "totalExpenses": {
+                                "type": "integer",
+                                "example": 890000
+                            },
+                            "netProfit": {
+                                "type": "integer",
+                                "example": 690000
+                            }
+                        }
+                    }
+                }
+            },
+            "CreateApiKeyRequest": {
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Capteur Connecté IoT Poulailler A"
+                    },
+                    "environment": {
+                        "type": "string",
+                        "enum": [
+                            "live",
+                            "test"
+                        ],
+                        "default": "live",
+                        "example": "live"
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "*"
+                        ],
+                        "example": [
+                            "*"
+                        ]
+                    },
+                    "expiresInDays": {
+                        "type": "integer",
+                        "nullable": true,
+                        "example": 90
+                    }
+                }
+            },
+            "ApiKeyResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01M54YQ91Z6B0YRS9TMD2DDMMK"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Capteur Connecté IoT Poulailler A"
+                    },
+                    "maskedKey": {
+                        "type": "string",
+                        "example": "lef_live_...16bc"
+                    },
+                    "keyPrefix": {
+                        "type": "string",
+                        "example": "lef_live_"
+                    },
+                    "lastFour": {
+                        "type": "string",
+                        "example": "16bc"
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "*"
+                        ]
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "lastUsedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "example": "2026-10-17T12:52:22Z"
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "example": "2027-01-15T12:00:00Z"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-10-17T12:45:00Z"
+                    },
+                    "rawKey": {
+                        "type": "string",
+                        "description": "Affiché UNIQUEMENT à la génération",
+                        "example": "lef_live_1de8d40171cf710e57cbc8958addc38b4b0a5cba604416bc"
+                    },
+                    "warning": {
+                        "type": "string",
+                        "example": "Conservez cette clé en lieu sûr. Elle ne sera plus JAMAIS affichée."
+                    }
+                }
+            },
+            "CreateRoleRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "permissions"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Superviseur Ponte Matin"
+                    },
+                    "code": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "SUPERVISEUR_PONTE"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Chargé du ramassage et tri des œufs au lever du jour"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "egg:view",
+                            "egg:create",
+                            "flock:view",
+                            "dashboard:view"
+                        ]
+                    }
+                }
+            },
+            "UpdateRoleRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Superviseur Ponte & Aliments"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Mise à jour des attributions"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "egg:view",
+                            "egg:create",
+                            "flock:view",
+                            "flock:movement",
+                            "dashboard:view"
+                        ]
+                    }
+                }
+            },
+            "RoleResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01M54ZKM65DCK6FEX90AA5AYY7"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Superviseur Ponte Matin"
+                    },
+                    "code": {
+                        "type": "string",
+                        "example": "SUPERVISEUR_PONTE"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Chargé du ramassage et tri des œufs au lever du jour"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "egg:view",
+                            "egg:create",
+                            "flock:view",
+                            "dashboard:view"
+                        ]
+                    },
+                    "isSystem": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-10-17T13:00:00Z"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-10-17T13:05:00Z"
+                    }
+                }
+            },
+            "CreateFarmRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "productionType"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 150,
+                        "example": "Ferme Avicole Calavi 2"
+                    },
+                    "productionType": {
+                        "type": "string",
+                        "enum": [
+                            "LAYER",
+                            "BROILER",
+                            "MIXED"
+                        ],
+                        "example": "LAYER"
+                    },
+                    "locationCity": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Calavi"
+                    },
+                    "code": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "FRM-CAL2"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "default": "XOF",
+                        "example": "XOF"
+                    }
+                }
+            }
+        }
+    },
+    "security": [
+        {
+            "bearerAuth": []
+        }
+    ],
+    "paths": {
+        "/api/auth/register": {
+            "post": {
+                "tags": [
+                    "01. Authentification & Profil"
+                ],
+                "summary": "Inscription d'un nouvel utilisateur",
+                "description": "Crée le compte utilisateur éleveur/collaborateur avec mot de passe haché. La création d'exploitation est découplée et s'effectue ensuite via POST /api/farms.",
+                "security": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Compte et exploitation créés avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/AuthResponse"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation (email déjà utilisé, données invalides)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "01. Authentification & Profil"
+                ],
+                "summary": "Connexion et obtention du jeton JWT",
+                "description": "Vérifie les identifiants email / mot de passe et génère un jeton JWT avec signature RSA-4096.",
+                "security": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authentification réussie",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string",
+                                            "example": "eyJhbGciOiJSUzI1Ni..."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Identifiants invalides",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "tags": [
+                    "01. Authentification & Profil"
+                ],
+                "summary": "Consulter le profil connecté",
+                "description": "Retourne les informations de l'éleveur connecté, ses appartenances d'exploitation et ses rôles d'accès.",
+                "responses": {
+                    "200": {
+                        "description": "Profil utilisateur retourné avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiSuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token JWT manquant ou expiré"
+                    }
+                }
+            }
+        },
+        "/api/farms": {
+            "get": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Lister les exploitations de l'utilisateur",
+                "description": "Retourne la liste de toutes les fermes auxquelles l'utilisateur a accès avec son rôle respectif.",
+                "responses": {
+                    "200": {
+                        "description": "Liste des exploitations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/FarmResponse"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Créer une nouvelle exploitation avicole",
+                "description": "Permet au propriétaire de créer une nouvelle exploitation au sein de son organisation (gestion multi-fermes). Le créateur est automatiquement assigné comme OWNER de la nouvelle ferme.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateFarmRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Exploitation créée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/FarmResponse"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation des données de l'exploitation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}": {
+            "get": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Détails d'une exploitation avicole",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Détails de la ferme",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FarmResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit (non membre de cette exploitation)"
+                    },
+                    "404": {
+                        "description": "Exploitation introuvable"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Mettre à jour une exploitation",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "locationCity": {
+                                        "type": "string"
+                                    },
+                                    "locationDepartment": {
+                                        "type": "string"
+                                    },
+                                    "totalCapacity": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Exploitation mise à jour avec succès"
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/buildings": {
+            "get": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Lister les bâtiments d'une exploitation",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des bâtiments retournée"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "02. Exploitations & Bâtiments"
+                ],
+                "summary": "Créer un nouveau bâtiment",
+                "description": "Ajoute un poulailler, magasin d'aliments ou hangar d'équipement au sein de l'exploitation.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateBuildingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bâtiment créé avec succès"
+                    }
+                }
+            }
+        },
+        "/api/flocks": {
+            "get": {
+                "tags": [
+                    "03. Bandes & Effectifs"
+                ],
+                "summary": "Lister les bandes de volailles",
+                "parameters": [
+                    {
+                        "name": "farmId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ACTIVE",
+                                "DEPLETED",
+                                "SOLD",
+                                "QUARANTINED"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des bandes retournée"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "03. Bandes & Effectifs"
+                ],
+                "summary": "Créer une nouvelle bande de volailles",
+                "description": "Initialise une bande (Pondeuses, Poulets de chair, Reproducteurs, etc.) avec son effectif de départ et son bâtiment d'hébergement.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateFlockRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bande créée avec succès"
+                    }
+                }
+            }
+        },
+        "/api/flocks/{id}": {
+            "get": {
+                "tags": [
+                    "03. Bandes & Effectifs"
+                ],
+                "summary": "Détails d'une bande de volailles",
+                "description": "Fournit l'effectif actuel vivant, l'âge dynamique en jours et semaines, et le taux de mortalité.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de la bande",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Détails zootechniques de la bande"
+                    }
+                }
+            }
+        },
+        "/api/flocks/{id}/movements": {
+            "post": {
+                "tags": [
+                    "03. Bandes & Effectifs"
+                ],
+                "summary": "Enregistrer un mouvement d'effectif",
+                "description": "Enregistre une mortalité, une vente sur pied, une réforme ou un transfert. Met à jour l'effectif vif de la bande de manière transactionnelle.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordFlockMovementRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Mouvement enregistré et effectif actualisé"
+                    },
+                    "422": {
+                        "description": "Effectif insuffisant (quantité demandée supérieure au cheptel vivant)"
+                    }
+                }
+            }
+        },
+        "/api/inventory/items": {
+            "get": {
+                "tags": [
+                    "04. Alimentation & Stocks"
+                ],
+                "summary": "Lister les articles d'inventaire",
+                "parameters": [
+                    {
+                        "name": "farmId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "lowStockOnly",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Articles en stock retournés"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "04. Alimentation & Stocks"
+                ],
+                "summary": "Créer un article d'inventaire",
+                "description": "Ajoute un type d'aliment, médicament, vaccin ou équipement avec son seuil de réapprovisionnement.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateInventoryItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Article créé avec succès"
+                    }
+                }
+            }
+        },
+        "/api/inventory/items/{id}/movements": {
+            "post": {
+                "tags": [
+                    "04. Alimentation & Stocks"
+                ],
+                "summary": "Enregistrer une entrée ou sortie de stock",
+                "description": "Met à jour le stock disponible (achat d'aliment, distribution journalière, perte/avarie) et vérifie les seuils d'alerte.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordStockMovementRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Mouvement de stock enregistré"
+                    },
+                    "422": {
+                        "description": "Stock insuffisant pour cette consommation"
+                    }
+                }
+            }
+        },
+        "/api/inventory/valuation": {
+            "get": {
+                "tags": [
+                    "04. Alimentation & Stocks"
+                ],
+                "summary": "Valorisation financière globale des stocks",
+                "description": "Calcule la valeur marchande totale des stocks d'une exploitation en FCFA.",
+                "parameters": [
+                    {
+                        "name": "farmId",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Valorisation totale retournée en FCFA"
+                    }
+                }
+            }
+        },
+        "/api/egg-productions": {
+            "get": {
+                "tags": [
+                    "05. Production d'Œufs"
+                ],
+                "summary": "Historique des collectes d'œufs",
+                "parameters": [
+                    {
+                        "name": "farmId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "flockId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "startDate",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "endDate",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historique des collectes"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "05. Production d'Œufs"
+                ],
+                "summary": "Enregistrer une collecte journalière d'œufs",
+                "description": "Enregistre le ramassage (Matin, Midi, Soir). Convertit automatiquement en plateaux de 30 alvéoles et calcule le taux de ponte journalier.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordEggProductionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Collecte enregistrée, plateaux et taux de ponte calculés"
+                    },
+                    "409": {
+                        "description": "Collecte déjà enregistrée pour cette bande et cette session à cette date"
+                    },
+                    "422": {
+                        "description": "La bande sélectionnée n'est pas une bande de pondeuses"
+                    }
+                }
+            }
+        },
+        "/api/contacts": {
+            "get": {
+                "tags": [
+                    "06. Finances & Ventes"
+                ],
+                "summary": "Lister les contacts / tiers",
+                "parameters": [
+                    {
+                        "name": "farmId",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "CLIENT",
+                                "SUPPLIER",
+                                "VET",
+                                "SERVICE_PROVIDER",
+                                "OTHER"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des tiers retournée"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "06. Finances & Ventes"
+                ],
+                "summary": "Créer un nouveau tiers (Client, Fournisseur, Vétérinaire)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Contact créé avec succès"
+                    }
+                }
+            }
+        },
+        "/api/transactions": {
+            "post": {
+                "tags": [
+                    "06. Finances & Ventes"
+                ],
+                "summary": "Enregistrer une vente ou une dépense",
+                "description": "Gère les encaissements et règlements régionaux : MTN MoMo, Moov Money, Celtiis Cash, Espèces, Virements, Chèques.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateTransactionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Transaction enregistrée avec succès"
+                    },
+                    "422": {
+                        "description": "Incompatibilité de catégorie financière ou montant invalide"
+                    }
+                }
+            }
+        },
+        "/api/flocks/{id}/transactions": {
+            "get": {
+                "tags": [
+                    "06. Finances & Ventes"
+                ],
+                "summary": "Calcul de rentabilité et marge brute d'une bande",
+                "description": "Agrège toutes les recettes (œufs, volailles réformées) et dépenses directes (poussins, aliments, soins) pour calculer la marge nette en FCFA.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Marge brute et liste des transactions de la bande"
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/financial-summary": {
+            "get": {
+                "tags": [
+                    "06. Finances & Ventes"
+                ],
+                "summary": "Synthèse financière et trésorerie nette",
+                "description": "Bilan global en FCFA : total des ventes, total des charges, résultat d'exploitation net et ventilation par catégorie.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Synthèse financière retournée"
+                    },
+                    "403": {
+                        "description": "Non autorisé (les rôles de production n'ont pas accès aux données financières)"
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/dashboard": {
+            "get": {
+                "tags": [
+                    "07. Tableau de Bord & Indicateurs KPI"
+                ],
+                "summary": "Tableau de bord consolidé en temps réel",
+                "description": "Point d'entrée unique fournissant la vue à 360° : effectif vif, mortalité %, ponte du jour, alertes stock bas et santé financière avec masquage selon rôle.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Indicateurs consolidés",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/DashboardResponse"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/api-keys": {
+            "get": {
+                "tags": [
+                    "08. Clés API Développeur"
+                ],
+                "summary": "Lister les clés API d'une exploitation",
+                "description": "Retourne la liste des clés actives et inactives de la ferme avec les 4 derniers caractères visibles.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des clés API retournée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/ApiKeyResponse"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé (seuls OWNER et MANAGER peuvent consulter les clés)"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "08. Clés API Développeur"
+                ],
+                "summary": "Créer une nouvelle clé API (IoT / Machine)",
+                "description": "Génère une clé secrète préfixée (lef_live_... / lef_test_...). La clé brute n'est affichée qu'UNE SEULE FOIS lors de cette réponse. Seule son empreinte SHA-256 est persistée.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateApiKeyRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Clé API générée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/ApiKeyResponse"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Prérogatives insuffisantes"
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/api-keys/{keyId}": {
+            "delete": {
+                "tags": [
+                    "08. Clés API Développeur"
+                ],
+                "summary": "Révoquer immédiatement une clé API",
+                "description": "Désactive définitivement la clé API spécifiée. Tout appel ultérieur avec cette clé renverra 401 Unauthorized.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'exploitation",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de la clé API",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Clé révoquée avec succès"
+                    },
+                    "404": {
+                        "description": "Clé API introuvable pour cette ferme"
+                    }
+                }
+            }
+        },
+        "/api/permissions": {
+            "get": {
+                "tags": [
+                    "09. Matrice des Rôles & Permissions"
+                ],
+                "summary": "Dictionnaire complet des 22 permissions système",
+                "description": "Retourne la liste complète des permissions atomiques avec libellés français et groupement par module pour l'interface utilisateur.",
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Matrice des permissions retournée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/roles": {
+            "get": {
+                "tags": [
+                    "09. Matrice des Rôles & Permissions"
+                ],
+                "summary": "Lister les rôles configurés pour une agence",
+                "description": "Retourne les rôles prédéfinis et sur-mesure de l'agence avec leur matrice de permissions.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'agence",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des rôles de l'agence retournée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/RoleResponse"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "09. Matrice des Rôles & Permissions"
+                ],
+                "summary": "Créer un rôle personnalisé pour l'agence",
+                "description": "Définit un nouveau rôle au sein de l'agence avec une sélection de permissions à la carte.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'agence",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateRoleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Rôle créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/ApiSuccessResponse"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/RoleResponse"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Un rôle avec ce code existe déjà pour cette agence"
+                    }
+                }
+            }
+        },
+        "/api/farms/{id}/roles/{roleId}": {
+            "put": {
+                "tags": [
+                    "09. Matrice des Rôles & Permissions"
+                ],
+                "summary": "Modifier un rôle et ses permissions",
+                "description": "Met à jour le nom, la description ou la liste des permissions accordées.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'agence",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "roleId",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID du rôle",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateRoleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Rôle mis à jour"
+                    },
+                    "400": {
+                        "description": "Le rôle Propriétaire système ne peut pas être modifié"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "09. Matrice des Rôles & Permissions"
+                ],
+                "summary": "Supprimer un rôle personnalisé",
+                "description": "Supprime le rôle de l'agence (les rôles système protégés ne peuvent pas être supprimés).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID de l'agence",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "roleId",
+                        "in": "path",
+                        "required": true,
+                        "description": "ULID du rôle",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rôle supprimé avec succès"
+                    },
+                    "400": {
+                        "description": "Impossible de supprimer un rôle système"
+                    }
+                }
+            }
+        }
+    }
+}
