@@ -34,9 +34,9 @@ export default function EggsPage() {
     setCollectionDate(new Date().toISOString().split("T")[0]);
   }, []);
   const [session, setSession] = useState<EggSession>("MORNING");
-  const [goodEggs, setGoodEggs] = useState<number>(0);
-  const [brokenEggs, setBrokenEggs] = useState<number>(0);
-  const [abnormalEggs, setAbnormalEggs] = useState<number>(0);
+  const [goodEggs, setGoodEggs] = useState<number | string>(0);
+  const [brokenEggs, setBrokenEggs] = useState<number | string>(0);
+  const [abnormalEggs, setAbnormalEggs] = useState<number | string>(0);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [editingEggId, setEditingEggId] = useState<string | null>(null);
@@ -423,7 +423,12 @@ export default function EggsPage() {
                 min="0"
                 required
                 value={goodEggs}
-                onChange={(e) => setGoodEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGoodEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-success/30 bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-success focus:outline-hidden"
               />
             </div>
@@ -436,7 +441,12 @@ export default function EggsPage() {
                 type="number"
                 min="0"
                 value={brokenEggs}
-                onChange={(e) => setBrokenEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBrokenEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-danger focus:outline-hidden"
               />
             </div>
@@ -449,7 +459,12 @@ export default function EggsPage() {
                 type="number"
                 min="0"
                 value={abnormalEggs}
-                onChange={(e) => setAbnormalEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAbnormalEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-warning focus:outline-hidden"
               />
             </div>
@@ -462,7 +477,7 @@ export default function EggsPage() {
               <span className="text-sm font-mono">{trayCalc.text}</span>
             </div>
             <div className="mt-1 text-[11px] opacity-80">
-              Total ramassé : {goodEggs + brokenEggs + abnormalEggs} œufs
+              Total ramassé : {Number(goodEggs || 0) + Number(brokenEggs || 0) + Number(abnormalEggs || 0)} œufs
             </div>
           </div>
 

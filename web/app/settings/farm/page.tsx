@@ -15,7 +15,6 @@ import {
   Sparkles,
   Users,
   ShieldCheck,
-  KeyRound,
   Settings,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
@@ -23,6 +22,7 @@ import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
+import { CreateBuildingModal } from "@/components/farms/create-building-modal";
 import { formatNumber, formatDate } from "@/lib/utils";
 
 interface BuildingItem {
@@ -54,12 +54,6 @@ export default function FarmSettingsPage() {
 
   // Add Building Modal
   const [buildingModalOpen, setBuildingModalOpen] = useState(false);
-  const [buildingName, setBuildingName] = useState("");
-  const [buildingType, setBuildingType] = useState<"POULTRY_HOUSE" | "BROODER" | "STORAGE" | "OTHER">("POULTRY_HOUSE");
-  const [buildingCapacity, setBuildingCapacity] = useState<number>(1000);
-  const [buildingSurface, setBuildingSurface] = useState<string>("");
-  const [submittingBuilding, setSubmittingBuilding] = useState(false);
-  const [buildingErrorMsg, setBuildingErrorMsg] = useState<string | null>(null);
 
   // Sync form with active farm
   useEffect(() => {
@@ -112,34 +106,7 @@ export default function FarmSettingsPage() {
     }
   }
 
-  async function handleCreateBuilding(e: React.FormEvent) {
-    e.preventDefault();
-    if (!activeFarm?.id || !buildingName.trim()) return;
 
-    setSubmittingBuilding(true);
-    setBuildingErrorMsg(null);
-
-    try {
-      await api.farms.createBuilding(activeFarm.id, {
-        name: buildingName.trim(),
-        type: buildingType,
-        capacity: Number(buildingCapacity) || 0,
-        surfaceArea: buildingSurface ? parseFloat(buildingSurface) : undefined,
-      });
-
-      setBuildingModalOpen(false);
-      setBuildingName("");
-      setBuildingType("POULTRY_HOUSE");
-      setBuildingCapacity(1000);
-      setBuildingSurface("");
-
-      await loadBuildings(activeFarm.id);
-    } catch (err: any) {
-      setBuildingErrorMsg(err?.message || "Erreur lors de la création du bâtiment.");
-    } finally {
-      setSubmittingBuilding(false);
-    }
-  }
 
   const totalCapacity = buildings.reduce((sum, b) => sum + (b.capacity || 0), 0);
 
@@ -174,13 +141,6 @@ export default function FarmSettingsPage() {
         >
           <ShieldCheck className="h-4 w-4" />
           <span>Rôles & Permissions</span>
-        </Link>
-        <Link
-          href="/developer"
-          className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-        >
-          <KeyRound className="h-4 w-4" />
-          <span>Clés API Développeur</span>
         </Link>
       </div>
 
@@ -452,101 +412,16 @@ export default function FarmSettingsPage() {
       )}
 
       {/* MODAL CRÉATION DE BÂTIMENT */}
-      <Modal
+      <CreateBuildingModal
         isOpen={buildingModalOpen}
         onClose={() => setBuildingModalOpen(false)}
-        title="Ajouter un bâtiment d'élevage"
-        description="Créez un poulailler ou espace d'élevage au sein de cette exploitation."
-        maxWidth="md"
-      >
-        <form onSubmit={handleCreateBuilding} className="space-y-4">
-          {buildingErrorMsg && (
-            <div className="rounded-xl border border-danger/20 bg-danger-soft p-3 text-xs text-danger">
-              {buildingErrorMsg}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Nom ou désignation du bâtiment *
-            </label>
-            <input
-              type="text"
-              required
-              value={buildingName}
-              onChange={(e) => setBuildingName(e.target.value)}
-              placeholder="ex. Poulailler Bâtiment A"
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Type de bâtiment
-              </label>
-              <select
-                value={buildingType}
-                onChange={(e) => setBuildingType(e.target.value as any)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
-              >
-                <option value="POULTRY_HOUSE">Poulailler</option>
-                <option value="BROODER">Poussinière</option>
-                <option value="STORAGE">Magasin de stockage</option>
-                <option value="OTHER">Autre installation</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Capacité d'accueil (sujets) *
-              </label>
-              <input
-                type="number"
-                min={0}
-                required
-                value={buildingCapacity}
-                onChange={(e) => setBuildingCapacity(parseInt(e.target.value) || 0)}
-                placeholder="ex. 1500"
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Surface au sol en m² (optionnel)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min={0}
-              value={buildingSurface}
-              onChange={(e) => setBuildingSurface(e.target.value)}
-              placeholder="ex. 250.5"
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
-            />
-          </div>
-
-          <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={() => setBuildingModalOpen(false)}
-              className="rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submittingBuilding}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-              <span>{submittingBuilding ? "Ajout..." : "Créer le bâtiment"}</span>
-            </button>
-          </div>
-        </form>
-      </Modal>
+        suggestedName={`Poulailler ${buildings.length + 1}`}
+        onSuccess={async () => {
+          if (activeFarm?.id) {
+            await loadBuildings(activeFarm.id);
+          }
+        }}
+      />
     </Shell>
   );
 }

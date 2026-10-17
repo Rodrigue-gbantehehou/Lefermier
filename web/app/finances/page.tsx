@@ -23,7 +23,7 @@ export default function FinancesPage() {
   // New Transaction Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<TransactionType>("INCOME");
-  const [amountFcfa, setAmountFcfa] = useState<number>(0);
+  const [amountFcfa, setAmountFcfa] = useState<number | string>(0);
   const [category, setCategory] = useState("Vente Oeufs");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
   const [reference, setReference] = useState("");
@@ -334,11 +334,16 @@ export default function FinancesPage() {
                 min="1"
                 required
                 value={amountFcfa}
-                onChange={(e) => setAmountFcfa(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAmountFcfa(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
               <div className="mt-1 text-[11px] text-muted font-mono">
-                {formatFcfa(amountFcfa)}
+                {formatFcfa(Number(amountFcfa) || 0)}
               </div>
             </div>
 

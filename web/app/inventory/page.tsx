@@ -32,9 +32,9 @@ export default function InventoryPage() {
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState<InventoryCategory>("FEED");
   const [unit, setUnit] = useState("BAG_50KG");
-  const [minThreshold, setMinThreshold] = useState<number>(10);
-  const [currentStock, setCurrentStock] = useState<number>(50);
-  const [unitCostFcfa, setUnitCostFcfa] = useState<number>(18500);
+  const [minThreshold, setMinThreshold] = useState<number | string>(10);
+  const [currentStock, setCurrentStock] = useState<number | string>(50);
+  const [unitCostFcfa, setUnitCostFcfa] = useState<number | string>(18500);
   const [submittingItem, setSubmittingItem] = useState(false);
 
   // Movement Modal
@@ -42,8 +42,8 @@ export default function InventoryPage() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [moveType, setMoveType] = useState<StockMovementType>("OUT");
   const [moveUnit, setMoveUnit] = useState<string>("BAG_50KG");
-  const [quantity, setQuantity] = useState<number>(1);
-  const [unitPrice, setUnitPrice] = useState<number>(0);
+  const [quantity, setQuantity] = useState<number | string>(1);
+  const [unitPrice, setUnitPrice] = useState<number | string>(0);
   const [reason, setReason] = useState("Consommation journalière bande");
   const [submittingMove, setSubmittingMove] = useState(false);
 
@@ -407,7 +407,11 @@ export default function InventoryPage() {
                 min="0"
                 required
                 value={currentStock}
-                onChange={(e) => setCurrentStock(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCurrentStock(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>
@@ -421,7 +425,11 @@ export default function InventoryPage() {
                 min="0"
                 required
                 value={minThreshold}
-                onChange={(e) => setMinThreshold(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setMinThreshold(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-danger focus:outline-hidden"
               />
             </div>
@@ -435,7 +443,11 @@ export default function InventoryPage() {
                 min="0"
                 required
                 value={unitCostFcfa}
-                onChange={(e) => setUnitCostFcfa(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setUnitCostFcfa(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>
@@ -505,7 +517,11 @@ export default function InventoryPage() {
                   step="any"
                   required
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0))}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setQuantity(val === "" ? "" : Math.max(0.01, parseFloat(val) || 0));
+                  }}
                   className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-primary focus:outline-hidden"
                 />
                 <select
@@ -531,7 +547,11 @@ export default function InventoryPage() {
                 type="number"
                 min="0"
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setUnitPrice(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>

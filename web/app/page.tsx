@@ -62,9 +62,9 @@ export default function DashboardPage() {
   const [selectedFlockId, setSelectedFlockId] = useState("");
   const [eggDate, setEggDate] = useState("");
   const [eggSession, setEggSession] = useState<EggSession>("MORNING");
-  const [goodEggs, setGoodEggs] = useState<number>(0);
-  const [brokenEggs, setBrokenEggs] = useState<number>(0);
-  const [abnormalEggs, setAbnormalEggs] = useState<number>(0);
+  const [goodEggs, setGoodEggs] = useState<number | string>(0);
+  const [brokenEggs, setBrokenEggs] = useState<number | string>(0);
+  const [abnormalEggs, setAbnormalEggs] = useState<number | string>(0);
   const [eggNotes, setEggNotes] = useState("");
   const [submittingEgg, setSubmittingEgg] = useState(false);
   const [editingEggId, setEditingEggId] = useState<string | null>(null);
@@ -98,13 +98,13 @@ export default function DashboardPage() {
   // Movement Form state
   const [moveFlockId, setMoveFlockId] = useState("");
   const [moveType, setMoveType] = useState<"MORTALITY" | "SALE" | "CULL">("MORTALITY");
-  const [moveQuantity, setMoveQuantity] = useState<number>(1);
+  const [moveQuantity, setMoveQuantity] = useState<number | string>(1);
   const [moveReason, setMoveReason] = useState("");
   const [submittingMove, setSubmittingMove] = useState(false);
 
   // Finance Form state
   const [txType, setTxType] = useState<"INCOME" | "EXPENSE">("INCOME");
-  const [txAmount, setTxAmount] = useState<number>(0);
+  const [txAmount, setTxAmount] = useState<number | string>(0);
   const [txCategory, setTxCategory] = useState("Vente Oeufs");
   const [txPaymentMethod, setTxPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
   const [txNotes, setTxNotes] = useState("");
@@ -1041,7 +1041,12 @@ export default function DashboardPage() {
                 min="0"
                 required
                 value={goodEggs}
-                onChange={(e) => setGoodEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGoodEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-success/30 bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-success focus:outline-hidden"
               />
             </div>
@@ -1054,7 +1059,12 @@ export default function DashboardPage() {
                 type="number"
                 min="0"
                 value={brokenEggs}
-                onChange={(e) => setBrokenEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBrokenEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-danger focus:outline-hidden"
               />
             </div>
@@ -1067,7 +1077,12 @@ export default function DashboardPage() {
                 type="number"
                 min="0"
                 value={abnormalEggs}
-                onChange={(e) => setAbnormalEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAbnormalEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+                }}
+                placeholder="0"
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-warning focus:outline-hidden"
               />
             </div>
@@ -1080,7 +1095,7 @@ export default function DashboardPage() {
               <span className="text-sm font-mono">{trayCalc.text}</span>
             </div>
             <div className="mt-1 text-[11px] opacity-80">
-              Total ramassé : {goodEggs + brokenEggs + abnormalEggs} œufs
+              Total ramassé : {Number(goodEggs || 0) + Number(brokenEggs || 0) + Number(abnormalEggs || 0)} œufs
             </div>
           </div>
 
@@ -1199,7 +1214,11 @@ export default function DashboardPage() {
               min="1"
               required
               value={moveQuantity}
-              onChange={(e) => setMoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMoveQuantity(val === "" ? "" : Math.max(1, parseInt(val) || 1));
+              }}
               className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground"
             />
           </div>
@@ -1284,12 +1303,16 @@ export default function DashboardPage() {
               min="1"
               required
               value={txAmount}
-              onChange={(e) => setTxAmount(Math.max(0, parseInt(e.target.value) || 0))}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTxAmount(val === "" ? "" : Math.max(0, parseInt(val) || 0));
+              }}
               placeholder="ex. 45000"
               className="w-full rounded-xl border border-border bg-surface p-2.5 text-base font-bold font-mono text-foreground"
             />
             <div className="mt-1 text-[11px] text-muted font-mono">
-              Aperçu : {formatFcfa(txAmount)}
+              Aperçu : {formatFcfa(Number(txAmount) || 0)}
             </div>
           </div>
 

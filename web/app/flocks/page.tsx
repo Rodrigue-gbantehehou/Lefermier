@@ -11,6 +11,7 @@ import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
 import { Flock, FlockType } from "@/lib/types";
 import { formatNumber, formatDate } from "@/lib/utils";
+import { CreateBuildingModal } from "@/components/farms/create-building-modal";
 
 export default function FlocksPage() {
   const { activeFarm, hasPermission } = useAuth();
@@ -22,13 +23,14 @@ export default function FlocksPage() {
   // Buildings
   const [buildings, setBuildings] = useState<any[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
+  const [buildingModalOpen, setBuildingModalOpen] = useState(false);
 
   // New Flock Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [flockName, setFlockName] = useState("");
   const [flockType, setFlockType] = useState<FlockType>("LAYER");
   const [breed, setBreed] = useState("Lohmann Brown");
-  const [initialQuantity, setInitialQuantity] = useState<number>(500);
+  const [initialQuantity, setInitialQuantity] = useState<number | string>(500);
   const [startDate, setStartDate] = useState("");
 
   const getInitialFlockType = useCallback((productionType?: string): FlockType => {
@@ -60,7 +62,7 @@ export default function FlocksPage() {
   const [movementModalOpen, setMovementModalOpen] = useState(false);
   const [activeFlock, setActiveFlock] = useState<Flock | null>(null);
   const [moveType, setMoveType] = useState<"MORTALITY" | "SALE" | "CULL">("MORTALITY");
-  const [moveQty, setMoveQty] = useState<number>(1);
+  const [moveQty, setMoveQty] = useState<number | string>(1);
   const [moveReason, setMoveReason] = useState("");
   const [submittingMove, setSubmittingMove] = useState(false);
 
@@ -292,16 +294,29 @@ export default function FlocksPage() {
           </p>
         </div>
 
-        {hasPermission("flock:create") && (
-          <button
-            type="button"
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau groupe de poules</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasPermission("farm:update") && (
+            <button
+              type="button"
+              onClick={() => setBuildingModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover shadow-xs transition-colors"
+            >
+              <Warehouse className="h-4 w-4 text-primary" />
+              <span>Nouveau poulailler</span>
+            </button>
+          )}
+
+          {hasPermission("flock:create") && (
+            <button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouveau groupe de poules</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Table */}
@@ -345,22 +360,12 @@ export default function FlocksPage() {
                         )}
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        flock.type === "LAYER"
-                          ? "warning"
-                          : flock.type === "BROILER"
-                          ? "default"
-                          : "neutral"
-                      }
-                      size="sm"
-                    >
+                  
                       {flock.type === "LAYER"
                         ? "Pondeuses"
                         : flock.type === "BROILER"
                         ? "Chair"
                         : "Mixte"}
-                    </Badge>
                   </div>
 
                   {/* Quantitative Stats */}
@@ -453,15 +458,24 @@ export default function FlocksPage() {
               <label className="block text-xs font-semibold text-foreground">
                 Bâtiment / Poulailler d'accueil
               </label>
-              {buildings.length > 0 && (
-                <span className="text-[10px] text-muted">
-                  {buildings.length} bâtiment{buildings.length > 1 ? "s" : ""} disponible{buildings.length > 1 ? "s" : ""}
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={() => setBuildingModalOpen(true)}
+                className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover hover:underline transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                <span>+ Nouveau poulailler</span>
+              </button>
             </div>
             <select
               value={selectedBuildingId}
-              onChange={(e) => setSelectedBuildingId(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__NEW__") {
+                  setBuildingModalOpen(true);
+                } else {
+                  setSelectedBuildingId(e.target.value);
+                }
+              }}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
             >
               <option value="">-- Aucun bâtiment assigné (ou non spécifié) --</option>
@@ -470,7 +484,25 @@ export default function FlocksPage() {
                   {b.name} {b.capacity ? `(Capacité max : ${b.capacity} poules)` : ""}
                 </option>
               ))}
+              <option value="__NEW__">➕ Créer un nouveau poulailler...</option>
             </select>
+
+            {buildings.length === 0 && (
+              <div className="mt-2 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/5 p-2.5 text-xs">
+                <div className="flex items-center gap-2 text-primary font-medium">
+                  <Warehouse className="h-4 w-4 shrink-0" />
+                  <span>Aucun poulailler enregistré sur cette ferme.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBuildingModalOpen(true)}
+                  className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Créer en 1 clic</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -525,7 +557,11 @@ export default function FlocksPage() {
                 min="1"
                 required
                 value={initialQuantity}
-                onChange={(e) => setInitialQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInitialQuantity(val === "" ? "" : Math.max(1, parseInt(val) || 1));
+                }}
                 className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>
@@ -629,7 +665,11 @@ export default function FlocksPage() {
               min="1"
               required
               value={moveQty}
-              onChange={(e) => setMoveQty(Math.max(1, parseInt(e.target.value) || 1))}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMoveQty(val === "" ? "" : Math.max(1, parseInt(val) || 1));
+              }}
               className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground"
             />
           </div>
@@ -665,6 +705,18 @@ export default function FlocksPage() {
           </div>
         </form>
       </Modal>
+
+      {/* QUICK CREATE BUILDING MODAL */}
+      <CreateBuildingModal
+        isOpen={buildingModalOpen}
+        onClose={() => setBuildingModalOpen(false)}
+        defaultCapacity={Number(initialQuantity) || 1000}
+        suggestedName={`Poulailler ${buildings.length + 1}`}
+        onSuccess={(newBuilding) => {
+          setBuildings((prev) => [...prev, newBuilding]);
+          setSelectedBuildingId(newBuilding.id);
+        }}
+      />
     </Shell>
   );
 }

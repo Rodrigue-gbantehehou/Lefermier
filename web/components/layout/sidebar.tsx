@@ -10,7 +10,6 @@ import {
   Package,
   Wallet,
   ShieldCheck,
-  KeyRound,
   Users,
   X,
   Sparkles,
@@ -59,12 +58,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: Wallet,
       show: hasPermission("finance:read"),
     },
-    {
-      name: "Paramètres de la ferme",
-      href: "/settings/farm",
-      icon: Settings,
-      show: true,
-    },
+    
     {
       name: "Utilisateurs & Employés",
       href: "/settings/members",
@@ -78,10 +72,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       show: hasPermission("role:read") || user?.roles.includes("ROLE_ADMIN"),
     },
     {
-      name: "Clés API Développeur",
-      href: "/developer",
-      icon: KeyRound,
-      show: hasPermission("farm:update") || user?.roles.includes("ROLE_ADMIN"),
+      name: "Paramètres de la ferme",
+      href: "/settings/farm",
+      icon: Settings,
+      show: true,
     },
   ];
 
@@ -164,11 +158,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   )}
                 />
                 <span className="truncate">{item.name}</span>
-                {item.href === "/developer" && (
-                  <span className="ml-auto rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-mono text-accent">
-                    API
-                  </span>
-                )}
               </Link>
             );
           })}

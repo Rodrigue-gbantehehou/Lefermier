@@ -354,18 +354,9 @@ export default function MembersManagementPage() {
                       {/* Rôle */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1.5">
-                          <Badge
-                            variant={
-                              m.isOwner
-                                ? "danger"
-                                : m.roleDefinition
-                                ? "warning"
-                                : "info"
-                            }
-                            size="sm"
-                          >
-                            {m.isOwner ? "Propriétaire (Owner)" : roleName}
-                          </Badge>
+                          
+                            {m.isOwner ? "Owner" : roleName}
+                         
                           {m.roleDefinition?.isSystem && (
                             <span title="Rôle système prédéfini">
                               <Lock className="h-3 w-3 text-muted" />
