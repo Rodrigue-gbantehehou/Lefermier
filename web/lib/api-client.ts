@@ -319,6 +319,8 @@ export const api = {
         expectedEndDate: f.estimatedEndDate || f.expectedEndDate,
         status: f.status || "ACTIVE",
         notes: f.notes,
+        buildingId: f.building?.id || null,
+        buildingName: f.building?.name || null,
       }));
     },
     create: async (data: any) => {

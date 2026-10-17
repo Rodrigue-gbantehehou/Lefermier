@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Plus, Bird, Calendar } from "lucide-react";
+import React, { useEffect, useState, useCallback } from "react";
+import { Plus, Bird, Calendar, Warehouse } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -19,18 +19,40 @@ export default function FlocksPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Buildings
+  const [buildings, setBuildings] = useState<any[]>([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
+
   // New Flock Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [flockName, setFlockName] = useState("");
-  const [flockCode, setFlockCode] = useState("");
   const [flockType, setFlockType] = useState<FlockType>("LAYER");
   const [breed, setBreed] = useState("Lohmann Brown");
   const [initialQuantity, setInitialQuantity] = useState<number>(500);
   const [startDate, setStartDate] = useState("");
 
+  const getInitialFlockType = useCallback((productionType?: string): FlockType => {
+    if (productionType === "BROILER") return "BROILER";
+    return "LAYER";
+  }, []);
+
+  const getDefaultBreed = useCallback((type: FlockType): string => {
+    if (type === "BROILER") return "Cobb 500";
+    if (type === "MIXED") return "Goliath / Locale";
+    return "Lohmann Brown";
+  }, []);
+
   useEffect(() => {
     setStartDate(new Date().toISOString().split("T")[0]);
   }, []);
+
+  // Automatically adapt flock type and breed based on the active farm's production type
+  useEffect(() => {
+    const defaultType = getInitialFlockType(activeFarm?.productionType);
+    setFlockType(defaultType);
+    setBreed(getDefaultBreed(defaultType));
+  }, [activeFarm?.productionType, getInitialFlockType, getDefaultBreed]);
+
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,8 +73,12 @@ export default function FlocksPage() {
   async function loadFlocks() {
     setIsLoading(true);
     try {
-      const data = await api.flocks.list({ farmId: activeFarm?.id });
-      setFlocks(data);
+      const [flocksData, buildingsData] = await Promise.all([
+        api.flocks.list({ farmId: activeFarm?.id }),
+        activeFarm?.id ? api.farms.listBuildings(activeFarm.id).catch(() => []) : Promise.resolve([]),
+      ]);
+      setFlocks(flocksData);
+      setBuildings(buildingsData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -65,14 +91,20 @@ export default function FlocksPage() {
     if (!activeFarm?.id) return;
     setSubmitting(true);
     try {
+      const autoCode = `LOT-${new Date().getFullYear()}-${(flockName || "BAN")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toUpperCase()
+        .slice(0, 4)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
       await api.flocks.create({
         farmId: activeFarm.id,
-        code: flockCode || undefined,
+        code: autoCode,
         name: flockName,
         type: flockType,
         poultryType: flockType,
         breed,
         strain: breed,
+        buildingId: selectedBuildingId || undefined,
         initialQuantity: Number(initialQuantity),
         currentQuantity: Number(initialQuantity),
         startDate,
@@ -81,7 +113,7 @@ export default function FlocksPage() {
       });
       setCreateModalOpen(false);
       setFlockName("");
-      setFlockCode("");
+      setSelectedBuildingId("");
       await loadFlocks();
     } catch (err: any) {
       alert(err?.message || "Erreur lors de la création de la bande");
@@ -152,6 +184,21 @@ export default function FlocksPage() {
             : "Mixte"}
         </Badge>
       ),
+    },
+    {
+      key: "building",
+      header: "Bâtiment",
+      sortable: true,
+      accessor: (f) => f.buildingName || "",
+      cell: (flock) =>
+        flock.buildingName ? (
+          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
+            <Warehouse className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>{flock.buildingName}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted/60 italic">-</span>
+        ),
     },
     {
       key: "breed",
@@ -286,9 +333,17 @@ export default function FlocksPage() {
                       <h3 className="text-base font-bold text-foreground">
                         {flock.name}
                       </h3>
-                      <p className="text-xs text-muted">
-                        {flock.breed}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted">
+                          {flock.breed}
+                        </span>
+                        {flock.buildingName && (
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
+                            <Warehouse className="h-3 w-3" />
+                            {flock.buildingName}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Badge
                       variant={
@@ -378,50 +433,66 @@ export default function FlocksPage() {
         description="Renseignez les informations de ce groupe (pondeuses ou poulets de chair)."
       >
         <form onSubmit={handleCreateFlock} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Nom du groupe de poules *
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Nom du groupe de poules *
+            </label>
+            <input
+              type="text"
+              required
+              value={flockName}
+              onChange={(e) => setFlockName(e.target.value)}
+              placeholder="ex. Pondeuses Bâtiment A"
+              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
+            />
+          </div>
+
+          {/* Bâtiment d'accueil */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-foreground">
+                Bâtiment / Poulailler d'accueil
               </label>
-              <input
-                type="text"
-                required
-                value={flockName}
-                onChange={(e) => {
-                  setFlockName(e.target.value);
-                  if (!flockCode) {
-                    const clean = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6);
-                    if (clean) setFlockCode(`LOT-${clean}`);
-                  }
-                }}
-                placeholder="ex. Pondeuses Bâtiment A"
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
-              />
+              {buildings.length > 0 && (
+                <span className="text-[10px] text-muted">
+                  {buildings.length} bâtiment{buildings.length > 1 ? "s" : ""} disponible{buildings.length > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Code du lot *
-              </label>
-              <input
-                type="text"
-                required
-                value={flockCode}
-                onChange={(e) => setFlockCode(e.target.value.toUpperCase())}
-                placeholder="ex. LOT-2026-P01"
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
-              />
-            </div>
+            <select
+              value={selectedBuildingId}
+              onChange={(e) => setSelectedBuildingId(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
+            >
+              <option value="">-- Aucun bâtiment assigné (ou non spécifié) --</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} {b.capacity ? `(Capacité max : ${b.capacity} poules)` : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Type d'élevage
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-foreground">
+                  Type d'élevage
+                </label>
+                {activeFarm?.productionType && (
+                  <span className="text-[10px] font-semibold text-primary">
+                    Auto ({activeFarm.productionType === "BROILER" ? "Chair" : activeFarm.productionType === "LAYER" ? "Pondeuses" : "Mixte"})
+                  </span>
+                )}
+              </div>
               <select
                 value={flockType}
-                onChange={(e) => setFlockType(e.target.value as FlockType)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground"
+                onChange={(e) => {
+                  const newType = e.target.value as FlockType;
+                  setFlockType(newType);
+                  setBreed(getDefaultBreed(newType));
+                }}
+                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
               >
                 <option value="LAYER">Pondeuses (Œufs)</option>
                 <option value="BROILER">Poulets de chair (Viande)</option>
