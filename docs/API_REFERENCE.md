@@ -141,18 +141,23 @@ curl -X GET http://127.0.0.1:8000/api/farms/01M54XTKF5AB2XZA9S380QCFJY/dashboard
 - `POST /api/auth/login` : Authentification et délivrance du JWT RSA-4096.
 - `GET /api/auth/me` : Profil de l'utilisateur connecté et liste de ses exploitations avec rôles.
 
-### Module 2 : Exploitations & Bâtiments
+### Module 2 : Exploitations, Collaborateurs & Bâtiments
 - `GET /api/farms` : Liste des fermes accessibles par l'utilisateur connecté.
 - `POST /api/farms` : Création d'une nouvelle exploitation par le propriétaire (attribution automatique du rôle `OWNER` et rattachement à son organisation).
 - `GET /api/farms/{id}` : Détails d'une ferme (capacité, ville, département).
 - `PUT /api/farms/{id}` : Mise à jour des informations de l'exploitation.
+- `GET /api/farms/{id}/members` : Liste des collaborateurs et membres de l'exploitation avec leurs rôles.
+- `POST /api/farms/{id}/members` : Invitation / rattachement d'un collaborateur existant par email avec un rôle.
+- `PUT /api/farms/{id}/members/{membershipId}` : Modification du rôle ou du statut d'un collaborateur.
+- `DELETE /api/farms/{id}/members/{membershipId}` : Retrait d'un collaborateur de l'exploitation.
 - `GET /api/farms/{id}/buildings` : Liste des bâtiments et capacités.
-- `POST /api/farms/{id}/buildings` : Création d'un bâtiment (`POULTRY_HOUSE`, `FEED_STORAGE`, etc.).
+- `POST /api/farms/{id}/buildings` : Création d'un bâtiment (`POULTRY_HOUSE`, `BROODER`, `STORAGE`) avec présets et raccourcis.
 
 ### Module 3 : Bandes de Volailles & Cheptel
-- `GET /api/flocks?farmId={id}&status={status}` : Liste filtrée des bandes.
-- `POST /api/flocks` : Création d'une nouvelle bande (espèce, souche ISA Brown / Cobb 500, effectif initial, coût).
-- `GET /api/flocks/{id}` : Fiche détaillée (effectif vivant, âge en jours/semaines, taux de mortalité en %).
+- `GET /api/farms/{id}/flocks?status={status}` : Liste filtrée des bandes de l'exploitation.
+- `POST /api/farms/{id}/flocks` : Création d'une nouvelle bande (espèce, souche ISA Brown / Cobb 500, effectif initial, bâtiment d'accueil optionnel). Le code du lot (`code`) est auto-généré par le système sous format `LOT-YYYY-XXXX-NNNN`.
+- `GET /api/flocks/{id}` : Fiche détaillée (effectif vivant, âge en jours/semaines, taux de mortalité en %, mouvements).
+- `PUT /api/flocks/{id}` : Mise à jour des informations d'une bande.
 - `POST /api/flocks/{id}/movements` : Mouvement d'effectif (`MORTALITY`, `SALE`, `CULLING`, `TRANSFER`).
 
 ### Module 4 : Alimentation & Stocks
@@ -177,7 +182,7 @@ curl -X GET http://127.0.0.1:8000/api/farms/01M54XTKF5AB2XZA9S380QCFJY/dashboard
 - `GET /api/farms/{id}/dashboard` : Vue unifiée en temps réel (cheptel vivant, mortalité %, ponte du jour, alertes stock bas, santé financière avec masquage selon rôle).
 
 ### Module 8 : Clés API Développeur & Intégrations Machine
-Gestion autonome des clés API de l'exploitation (réservé aux rôles disposant de la permission `api_key:manage`).
+Gestion autonome des clés API de l'exploitation (réservé aux intégrations machine-to-machine, automates et capteurs connectés ; masqué dans l'interface de navigation éleveur pour préserver la simplicité opérationnelle). Requiert la permission `api_key:manage`.
 
 #### 8.1. Lister les clés API d'une ferme
 ```http

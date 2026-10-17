@@ -375,6 +375,28 @@ Organiser les formulaires longs en sections logiques. Ne pas créer un assistant
 
 Les suppressions et opérations irréversibles nécessitent une confirmation adaptée.
 
+### Règles ergonomiques et techniques obligatoires des formulaires :
+
+1. **Règle absolue de saisie numérique (Anti-blocage à zéro / Anti-Zero Freeze) :**
+   - Ne jamais utiliser le pattern naïf `parseInt(e.target.value) || 0` directement sur l'état d'un input contrôlé, car l'effacement du champ (`Backspace`) renvoie une chaîne vide convertie en `NaN`, qui retombe immédiatement sur `0`, emprisonnant l'utilisateur dans une valeur zéro impossible à effacer.
+   - L'état local du champ doit supporter le type `number | string` pour accepter temporairement `""` lorsque l'utilisateur efface la saisie (`val === "" ? "" : Math.max(0, parseInt(val) || 0)`).
+   - Tout champ numérique doit obligatoirement inclure l'événement `onFocus={(e) => e.target.select()}` afin que le contenu existant soit automatiquement surligné dès la sélection, permettant une réécriture instantanée sans devoir effacer manuellement.
+   - Les conversions strictes en entier (`Number(val) || 0`) sont effectuées lors de la validation finale et de la soumission du formulaire vers l'API.
+
+2. **Automatisation des identifiants techniques (Codes de lot & bandes) :**
+   - Ne jamais imposer à l'éleveur de concevoir, saisir ou voir des identifiants techniques complexes non souhaités.
+   - Les codes de bande/lot (champ `code`) doivent être générés automatiquement par l'application au format normalisé `LOT-YYYY-XXXX-NNNN` (ex: `LOT-2026-COCH-4821`).
+   - Le champ technique doit être retiré des écrans de saisie utilisateur pour alléger la charge mentale et accélérer l'enregistrement opérationnel.
+
+3. **Création contextuelle et présets d'infrastructure (Poulaillers & Bâtiments) :**
+   - Lorsqu'une action dépend d'une infrastructure existante (ex: affecter une bande à un poulailler alors qu'aucun bâtiment n'a encore été créé), ne jamais bloquer l'éleveur ni l'obliger à quitter son parcours vers les paramètres.
+   - Proposer une création instantanée via modale contextuelle dédiée (`CreateBuildingModal`), accessible directement depuis le sélecteur (`+ Nouveau poulailler` ou bannière d'alerte en 1-clic).
+   - Fournir des raccourcis intelligents : puces de suggestion de nom en 1-clic (*Poulailler 1*, *Poulailler 2*, *Bâtiment A*, *Poussinière*, etc.) et boutons de capacité rapide (`+500`, `+1 000`, `+2 000`, `+5 000` sujets).
+
+4. **Sobriété de l'interface éleveur & masquage des éléments techniques :**
+   - Les fonctionnalités d'intégration technique et d'automates machine (telles que la gestion brute des clés d'API développeur `lef_live_...`) ne doivent pas figurer dans le menu de navigation quotidien ni dans les onglets de paramétrage de base de l'exploitation.
+   - L'interface éleveur reste exclusivement dédiée à l'exploitation avicole (animaux, ponte, alimentation, finances, collaborateurs). Les routes techniques spécifiques doivent être masquées ou réservées aux administrateurs système.
+
 ## 7.4. États obligatoires
 
 Toute page connectée aux données doit gérer explicitement :

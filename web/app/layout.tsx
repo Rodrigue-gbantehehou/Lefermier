@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/context/theme-context";
 export const metadata: Metadata = {
   title: "Lefermier — Logiciel de Gestion Avicole",
   description:
-    "Solution professionnelle de gestion d'exploitations avicoles pour le Bénin et l'Afrique de l'Ouest. Suivi des bandes, ponte, stocks et finances.",
+    "Solution professionnelle de gestion d'exploitations avicoles africaine. Suivi des bandes, ponte, stocks et finances.",
   icons: {
     icon: "/favicon.ico",
   },

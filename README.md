@@ -1,6 +1,6 @@
 # 🐔 Lefermier — Logiciel de Gestion Avicole Moderne
 
-> **Solution professionnelle de pilotage d'exploitations avicoles (Poules pondeuses, Poulets de chair et Élevages mixtes) conçue pour le Bénin et l'Afrique de l'Ouest.**
+> **Solution professionnelle de pilotage d'exploitations avicoles (Poules pondeuses, Poulets de chair et Élevages mixtes) conçue africaine.**
 
 [![API Symfony](https://img.shields.io/badge/API-Symfony%208.1%20%2F%20PHP%208.4-6C5CE7?style=flat-square&logo=symfony)](https://symfony.com)
 [![Web Next.js](https://img.shields.io/badge/Web-Next.js%2016%20%2F%20React%2019-000000?style=flat-square&logo=next.js)](https://nextjs.org)

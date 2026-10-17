@@ -29,8 +29,10 @@
                                     "if (pm.response.code === 201) {",
                                     "    var json = pm.response.json();",
                                     "    pm.environment.set('jwt_token', json.data.token);",
-                                    "    pm.environment.set('farm_id', json.data.farm.id);",
-                                    "    console.log('JWT Token & Farm ID enregistrés avec succès dans l’environnement !');",
+                                    "    if (json.data.farm && json.data.farm.id) {",
+                                    "        pm.environment.set('farm_id', json.data.farm.id);",
+                                    "    }",
+                                    "    console.log('JWT Token enregistré avec succès dans l’environnement !');",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -231,6 +233,23 @@
                 },
                 {
                     "name": "Créer une exploitation",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    var json = pm.response.json();",
+                                    "    if (json.data && json.data.id) {",
+                                    "        pm.environment.set('farm_id', json.data.id);",
+                                    "        console.log('Farm ID enregistré avec succès dans l’environnement !');",
+                                    "    }",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
                         "header": [
@@ -248,9 +267,9 @@
                             "raw": "{\n    \"name\": \"Ferme Avicole Calavi 2\",\n    \"productionType\": \"LAYER\",\n    \"locationCity\": \"Calavi\",\n    \"code\": \"FRM-CAL2\",\n    \"currency\": \"XOF\"\n}"
                         },
                         "url": {
-                            "raw": "{{base_url}}/api/farms",
+                            "raw": "{{baseUrl}}/api/farms",
                             "host": [
-                                "{{base_url}}"
+                                "{{baseUrl}}"
                             ],
                             "path": [
                                 "api",

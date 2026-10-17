@@ -1374,7 +1374,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Compte et exploitation créés avec succès",
+                        "description": "Compte utilisateur créé avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {

@@ -67,7 +67,7 @@ export default function LoginPage() {
             Lefermier
           </h1>
           <p className="mt-1 text-xs text-muted">
-            Logiciel de gestion avicole pour le Bénin et l'Afrique de l'Ouest
+            Logiciel de gestion avicole africaine
           </p>
         </div>
 
@@ -141,15 +141,6 @@ export default function LoginPage() {
           </form>
 
           {/* Quick Demo Credentials Helper */}
-          <div className="mt-5 border-t border-border pt-4 text-center">
-            <button
-              type="button"
-              onClick={handleDemoFill}
-              className="text-xs font-semibold text-accent hover:underline"
-            >
-              💡 Remplir avec le compte de test d'agence
-            </button>
-          </div>
 
           <div className="mt-5 text-center text-xs text-muted">
             Pas encore de compte ?{" "}
