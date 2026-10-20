@@ -156,9 +156,10 @@ export default function FlocksPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-foreground">{flock.name}</span>
-            <Badge variant={flock.status === "ACTIVE" ? "success" : "neutral"} size="sm" dot>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <span className={`h-1.5 w-1.5 rounded-full ${flock.status === "ACTIVE" ? "bg-success" : "bg-muted"}`} />
               {flock.status === "ACTIVE" ? "Actif" : "Clôturé"}
-            </Badge>
+            </span>
           </div>
           {flock.code && <span className="text-[10px] font-mono text-muted">{flock.code}</span>}
         </div>
@@ -169,22 +170,13 @@ export default function FlocksPage() {
       header: "Type d'élevage",
       sortable: true,
       cell: (flock) => (
-        <Badge
-          variant={
-            flock.type === "LAYER"
-              ? "warning"
-              : flock.type === "BROILER"
-              ? "default"
-              : "neutral"
-          }
-          size="sm"
-        >
+        <span className="text-xs font-medium text-foreground">
           {flock.type === "LAYER"
             ? "Pondeuses"
             : flock.type === "BROILER"
             ? "Chair"
             : "Mixte"}
-        </Badge>
+        </span>
       ),
     },
     {

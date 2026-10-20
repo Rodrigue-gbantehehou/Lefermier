@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Bird,
   Egg,
+  HeartPulse,
   Package,
   Wallet,
   ShieldCheck,
@@ -44,6 +45,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/eggs",
       icon: Egg,
       show: hasPermission("egg:read"),
+    },
+    {
+      name: "Santé & Vaccins",
+      href: "/health",
+      icon: HeartPulse,
+      show: true,
     },
     {
       name: "Stocks & Aliments",

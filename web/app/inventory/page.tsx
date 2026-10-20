@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { Plus, Package, AlertTriangle, Filter } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAuth } from "@/context/auth-context";
@@ -258,16 +257,7 @@ export default function InventoryPage() {
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        <Badge
-                          variant={
-                            item.category === "FEED"
-                              ? "default"
-                              : item.category === "VACCINE"
-                              ? "info"
-                              : "neutral"
-                          }
-                          size="sm"
-                        >
+                        <span className="text-xs font-medium text-foreground">
                           {item.category === "FEED"
                             ? "Aliment"
                             : item.category === "VACCINE"
@@ -275,12 +265,12 @@ export default function InventoryPage() {
                             : item.category === "MEDICINE"
                             ? "Médicament"
                             : item.category}
-                        </Badge>
+                        </span>
                       </td>
                       <td className="py-3 px-3">
-                        <Badge variant="neutral" size="sm">
+                        <span className="text-xs font-mono text-muted">
                           {getUnitLabel(item.unit)}
-                        </Badge>
+                        </span>
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-muted">
                         {formatInventoryUnit(item.minThreshold, item.unit, { short: true })}

@@ -178,10 +178,19 @@ curl -X GET http://127.0.0.1:8000/api/farms/01M54XTKF5AB2XZA9S380QCFJY/dashboard
 - `GET /api/flocks/{id}/transactions` : Calcul de rentabilité et marge brute d'une bande en FCFA.
 - `GET /api/farms/{id}/financial-summary` : Trésorerie nette et ventilation recettes/dépenses de l'exploitation.
 
-### Module 7 : Tableau de Bord & Indicateurs Décisionnels (KPI)
+### Module 7 : Santé Animale, Soins & Calendrier Prophylactique
+- `GET /api/farms/{id}/health-treatments` : Calendrier vaccinal et suivi des soins avec filtres (`flockId`, `status`, `from`, `to`).
+- `POST /api/farms/{id}/health-treatments` : Planification d'une intervention vétérinaire (vaccin, déparasitage, traitement, vitamines).
+- `POST /api/farms/{id}/health-treatments/generate-program` : Génération automatique 1-clic du programme prophylactique officiel selon l'espèce (chair ou pondeuse).
+- `GET /api/health-treatments/{id}` : Consultation détaillée d'un soin.
+- `PUT /api/health-treatments/{id}` : Modification d'une intervention planifiée.
+- `POST /api/health-treatments/{id}/complete` : Validation de l'administration du soin avec date réelle, déduction automatique de stock et coût engagé en FCFA.
+- `DELETE /api/health-treatments/{id}` : Suppression d'une intervention.
+
+### Module 8 : Tableau de Bord & Indicateurs Décisionnels (KPI)
 - `GET /api/farms/{id}/dashboard` : Vue unifiée en temps réel (cheptel vivant, mortalité %, ponte du jour, alertes stock bas, santé financière avec masquage selon rôle).
 
-### Module 8 : Clés API Développeur & Intégrations Machine
+### Module 9 : Clés API Développeur & Intégrations Machine
 Gestion autonome des clés API de l'exploitation (réservé aux intégrations machine-to-machine, automates et capteurs connectés ; masqué dans l'interface de navigation éleveur pour préserver la simplicité opérationnelle). Requiert la permission `api_key:manage`.
 
 #### 8.1. Lister les clés API d'une ferme

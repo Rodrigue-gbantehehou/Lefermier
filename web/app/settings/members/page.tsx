@@ -15,7 +15,6 @@ import {
   Lock,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -374,12 +373,14 @@ export default function MembersManagementPage() {
 
                       {/* Statut */}
                       <td className="py-3 px-3">
-                        <Badge
-                          variant={m.isActive ? "success" : "danger"}
-                          size="sm"
-                        >
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              m.isActive ? "bg-success" : "bg-danger"
+                            }`}
+                          />
                           {m.isActive ? "Actif" : "Suspendu"}
-                        </Badge>
+                        </span>
                       </td>
 
                       {/* Date de création */}

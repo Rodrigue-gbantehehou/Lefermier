@@ -44,6 +44,10 @@ final class Permission
     public const DASHBOARD_VIEW = 'dashboard:view';
     public const DASHBOARD_FINANCIALS = 'dashboard:financials';
 
+    // Santé & Prophylaxie
+    public const HEALTH_VIEW = 'health:view';
+    public const HEALTH_MANAGE = 'health:manage';
+
     // Clés API & Intégrations
     public const API_KEY_MANAGE = 'api_key:manage';
 
@@ -159,6 +163,16 @@ final class Permission
                 'module' => 'Tableau de Bord',
                 'label' => 'Voir les KPI financiers',
                 'description' => 'Afficher la trésorerie et bénéfices sur le dashboard',
+            ],
+            self::HEALTH_VIEW => [
+                'module' => 'Santé & Prophylaxie',
+                'label' => 'Consulter les soins & vaccins',
+                'description' => 'Visualiser le calendrier vaccinal et historique des soins',
+            ],
+            self::HEALTH_MANAGE => [
+                'module' => 'Santé & Prophylaxie',
+                'label' => 'Gérer les soins & vaccins',
+                'description' => 'Planifier, administrer des soins et générer le calendrier',
             ],
             self::API_KEY_MANAGE => [
                 'module' => 'Intégrations & IoT',

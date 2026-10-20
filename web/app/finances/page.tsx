@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Filter } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
@@ -119,9 +118,10 @@ export default function FinancesPage() {
       cell: (tx) => {
         const isIncome = tx.type === "INCOME";
         return (
-          <Badge variant={isIncome ? "success" : "danger"} size="sm">
+          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${isIncome ? "bg-success" : "bg-danger"}`} />
             {isIncome ? "Recette" : "Dépense"}
-          </Badge>
+          </span>
         );
       },
     },
@@ -139,12 +139,11 @@ export default function FinancesPage() {
       cell: (tx) => {
         const method = paymentMethodLabels[tx.paymentMethod] || {
           label: tx.paymentMethod,
-          badge: "neutral" as const,
         };
         return (
-          <Badge variant={method.badge} size="sm">
+          <span className="text-xs font-medium text-muted">
             {method.label}
-          </Badge>
+          </span>
         );
       },
     },

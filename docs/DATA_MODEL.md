@@ -380,7 +380,41 @@ Permet le suivi global de la rentabilité de l'exploitation ainsi que le calcul 
 
 ---
 
-## 7. Tableau de Bord & Indicateurs KPI (`Dashboard`)
+## 7. Module Santé Animale, Vaccins & Prophylaxie (`HealthTreatment`)
+
+### 7.1. HealthTreatment (`health_treatments`)
+Représente une intervention sanitaire préventive ou curative (vaccination, déparasitage, traitement anticoccidien, cure de vitamines) planifiée ou administrée à une bande de volailles.
+
+| Champ | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | `ulid` | PK | Identifiant unique universel |
+| `farm_id` | `ulid` | FK (farms.id), NOT NULL, ON DELETE CASCADE | Exploitation de rattachement |
+| `flock_id` | `ulid` | FK (flocks.id), NOT NULL, ON DELETE CASCADE | Bande de volailles ciblée |
+| `inventory_item_id` | `ulid` | FK (inventory_items.id), NULL, ON DELETE SET NULL | Médicament / vaccin du magasin déduit |
+| `recorded_by_id` | `ulid` | FK (users.id), NULL, ON DELETE SET NULL | Utilisateur ayant validé le soin |
+| `title` | `VARCHAR(150)` | NOT NULL | Nom de l'intervention (ex: "Vaccin Gumboro J7") |
+| `type` | `VARCHAR(30)` | NOT NULL | `VACCINATION`, `TREATMENT`, `DEWORMING`, `VITAMIN`, `DISINFECTION`, `OTHER` |
+| `administration_method` | `VARCHAR(30)` | NOT NULL | `DRINKING_WATER`, `INJECTION`, `OCULAR_NASAL`, `SPRAY`, `FEED`, `TOPICAL`, `OTHER` |
+| `target_age_days` | `INT` | NOT NULL | Âge théorique en jours des volailles au moment du soin |
+| `scheduled_date` | `DATE_IMMUTABLE` | NOT NULL | Date prévisionnelle d'administration |
+| `administered_date` | `DATE_IMMUTABLE` | NULL | Date effective de réalisation du soin |
+| `status` | `VARCHAR(30)` | NOT NULL, DEFAULT 'SCHEDULED' | `SCHEDULED`, `COMPLETED`, `CANCELLED`, `MISSED` |
+| `quantity_used` | `DECIMAL(10,2)` | NULL | Doses ou volume consommés (flacons, ml, g) |
+| `cost_fcfa` | `INT` | NULL | Coût total engagé en FCFA |
+| `veterinarian` | `VARCHAR(100)` | NULL | Nom du vétérinaire ou agent vaccinateur |
+| `notes` | `TEXT` | NULL | Numéro de lot du vaccin, posologie, observations |
+| `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de planification |
+| `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Dernière mise à jour |
+
+**Index de performance :**
+- `INDEX idx_health_farm (farm_id)`
+- `INDEX idx_health_flock (flock_id)`
+- `INDEX idx_health_scheduled_date (scheduled_date)`
+- `INDEX idx_health_status (status)`
+
+---
+
+## 8. Tableau de Bord & Indicateurs KPI (`Dashboard`)
 
 Point d'entrée analytique consolidé (`GET /api/farms/{id}/dashboard`), calculé à la volée côté serveur pour garantir une restitution instantanée sans déphasage de données.
 

@@ -172,6 +172,15 @@ X-API-KEY: lef_live_<token_securise>
 - `GET /api/flocks/{id}/transactions` : Marge brute et rentabilité par lot en FCFA (`finance:margin`).
 - `GET /api/farms/{id}/financial-summary` : Synthèse globale recettes/dépenses/trésorerie nette (`finance:view`).
 
+### Santé Animale & Prophylaxie (`/api/farms/{id}/health-treatments`)
+- `GET /api/farms/{id}/health-treatments` : Calendrier vaccinal et liste des soins avec filtres (`flockId`, `status`, `from`, `to`) (`health:view`).
+- `POST /api/farms/{id}/health-treatments` : Planification d'une intervention vétérinaire (vaccin, déparasitage, traitement, vitamines) (`health:manage`).
+- `POST /api/farms/{id}/health-treatments/generate-program` : Génération automatique du programme vaccinal officiel en 1-clic selon l'espèce (chair ou pondeuse) (`health:manage`).
+- `GET /api/health-treatments/{id}` : Consultation détaillée d'un soin (`health:view`).
+- `PUT /api/health-treatments/{id}` : Modification d'une intervention planifiée (`health:manage`).
+- `POST /api/health-treatments/{id}/complete` : Validation de l'administration du soin avec date réelle, déduction optionnelle de stock et coût engagé (`health:manage`).
+- `DELETE /api/health-treatments/{id}` : Suppression d'une intervention (`health:manage`).
+
 ### Tableau de Bord & Indicateurs KPI (`/api/farms/{id}/dashboard`)
 - `GET /api/farms/{id}/dashboard` : Vue unifiée en temps réel (cheptel vivant, taux de mortalité %, production du jour en plateaux, alertes stock bas, santé financière conditionnée au rôle) (`dashboard:view`).
 

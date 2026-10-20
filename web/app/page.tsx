@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { CreateFarmModal } from "@/components/farms/create-farm-modal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -331,22 +330,13 @@ export default function DashboardPage() {
       header: "Type d'élevage",
       sortable: true,
       cell: (f) => (
-        <Badge
-          variant={
-            f.type === "LAYER"
-              ? "warning"
-              : f.type === "BROILER"
-              ? "default"
-              : "neutral"
-          }
-          size="sm"
-        >
+        <span className="text-xs font-medium text-foreground">
           {f.type === "LAYER"
             ? "Pondeuses"
             : f.type === "BROILER"
             ? "Chair"
             : "Mixte"}
-        </Badge>
+        </span>
       ),
     },
     {
@@ -795,9 +785,9 @@ export default function DashboardPage() {
                             )}
                           </td>
                           <td className="py-3 px-3 text-muted">
-                            <Badge variant="neutral" size="sm">
+                            <span className="text-xs font-medium text-muted">
                               {paymentLabels[tx.paymentMethod] || tx.paymentMethod}
-                            </Badge>
+                            </span>
                           </td>
                           <td
                             className={`py-3 px-3 text-right font-mono font-bold whitespace-nowrap ${
@@ -905,9 +895,9 @@ export default function DashboardPage() {
                           {item.name}
                         </td>
                         <td className="py-3 px-3 text-muted">
-                          <Badge variant="neutral" size="sm">
+                          <span className="text-xs font-medium text-muted">
                             {categoryLabels[item.category] || item.category}
-                          </Badge>
+                          </span>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-bold text-danger">
                           {formatInventoryUnit(item.currentStock, item.unit)}
@@ -916,9 +906,10 @@ export default function DashboardPage() {
                           {formatInventoryUnit(item.minThreshold, item.unit, { short: true })}
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <Badge variant="danger" size="sm" dot>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-danger">
+                            <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
                             Commander d'urgence
-                          </Badge>
+                          </span>
                         </td>
                       </tr>
                     ))}

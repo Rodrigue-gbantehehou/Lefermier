@@ -234,3 +234,69 @@ export interface DeveloperApiKey {
   createdAt: string;
   rawKey?: string; // only present upon creation
 }
+
+/**
+ * Health & Prophylaxis types
+ */
+export type HealthTreatmentType =
+  | "VACCINATION"
+  | "TREATMENT"
+  | "DEWORMING"
+  | "VITAMIN"
+  | "DISINFECTION"
+  | "OTHER";
+
+export type AdministrationMethod =
+  | "DRINKING_WATER"
+  | "INJECTION"
+  | "OCULAR_NASAL"
+  | "SPRAY"
+  | "FEED"
+  | "TOPICAL"
+  | "OTHER";
+
+export type HealthTreatmentStatus =
+  | "SCHEDULED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "MISSED";
+
+export interface HealthTreatment {
+  id: string;
+  title: string;
+  type: HealthTreatmentType;
+  typeLabel: string;
+  administrationMethod: AdministrationMethod;
+  administrationMethodLabel: string;
+  targetAgeDays: number;
+  scheduledDate: string;
+  administeredDate?: string | null;
+  status: HealthTreatmentStatus;
+  statusLabel: string;
+  isOverdue: boolean;
+  quantityUsed?: string | null;
+  costFcfa?: number | null;
+  veterinarian?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  flock: {
+    id: string;
+    code: string;
+    name: string;
+    poultryType: string;
+    currentQuantity: number;
+    currentAgeDays: number;
+  };
+  inventoryItem?: {
+    id: string;
+    name: string;
+    category: string;
+    unit: string;
+    unitPrice?: number | null;
+  } | null;
+  recordedBy?: {
+    id: string;
+    fullName: string;
+  } | null;
+}
