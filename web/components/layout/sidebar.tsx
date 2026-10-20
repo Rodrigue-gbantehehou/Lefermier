@@ -10,6 +10,7 @@ import {
   HeartPulse,
   Package,
   Wallet,
+  ContactRound,
   ShieldCheck,
   Users,
   X,
@@ -63,6 +64,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/finances",
       icon: Wallet,
       show: hasPermission("finance:read"),
+    },
+    {
+      name: "Contacts & Tiers",
+      href: "/contacts",
+      icon: ContactRound,
+      show: hasPermission("contact:read") || hasPermission("contact:view"),
     },
     
     {

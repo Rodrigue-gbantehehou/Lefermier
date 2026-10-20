@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Dto\Building\CreateBuildingRequestDto;
+use App\Dto\Building\UpdateBuildingRequestDto;
 use App\Dto\Farm\CreateFarmRequestDto;
 use App\Dto\Farm\UpdateFarmRequestDto;
 use App\Entity\Building;
@@ -17,7 +18,9 @@ use App\Repository\BuildingRepository;
 use App\Repository\FarmRepository;
 use App\Repository\OrganizationRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\Uid\Ulid;
 
 class FarmService
 {
@@ -124,14 +127,68 @@ class FarmService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function getBuildingsForFarm(Farm $farm): array
+    public function getBuildingsForFarm(Farm $farm, bool $onlyActive = false): array
     {
+        $criteria = ['farm' => $farm];
+        if ($onlyActive) {
+            $criteria['isActive'] = true;
+        }
+
         $buildings = $this->buildingRepository->findBy(
-            ['farm' => $farm, 'isActive' => true],
+            $criteria,
             ['name' => 'ASC']
         );
 
         return array_map([$this, 'serializeBuilding'], $buildings);
+    }
+
+    public function updateBuilding(Building $building, UpdateBuildingRequestDto $dto): Building
+    {
+        if ($dto->name !== null) {
+            $building->setName(trim($dto->name));
+        }
+        if ($dto->type !== null) {
+            $building->setType($dto->type);
+        }
+        if ($dto->capacity !== null) {
+            $building->setCapacity($dto->capacity);
+        }
+        if ($dto->surfaceArea !== null) {
+            $building->setSurfaceArea((string) $dto->surfaceArea);
+        }
+        if ($dto->isActive !== null) {
+            $building->setIsActive($dto->isActive);
+        }
+
+        $this->entityManager->flush();
+
+        return $building;
+    }
+
+    public function deleteBuilding(Building $building): void
+    {
+        $this->entityManager->remove($building);
+        $this->entityManager->flush();
+    }
+
+    public function getBuildingInFarm(Farm $farm, string $buildingId): Building
+    {
+        try {
+            $ulid = Ulid::fromString($buildingId);
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException('Bâtiment introuvable.');
+        }
+
+        $building = $this->buildingRepository->findOneBy([
+            'id' => $ulid,
+            'farm' => $farm,
+        ]);
+
+        if ($building === null) {
+            throw new NotFoundHttpException('Bâtiment introuvable pour cette ferme.');
+        }
+
+        return $building;
     }
 
     /**

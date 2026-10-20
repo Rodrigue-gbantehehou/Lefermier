@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Bird, Calendar, Warehouse } from "lucide-react";
+import Link from "next/link";
+import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -155,7 +156,13 @@ export default function FlocksPage() {
       cell: (flock) => (
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-foreground">{flock.name}</span>
+            <Link
+              href={`/flocks/${flock.id}`}
+              className="font-bold text-foreground hover:text-primary hover:underline transition-colors flex items-center gap-1.5"
+            >
+              {flock.name}
+              <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Link>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span className={`h-1.5 w-1.5 rounded-full ${flock.status === "ACTIVE" ? "bg-success" : "bg-muted"}`} />
               {flock.status === "ACTIVE" ? "Actif" : "Clôturé"}
@@ -256,20 +263,30 @@ export default function FlocksPage() {
       key: "actions",
       header: "Action",
       align: "right",
-      cell: (flock) =>
-        hasPermission("flock:update") && flock.status === "ACTIVE" ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveFlock(flock);
-              setMovementModalOpen(true);
-            }}
-            className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:opacity-90 transition-opacity"
+      cell: (flock) => (
+        <div className="flex items-center justify-end gap-1.5">
+          <Link
+            href={`/flocks/${flock.id}`}
+            className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover hover:border-primary/40 transition-colors inline-flex items-center gap-1"
           >
-            + Noter perte ou vente
-          </button>
-        ) : null,
+            <Eye className="h-3 w-3 text-muted" />
+            Fiche
+          </Link>
+          {hasPermission("flock:update") && flock.status === "ACTIVE" ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveFlock(flock);
+                setMovementModalOpen(true);
+              }}
+              className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:opacity-90 transition-opacity"
+            >
+              + Noter perte ou vente
+            </button>
+          ) : null}
+        </div>
+      ),
     },
   ];
 
@@ -393,9 +410,12 @@ export default function FlocksPage() {
 
                 {/* Card Action */}
                 <div className="mt-5 pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-[11px] text-muted">
-                    Départ : {formatNumber(flock.initialQuantity)} poules
-                  </span>
+                  <Link
+                    href={`/flocks/${flock.id}`}
+                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    Voir la fiche complète →
+                  </Link>
                   {hasPermission("flock:update") && flock.status === "ACTIVE" && (
                     <button
                       type="button"
@@ -405,7 +425,7 @@ export default function FlocksPage() {
                       }}
                       className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:opacity-90 transition-opacity"
                     >
-                      + Noter perte ou vente
+                      + Sortie
                     </button>
                   )}
                 </div>

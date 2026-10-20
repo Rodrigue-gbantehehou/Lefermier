@@ -92,17 +92,23 @@ export interface Flock {
   name: string;
   type: FlockType;
   breed: string;
+  strain?: string | null;
   initialQuantity: number;
   currentQuantity: number;
+  initialAgeDays?: number;
+  ageInDays?: number;
+  ageInWeeks?: number;
   startDate: string;
   expectedEndDate?: string | null;
+  actualEndDate?: string | null;
   status: FlockStatus;
   notes?: string | null;
   mortalityCount?: number;
   mortalityRate?: number;
+  movements?: FlockMovement[];
 }
 
-export type MovementType = "MORTALITY" | "SALE" | "CULL" | "TRANSFER";
+export type MovementType = "MORTALITY" | "SALE" | "CULL" | "TRANSFER" | "ADJUSTMENT";
 
 export interface FlockMovement {
   id: string;
@@ -112,6 +118,7 @@ export interface FlockMovement {
   date: string;
   reason?: string | null;
   notes?: string | null;
+  recordedBy?: string | null;
   createdAt: string;
 }
 
@@ -157,6 +164,8 @@ export interface InventoryItem {
   unitCostFcfa: number;
   totalValueFcfa?: number;
   isLowStock?: boolean;
+  notes?: string | null;
+  isActive?: boolean;
 }
 
 export interface StockMovement {
@@ -169,9 +178,32 @@ export interface StockMovement {
   unitLabel?: string;
   unitShortLabel?: string;
   unitPriceFcfa: number;
+  totalCostFcfa?: number;
   reason?: string | null;
   date: string;
+  flock?: { id: string; code: string; name: string } | null;
+  recordedBy?: { id: string; name: string } | null;
   createdAt: string;
+}
+
+/**
+ * Contacts & Tiers (Clients, Fournisseurs, Vétérinaires, Revendeuses)
+ */
+export type ContactType = "CLIENT" | "SUPPLIER" | "BOTH";
+
+export interface Contact {
+  id: string;
+  farmId: string;
+  name: string;
+  type: ContactType;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 /**
@@ -191,6 +223,13 @@ export interface Transaction {
   farmId: string;
   flockId?: string | null;
   flockName?: string | null;
+  contactId?: string | null;
+  contact?: {
+    id: string;
+    name: string;
+    type: ContactType;
+    phone?: string | null;
+  } | null;
   type: TransactionType;
   category: string;
   amountFcfa: number;

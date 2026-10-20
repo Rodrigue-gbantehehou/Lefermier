@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "egg:read", "egg:create", "egg:delete", "egg:view",
         "inventory:read", "inventory:create", "inventory:update", "inventory:delete", "inventory:view", "inventory:movement", "inventory:valuation",
         "finance:read", "finance:create", "finance:delete", "finance:view", "finance:margin",
+        "contact:read", "contact:create", "contact:update", "contact:delete", "contact:view",
         "role:read", "role:create", "role:update", "role:manage",
         "member:manage", "member:read", "member:create", "member:update", "member:delete",
         "dashboard:view", "dashboard:financials",

@@ -13,6 +13,11 @@ import {
   Layers,
   Sparkles,
   Settings,
+  Edit2,
+  Archive,
+  RotateCcw,
+  Trash2,
+  Filter,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Modal } from "@/components/ui/modal";
@@ -20,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
 import { CreateBuildingModal } from "@/components/farms/create-building-modal";
+import { EditBuildingModal } from "@/components/farms/edit-building-modal";
 import { formatNumber, formatDate } from "@/lib/utils";
 
 interface BuildingItem {
@@ -49,8 +55,11 @@ export default function FarmSettingsPage() {
   const [buildings, setBuildings] = useState<BuildingItem[]>([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
 
-  // Add Building Modal
+  // Add & Edit Building Modal
   const [buildingModalOpen, setBuildingModalOpen] = useState(false);
+  const [editingBuilding, setEditingBuilding] = useState<BuildingItem | null>(null);
+  const [editBuildingModalOpen, setEditBuildingModalOpen] = useState(false);
+  const [buildingFilter, setBuildingFilter] = useState<"ACTIVE" | "ARCHIVED" | "ALL">("ACTIVE");
 
   // Sync form with active farm
   useEffect(() => {
@@ -73,6 +82,18 @@ export default function FarmSettingsPage() {
       console.warn("Impossible de charger les bâtiments:", err);
     } finally {
       setLoadingBuildings(false);
+    }
+  }
+
+  async function handleQuickToggleArchive(b: BuildingItem) {
+    if (!activeFarm?.id) return;
+    try {
+      await api.farms.updateBuilding(activeFarm.id, b.id, {
+        isActive: !b.isActive,
+      });
+      await loadBuildings(activeFarm.id);
+    } catch (err: any) {
+      alert(err?.message || "Erreur lors du changement de statut d'archivage.");
     }
   }
 
@@ -105,7 +126,15 @@ export default function FarmSettingsPage() {
 
 
 
-  const totalCapacity = buildings.reduce((sum, b) => sum + (b.capacity || 0), 0);
+  const activeBuildings = buildings.filter((b) => b.isActive !== false);
+  const archivedBuildings = buildings.filter((b) => b.isActive === false);
+  const totalActiveCapacity = activeBuildings.reduce((sum, b) => sum + (b.capacity || 0), 0);
+
+  const displayedBuildings = buildings.filter((b) => {
+    if (buildingFilter === "ACTIVE") return b.isActive !== false;
+    if (buildingFilter === "ARCHIVED") return b.isActive === false;
+    return true;
+  });
 
   const buildingTypeLabels: Record<string, { label: string; variant: "default" | "success" | "warning" | "neutral" }> = {
     POULTRY_HOUSE: { label: "Poulailler", variant: "default" },
@@ -310,17 +339,54 @@ export default function FarmSettingsPage() {
               {/* Synthèse capacité */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="rounded-xl border border-border bg-surface-muted p-3">
-                  <span className="text-[11px] text-muted block">Capacité totale</span>
+                  <span className="text-[11px] text-muted block">Capacité active</span>
                   <span className="text-base font-extrabold text-foreground font-mono">
-                    {formatNumber(totalCapacity)} <span className="text-xs font-normal text-muted">sujets</span>
+                    {formatNumber(totalActiveCapacity)} <span className="text-xs font-normal text-muted">sujets</span>
                   </span>
                 </div>
                 <div className="rounded-xl border border-border bg-surface-muted p-3">
-                  <span className="text-[11px] text-muted block">Infrastructures</span>
+                  <span className="text-[11px] text-muted block">Poulaillers actifs</span>
                   <span className="text-base font-extrabold text-foreground font-mono">
-                    {buildings.length} <span className="text-xs font-normal text-muted">bâtiment(s)</span>
+                    {activeBuildings.length} <span className="text-xs font-normal text-muted">/ {buildings.length} total</span>
                   </span>
                 </div>
+              </div>
+
+              {/* Onglets de filtrage Actifs / Archivés */}
+              <div className="flex items-center gap-1.5 mb-3 border-b border-border pb-2.5">
+                <button
+                  type="button"
+                  onClick={() => setBuildingFilter("ACTIVE")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    buildingFilter === "ACTIVE"
+                      ? "bg-primary text-white"
+                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  Actifs ({activeBuildings.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBuildingFilter("ARCHIVED")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    buildingFilter === "ARCHIVED"
+                      ? "bg-warning text-white"
+                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  Archivés ({archivedBuildings.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBuildingFilter("ALL")}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    buildingFilter === "ALL"
+                      ? "bg-surface-hover text-foreground font-bold"
+                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  Tous ({buildings.length})
+                </button>
               </div>
 
               {/* Liste des bâtiments */}
@@ -328,33 +394,52 @@ export default function FarmSettingsPage() {
                 <div className="py-8 text-center text-xs text-muted">
                   Chargement des bâtiments...
                 </div>
-              ) : buildings.length === 0 ? (
+              ) : displayedBuildings.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border p-6 text-center">
                   <Warehouse className="mx-auto h-8 w-8 text-muted mb-2" />
-                  <p className="text-xs font-bold text-foreground">Aucun bâtiment configuré</p>
-                  <p className="mt-1 text-[11px] text-muted">
-                    Ajoutez vos poulaillers pour organiser vos bandes de volailles.
+                  <p className="text-xs font-bold text-foreground">
+                    {buildingFilter === "ARCHIVED"
+                      ? "Aucun bâtiment archivé"
+                      : "Aucun bâtiment configuré"}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setBuildingModalOpen(true)}
-                    className="mt-3 inline-flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Créer le premier bâtiment</span>
-                  </button>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {buildingFilter === "ARCHIVED"
+                      ? "Tous vos poulaillers sont actuellement actifs."
+                      : "Ajoutez vos poulaillers pour organiser vos bandes de volailles."}
+                  </p>
+                  {buildingFilter !== "ARCHIVED" && (
+                    <button
+                      type="button"
+                      onClick={() => setBuildingModalOpen(true)}
+                      className="mt-3 inline-flex items-center gap-1 rounded-xl bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Créer le premier bâtiment</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                  {buildings.map((b) => {
+                  {displayedBuildings.map((b) => {
                     const badgeInfo = buildingTypeLabels[b.type] || { label: b.type, variant: "neutral" };
                     return (
                       <div
                         key={b.id}
-                        className="flex items-center justify-between rounded-xl border border-border bg-surface-muted p-3 hover:bg-surface-hover transition-colors"
+                        className={`flex items-center justify-between rounded-xl border p-3 transition-colors ${
+                          b.isActive !== false
+                            ? "border-border bg-surface-muted hover:bg-surface-hover"
+                            : "border-warning/30 bg-warning/5 opacity-80"
+                        }`}
                       >
-                        <div>
-                          <div className="font-bold text-xs text-foreground">{b.name}</div>
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-foreground truncate">{b.name}</span>
+                            {b.isActive === false && (
+                              <Badge variant="neutral" size="sm">
+                                Archivé
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant={badgeInfo.variant} size="sm">
                               {badgeInfo.label}
@@ -367,11 +452,43 @@ export default function FarmSettingsPage() {
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-primary font-mono block">
-                            {formatNumber(b.capacity)}
-                          </span>
-                          <span className="text-[10px] text-muted">places</span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <span className="text-xs font-bold text-primary font-mono block">
+                              {formatNumber(b.capacity)}
+                            </span>
+                            <span className="text-[10px] text-muted">places</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingBuilding(b);
+                                setEditBuildingModalOpen(true);
+                              }}
+                              title="Modifier ou ajuster la capacité"
+                              className="rounded-lg border border-border bg-surface p-1.5 text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickToggleArchive(b)}
+                              title={b.isActive !== false ? "Archiver ce bâtiment" : "Restaurer ce bâtiment"}
+                              className={`rounded-lg border border-border bg-surface p-1.5 transition-colors ${
+                                b.isActive !== false
+                                  ? "text-muted hover:text-warning hover:bg-warning-soft"
+                                  : "text-muted hover:text-success hover:bg-success-soft"
+                              }`}
+                            >
+                              {b.isActive !== false ? (
+                                <Archive className="h-3.5 w-3.5" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -388,6 +505,21 @@ export default function FarmSettingsPage() {
         isOpen={buildingModalOpen}
         onClose={() => setBuildingModalOpen(false)}
         suggestedName={`Poulailler ${buildings.length + 1}`}
+        onSuccess={async () => {
+          if (activeFarm?.id) {
+            await loadBuildings(activeFarm.id);
+          }
+        }}
+      />
+
+      {/* MODAL MODIFICATION / AJUSTEMENT DE CAPACITÉ BÂTIMENT */}
+      <EditBuildingModal
+        isOpen={editBuildingModalOpen}
+        onClose={() => {
+          setEditBuildingModalOpen(false);
+          setEditingBuilding(null);
+        }}
+        building={editingBuilding}
         onSuccess={async () => {
           if (activeFarm?.id) {
             await loadBuildings(activeFarm.id);

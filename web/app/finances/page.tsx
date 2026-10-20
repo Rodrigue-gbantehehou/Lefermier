@@ -9,13 +9,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
-import { Transaction, TransactionType, PaymentMethod } from "@/lib/types";
+import { Transaction, TransactionType, PaymentMethod, Contact } from "@/lib/types";
 import { formatFcfa, formatDate } from "@/lib/utils";
 
 export default function FinancesPage() {
   const { activeFarm, hasPermission } = useAuth();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -24,6 +25,7 @@ export default function FinancesPage() {
   const [type, setType] = useState<TransactionType>("INCOME");
   const [amountFcfa, setAmountFcfa] = useState<number | string>(0);
   const [category, setCategory] = useState("Vente Oeufs");
+  const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,8 +45,12 @@ export default function FinancesPage() {
   async function loadTransactions() {
     setIsLoading(true);
     try {
-      const data = await api.finance.listTransactions({ farmId: activeFarm?.id });
-      setTransactions(data);
+      const [txData, contactsData] = await Promise.all([
+        api.finance.listTransactions({ farmId: activeFarm?.id }),
+        activeFarm?.id ? api.contacts.list({ farmId: activeFarm.id, onlyActive: true }).catch(() => []) : Promise.resolve([]),
+      ]);
+      setTransactions(txData);
+      setContacts(contactsData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -65,12 +71,14 @@ export default function FinancesPage() {
         paymentMethod,
         reference: reference || undefined,
         notes: notes || undefined,
+        contactId: selectedContactId || undefined,
         date: txDate,
       });
       setModalOpen(false);
       setAmountFcfa(0);
       setReference("");
       setNotes("");
+      setSelectedContactId("");
       await loadTransactions();
     } catch (err: any) {
       alert(err?.message || "Erreur lors de la création de la transaction");
@@ -149,10 +157,23 @@ export default function FinancesPage() {
     },
     {
       key: "reference",
-      header: "Référence / Tiers",
+      header: "Tiers & Référence",
       sortable: true,
-      accessor: (tx) => tx.notes || tx.reference || "-",
-      cell: (tx) => <span className="text-muted">{tx.notes || tx.reference || "-"}</span>,
+      cell: (tx) => (
+        <div className="flex flex-col text-xs">
+          {tx.contact?.name ? (
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${tx.contact.type === "CLIENT" ? "bg-success" : "bg-info"}`} />
+              {tx.contact.name}
+            </span>
+          ) : (
+            <span className="text-muted italic">Sans tiers</span>
+          )}
+          {(tx.notes || tx.reference) && (
+            <span className="text-muted truncate max-w-[200px]">{tx.notes || tx.reference}</span>
+          )}
+        </div>
+      ),
     },
     {
       key: "amountFcfa",
@@ -411,14 +432,47 @@ export default function FinancesPage() {
           </div>
 
           <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-foreground">
+                Tiers associé ({type === "INCOME" ? "Client / Acheteur" : "Fournisseur"})
+              </label>
+              <a
+                href="/contacts"
+                target="_blank"
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                + Gérer les contacts
+              </a>
+            </div>
+            <select
+              value={selectedContactId}
+              onChange={(e) => setSelectedContactId(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
+            >
+              <option value="">-- Aucun tiers associé (Vente directe / Comptoir) --</option>
+              {contacts
+                .filter((c) =>
+                  type === "INCOME"
+                    ? c.type === "CLIENT" || c.type === "BOTH"
+                    : c.type === "SUPPLIER" || c.type === "BOTH"
+                )
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.city ? `(${c.city})` : ""} {c.phone ? `• ${c.phone}` : ""}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Libellé / Tiers / Justificatif
+              Libellé / Description / N° Reçu
             </label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="ex. Facture N° 1045 - Société Avicole du Sud"
+              placeholder="ex. Reçu N° 1045, Acompte 50 plateaux"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
           </div>

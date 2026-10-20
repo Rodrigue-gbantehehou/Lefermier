@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Package, AlertTriangle, Filter } from "lucide-react";
+import Link from "next/link";
+import { Plus, Package, AlertTriangle, Filter, Eye } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
 import { Modal } from "@/components/ui/modal";
@@ -251,7 +252,12 @@ export default function InventoryPage() {
                       className="hover:bg-surface-hover transition-colors"
                     >
                       <td className="py-3 px-3 font-bold text-foreground">
-                        {item.name}
+                        <Link
+                          href={`/inventory/${item.id}`}
+                          className="hover:text-primary hover:underline transition-colors block"
+                        >
+                          {item.name}
+                        </Link>
                         <div className="text-[10px] font-normal text-muted font-mono">
                           {item.sku}
                         </div>
@@ -296,15 +302,25 @@ export default function InventoryPage() {
                         {formatFcfa(totalVal)}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {hasPermission("inventory:update") && (
-                          <button
-                            type="button"
-                            onClick={() => openMovementModal(item)}
-                            className="rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary hover:text-white transition-colors"
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Link
+                            href={`/inventory/${item.id}`}
+                            className="rounded-lg border border-border bg-surface px-2 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover hover:border-border-hover transition-colors inline-flex items-center gap-1"
+                            title="Consulter l'historique et la fiche 360°"
                           >
-                            Entrée / Sortie
-                          </button>
-                        )}
+                            <Eye className="h-3 w-3 text-muted" />
+                            <span>Détails</span>
+                          </Link>
+                          {hasPermission("inventory:update") && (
+                            <button
+                              type="button"
+                              onClick={() => openMovementModal(item)}
+                              className="rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary hover:text-white transition-colors"
+                            >
+                              Mouvement
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
