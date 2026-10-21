@@ -17,6 +17,9 @@ final readonly class CreateInventoryItemRequestDto
 
         public InventoryCategory $category = InventoryCategory::FEED,
 
+        #[Assert\Length(max: 100, maxMessage: "La précision de catégorie ne doit pas dépasser 100 caractères.")]
+        public ?string $customCategory = null,
+
         public InventoryUnit $unit = InventoryUnit::BAG_50KG,
 
         #[Assert\PositiveOrZero(message: "Le stock initial doit être un nombre positif ou nul.")]
@@ -27,6 +30,9 @@ final readonly class CreateInventoryItemRequestDto
 
         #[Assert\PositiveOrZero(message: "Le prix unitaire en FCFA doit être un entier positif ou nul.")]
         public ?int $unitPrice = null,
+
+        #[Assert\Positive(message: "Le poids par sac doit être strictement positif.")]
+        public ?float $packageWeightKg = null,
 
         public ?string $notes = null,
     ) {

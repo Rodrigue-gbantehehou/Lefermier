@@ -1,16 +1,18 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Check, Lock, Save } from "lucide-react";
+import { Plus, Check, Lock, Save, AlertCircle } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { FarmRole, Permission } from "@/lib/types";
 
 export default function RolesMatrixPage() {
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [roles, setRoles] = useState<FarmRole[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -22,6 +24,7 @@ export default function RolesMatrixPage() {
 
   // Create Role Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
   const [newRolePerms, setNewRolePerms] = useState<string[]>([]);
@@ -59,7 +62,7 @@ export default function RolesMatrixPage() {
 
   function togglePermission(key: string) {
     if (selectedRole?.isSystem) {
-      alert("Les rôles système par défaut ne sont pas modifiables directement. Créez un rôle personnalisé pour adapter les accès.");
+      toast.warning("Les rôles système par défaut ne sont pas modifiables directement. Créez un rôle personnalisé pour adapter les accès.");
       return;
     }
     setEditedPermissions((prev) =>
@@ -75,11 +78,11 @@ export default function RolesMatrixPage() {
       const updated = await api.roles.updateRole(activeFarm.id, selectedRole.id, {
         permissions: editedPermissions,
       });
-      setSuccessMsg("Permissions du rôle mises à jour avec succès !");
+      toast.success("Permissions du rôle mises à jour avec succès !");
       setSelectedRole(updated);
       setRoles((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la mise à jour du rôle");
+      toast.error(err?.message || "Erreur lors de la mise à jour du rôle");
     } finally {
       setIsSaving(false);
     }
@@ -88,6 +91,7 @@ export default function RolesMatrixPage() {
   async function handleCreateCustomRole(e: React.FormEvent) {
     e.preventDefault();
     if (!newRoleName || !activeFarm?.id) return;
+    setCreateError(null);
     setSubmittingCreate(true);
     try {
       const created = await api.roles.createRole(activeFarm.id, {
@@ -99,11 +103,14 @@ export default function RolesMatrixPage() {
       setNewRoleName("");
       setNewRoleDesc("");
       setNewRolePerms([]);
+      toast.success("Rôle personnalisé créé avec succès !");
       await loadData();
       setSelectedRole(created);
       setEditedPermissions(created.permissions || []);
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la création du rôle personnalisé");
+      const msg = err?.message || "Erreur lors de la création du rôle personnalisé";
+      setCreateError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingCreate(false);
     }
@@ -359,10 +366,20 @@ export default function RolesMatrixPage() {
             </div>
           </div>
 
+          {createError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{createError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setCreateModalOpen(false)}
+              onClick={() => {
+                setCreateModalOpen(false);
+                setCreateError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler

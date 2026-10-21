@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -21,6 +21,9 @@ import {
   CheckCircle2,
   Users,
   ShieldAlert,
+  Printer,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -29,6 +32,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import {
   Flock,
@@ -47,6 +51,7 @@ import {
   calcEggTrays,
   formatEggTraysSummary,
 } from "@/lib/utils";
+import { FlockSummaryReportModal } from "@/components/flocks/flock-summary-report-modal";
 
 const MOVEMENT_LABELS: Record<MovementType, { label: string; badge: "danger" | "warning" | "info" | "neutral" }> = {
   MORTALITY: { label: "Mortalité / Perte", badge: "danger" },
@@ -56,11 +61,12 @@ const MOVEMENT_LABELS: Record<MovementType, { label: string; badge: "danger" | "
   ADJUSTMENT: { label: "Ajustement d'inventaire", badge: "neutral" },
 };
 
-export default function FlockDetailPage() {
+function FlockDetailContent() {
   const params = useParams();
   const flockId = params?.id as string;
   const router = useRouter();
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [flock, setFlock] = useState<Flock | null>(null);
   const [movements, setMovements] = useState<FlockMovement[]>([]);
@@ -75,11 +81,12 @@ export default function FlockDetailPage() {
   }>({ totalIncome: 0, totalExpense: 0, grossMargin: 0, currency: "XOF" });
 
   const [buildings, setBuildings] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"movements" | "eggs" | "health" | "finance">("movements");
+  const [activeTab, setActiveTab] = useState<"movements" | "eggs" | "health" | "finance" | "details">("movements");
   const [isLoading, setIsLoading] = useState(true);
 
   // Modale Mouvement
   const [movementModalOpen, setMovementModalOpen] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [moveType, setMoveType] = useState<MovementType>("MORTALITY");
   const [moveQty, setMoveQty] = useState<number | string>(1);
   const [moveDate, setMoveDate] = useState("");
@@ -88,6 +95,7 @@ export default function FlockDetailPage() {
 
   // Modale Collecte Œufs
   const [eggModalOpen, setEggModalOpen] = useState(false);
+  const [eggError, setEggError] = useState<string | null>(null);
   const [eggDate, setEggDate] = useState("");
   const [eggSession, setEggSession] = useState<EggSession>("MORNING");
   const [goodEggs, setGoodEggs] = useState<number | string>(0);
@@ -98,12 +106,16 @@ export default function FlockDetailPage() {
 
   // Modale Édition Bande
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editBuildingId, setEditBuildingId] = useState("");
   const [editEstimatedEndDate, setEditEstimatedEndDate] = useState("");
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "SOLD" | "DEPLETED">("ACTIVE");
   const [editNotes, setEditNotes] = useState("");
   const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  // Modale Bilan Imprimable (PDF)
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   useEffect(() => {
     setMoveDate(new Date().toISOString().split("T")[0]);
@@ -164,6 +176,7 @@ export default function FlockDetailPage() {
   async function handleAddMovement(e: React.FormEvent) {
     e.preventDefault();
     if (!flockId) return;
+    setMoveError(null);
     setSubmittingMove(true);
     try {
       await api.flocks.addMovement(flockId, {
@@ -175,9 +188,16 @@ export default function FlockDetailPage() {
       setMovementModalOpen(false);
       setMoveQty(1);
       setMoveReason("");
+      toast.success(
+        moveType === "MORTALITY"
+          ? "Perte / mortalité enregistrée avec succès."
+          : "Mouvement de bande enregistré avec succès."
+      );
       await loadAllFlockData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement du mouvement");
+      const msg = err?.message || "Erreur lors de l'enregistrement du mouvement";
+      setMoveError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingMove(false);
     }
@@ -187,6 +207,7 @@ export default function FlockDetailPage() {
   async function handleAddEgg(e: React.FormEvent) {
     e.preventDefault();
     if (!flockId) return;
+    setEggError(null);
     setSubmittingEgg(true);
     try {
       await api.eggs.create({
@@ -203,9 +224,12 @@ export default function FlockDetailPage() {
       setBrokenEggs(0);
       setAbnormalEggs(0);
       setEggNotes("");
+      toast.success("Collecte d'œufs enregistrée avec succès !");
       await loadAllFlockData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement de la collecte");
+      const msg = err?.message || "Erreur lors de l'enregistrement de la collecte";
+      setEggError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingEgg(false);
     }
@@ -214,6 +238,7 @@ export default function FlockDetailPage() {
   // Action Modification Bande
   function openEditModal() {
     if (!flock) return;
+    setEditError(null);
     setEditName(flock.name);
     setEditBuildingId(flock.buildingId || "");
     setEditEstimatedEndDate(flock.expectedEndDate || "");
@@ -225,6 +250,7 @@ export default function FlockDetailPage() {
   async function handleEditFlock(e: React.FormEvent) {
     e.preventDefault();
     if (!flockId || !editName.trim()) return;
+    setEditError(null);
     setSubmittingEdit(true);
     try {
       await api.flocks.update(flockId, {
@@ -235,9 +261,12 @@ export default function FlockDetailPage() {
         notes: editNotes.trim() || null,
       });
       setEditModalOpen(false);
+      toast.success("Bande mise à jour avec succès !");
       await loadAllFlockData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la mise à jour de la bande");
+      const msg = err?.message || "Erreur lors de la mise à jour de la bande";
+      setEditError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingEdit(false);
     }
@@ -520,7 +549,7 @@ export default function FlockDetailPage() {
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-border">
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">{flock.name}</h1>
                 {flock.code && (
@@ -536,26 +565,27 @@ export default function FlockDetailPage() {
                 </Badge>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted pt-1">
-                <span className="flex items-center gap-1">
-                  <Bird className="h-3.5 w-3.5 text-primary" />
+              <p className="mt-1 text-xs text-muted flex flex-wrap items-center gap-2">
+                <span>
                   Souche : <strong className="text-foreground">{flock.strain || flock.breed}</strong>
                 </span>
-                <span className="flex items-center gap-1">
-                  <Warehouse className="h-3.5 w-3.5 text-primary" />
+                <span>•</span>
+                <span>
                   Bâtiment : <strong className="text-foreground">{flock.buildingName || "Non affecté"}</strong>
                 </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                <span>•</span>
+                <span>
                   Arrivée : <strong className="text-foreground">{formatDate(flock.startDate)}</strong>
                 </span>
                 {flock.ageInWeeks !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5 text-primary" />
-                    Âge : <strong className="text-foreground">Semaine {flock.ageInWeeks} ({flock.ageInDays} jours)</strong>
-                  </span>
+                  <>
+                    <span>•</span>
+                    <span>
+                      Âge : <strong className="text-foreground">Semaine {flock.ageInWeeks} ({flock.ageInDays} j)</strong>
+                    </span>
+                  </>
                 )}
-              </div>
+              </p>
             </div>
 
             {/* Boutons d'actions rapides */}
@@ -588,6 +618,16 @@ export default function FlockDetailPage() {
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 Modifier
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReportModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-primary-soft text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+                title="Générer la fiche imprimable et le bilan de fin de bande"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Bilan imprimable (PDF)
               </button>
             </div>
           </div>
@@ -681,6 +721,7 @@ export default function FlockDetailPage() {
               </button>
 
               <button
+                type="button"
                 onClick={() => setActiveTab("finance")}
                 className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                   activeTab === "finance"
@@ -690,6 +731,19 @@ export default function FlockDetailPage() {
               >
                 <Wallet className="h-4 w-4" />
                 Finances & Marge ({transactions.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("details")}
+                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === "details"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted hover:text-foreground"
+                }`}
+              >
+                <Info className="h-4 w-4" />
+                Fiche technique & Paramètres
               </button>
             </nav>
           </div>
@@ -750,6 +804,176 @@ export default function FlockDetailPage() {
               ) : (
                 <DataTable data={transactions} columns={txColumns} pageSize={10} />
               )
+            )}
+
+            {activeTab === "details" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Card 1: Caractéristiques & Paramètres du lot */}
+                <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs">
+                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4 border-b border-border pb-3">
+                    <Bird className="h-4 w-4 text-primary" />
+                    <span>Fiche d'identification & Paramètres du lot</span>
+                  </h2>
+
+                  <dl className="space-y-3.5 text-xs">
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Nom du lot / bande :</dt>
+                      <dd className="font-bold text-foreground">{flock.name}</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Code d'identification :</dt>
+                      <dd className="font-mono font-bold text-foreground">{flock.code || "—"}</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Statut du lot :</dt>
+                      <dd>
+                        <Badge variant={flock.status === "ACTIVE" ? "success" : "neutral"} size="sm">
+                          {flock.status === "ACTIVE" ? "En cours d'élevage" : flock.status === "SOLD" ? "Vendue" : "Clôturée"}
+                        </Badge>
+                      </dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Type de production :</dt>
+                      <dd>
+                        <Badge variant={flock.type === "LAYER" ? "warning" : flock.type === "BROILER" ? "info" : "neutral"} size="sm">
+                          {flock.type === "LAYER" ? "Pondeuses" : flock.type === "BROILER" ? "Poulets de chair" : "Mixte"}
+                        </Badge>
+                      </dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Souche / Race :</dt>
+                      <dd className="font-bold text-foreground">{flock.strain || flock.breed || "Non renseignée"}</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Bâtiment / Poulailler :</dt>
+                      <dd className="font-bold text-foreground flex items-center gap-1.5">
+                        <Warehouse className="h-3.5 w-3.5 text-primary" />
+                        {flock.buildingName || "Non affecté"}
+                      </dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Date d'arrivée :</dt>
+                      <dd className="font-mono font-bold text-foreground flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-muted" />
+                        {formatDate(flock.startDate)}
+                      </dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Âge actuel du lot :</dt>
+                      <dd className="font-bold text-primary flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {flock.ageInWeeks !== undefined
+                          ? `Semaine ${flock.ageInWeeks} (${flock.ageInDays} jours)`
+                          : "—"}
+                      </dd>
+                    </div>
+
+                    {flock.initialAgeDays !== undefined && flock.initialAgeDays > 0 && (
+                      <div className="flex justify-between py-1 border-b border-border/50">
+                        <dt className="text-muted">Âge à l'introduction :</dt>
+                        <dd className="font-mono font-bold text-foreground">{flock.initialAgeDays} jours</dd>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Effectif initial introduit :</dt>
+                      <dd className="font-mono font-bold text-foreground">{formatNumber(stats.initial)} sujets</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Cheptel vivant actuel :</dt>
+                      <dd className="font-mono font-bold text-success">{formatNumber(stats.current)} sujets ({stats.survivalRate.toFixed(1)} % survie)</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Mortalités & Pertes cumulées :</dt>
+                      <dd className="font-mono font-bold text-danger">{formatNumber(stats.losses)} sujets ({stats.mortalityRate.toFixed(1)} %)</dd>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-border/50">
+                      <dt className="text-muted">Date prévisionnelle de fin :</dt>
+                      <dd className="font-mono font-bold text-foreground">
+                        {flock.expectedEndDate ? formatDate(flock.expectedEndDate) : "Non définie"}
+                      </dd>
+                    </div>
+
+                    {flock.actualEndDate && (
+                      <div className="flex justify-between py-1">
+                        <dt className="text-muted">Date de clôture effective :</dt>
+                        <dd className="font-mono font-bold text-foreground">
+                          {formatDate(flock.actualEndDate)}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+
+                {/* Card 2: Observations & Actions administratives */}
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs">
+                    <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3 border-b border-border pb-3">
+                      <Info className="h-4 w-4 text-primary" />
+                      <span>Observations & Notes d'élevage</span>
+                    </h2>
+                    {flock.notes ? (
+                      <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap bg-surface-muted p-3.5 rounded-xl border border-border">
+                        {flock.notes}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted italic">
+                        Aucune note ou observation spécifique enregistrée pour cette bande.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs">
+                    <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3 border-b border-border pb-3">
+                      <Bird className="h-4 w-4 text-primary" />
+                      <span>Actions & Administration</span>
+                    </h2>
+                    <p className="text-xs text-muted mb-4">
+                      Opérations de gestion, d'édition des paramètres et génération de rapports pour ce lot.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={openEditModal}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary-soft px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Modifier la fiche</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setReportModalOpen(true)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-surface border border-border px-4 py-2 text-xs font-bold text-foreground hover:bg-surface-hover transition-colors"
+                      >
+                        <Printer className="h-3.5 w-3.5 text-primary" />
+                        <span>Bilan imprimable (PDF)</span>
+                      </button>
+
+                      {flock.status === "ACTIVE" && (
+                        <button
+                          type="button"
+                          onClick={() => setMovementModalOpen(true)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-danger-soft px-4 py-2 text-xs font-bold text-danger hover:bg-danger/20 transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Noter une perte ou vente</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -825,10 +1049,20 @@ export default function FlockDetailPage() {
               />
             </div>
 
+            {moveError && (
+              <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium leading-relaxed">{moveError}</div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
-                onClick={() => setMovementModalOpen(false)}
+                onClick={() => {
+                  setMovementModalOpen(false);
+                  setMoveError(null);
+                }}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-border text-muted hover:text-foreground transition-colors"
               >
                 Annuler
@@ -954,10 +1188,20 @@ export default function FlockDetailPage() {
                 />
               </div>
 
+              {eggError && (
+                <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium leading-relaxed">{eggError}</div>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setEggModalOpen(false)}
+                  onClick={() => {
+                    setEggModalOpen(false);
+                    setEggError(null);
+                  }}
                   className="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-border text-muted hover:text-foreground transition-colors"
                 >
                   Annuler
@@ -1055,10 +1299,20 @@ export default function FlockDetailPage() {
               />
             </div>
 
+            {editError && (
+              <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium leading-relaxed">{editError}</div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
-                onClick={() => setEditModalOpen(false)}
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditError(null);
+                }}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-border text-muted hover:text-foreground transition-colors"
               >
                 Annuler
@@ -1074,7 +1328,38 @@ export default function FlockDetailPage() {
             </div>
           </form>
         </Modal>
+
+        {/* MODALE BILAN DE FIN DE BANDE / FICHE IMPRIMABLE */}
+        <FlockSummaryReportModal
+          isOpen={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          flock={flock}
+          farm={activeFarm}
+          eggTotal={stats.totalEggs}
+          totalIncome={financialSummary.totalIncome}
+          totalExpense={financialSummary.totalExpense}
+          grossMargin={financialSummary.grossMargin}
+        />
       </div>
     </Shell>
+  );
+}
+
+export default function FlockDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <div className="flex h-96 items-center justify-center">
+            <div className="flex flex-col items-center gap-2 text-xs text-muted">
+              <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+              <span>Chargement de la fiche bande...</span>
+            </div>
+          </div>
+        </Shell>
+      }
+    >
+      <FlockDetailContent />
+    </Suspense>
   );
 }

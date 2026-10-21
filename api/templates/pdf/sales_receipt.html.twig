@@ -1,0 +1,104 @@
+{% extends 'pdf/base.html.twig' %}
+
+{% block title %}Reçu de Vente {{ documentReference }}{% endblock %}
+
+{% block content %}
+    {# Tableau des prestations / produits vendus #}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 50%; text-align: left;">Désignation du Produit / Prestation</th>
+                <th style="width: 25%; text-align: center;">Bande / Origine</th>
+                <th style="width: 25%; text-align: right;">Total Net</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <div style="font-size: 11px; font-weight: bold; color: #111827;">
+                        {% if transaction.category.value == 'EGG_SALE' %}
+                            Vente d'œufs de table
+                        {% elseif transaction.category.value == 'BIRD_SALE' %}
+                            Vente de volailles (sujets vifs / abattus)
+                        {% else %}
+                            {{ transaction.category.value }}
+                        {% endif %}
+                    </div>
+                    {% if transaction.description %}
+                        <div style="font-size: 9px; color: #6b7280; font-style: italic; margin-top: 3px;">
+                            {{ transaction.description }}
+                        </div>
+                    {% endif %}
+                </td>
+                <td style="text-align: center; font-family: 'Courier New', Courier, monospace; color: #4b5563;">
+                    {% if transaction.flock %}
+                        {{ transaction.flock.name }} ({{ transaction.flock.code }})
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-size: 12px; font-weight: bold; color: #111827;">
+                    {{ transaction.amount|number_format(0, ',', ' ') }} FCFA
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    {# Récapitulatif financier et mode de paiement #}
+    <table class="w-full" style="margin-top: 8px;">
+        <tr>
+            {# Colonne gauche : Mode de paiement & clauses #}
+            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+                <div class="card-box" style="margin-bottom: 0;">
+                    <div class="card-title">Modalités de Paiement</div>
+                    <div style="font-size: 10px; color: #1f2937; margin-bottom: 4px;">
+                        Mode de règlement : 
+                        <strong>
+                            {% if transaction.paymentMethod.value == 'CASH' %}Espèces (Cash)
+                            {% elseif transaction.paymentMethod.value == 'MTN_MOMO' %}MTN Mobile Money
+                            {% elseif transaction.paymentMethod.value == 'MOOV_MONEY' %}Moov Money
+                            {% elseif transaction.paymentMethod.value == 'CELTIIS_CASH' %}Celtiis Cash
+                            {% elseif transaction.paymentMethod.value == 'BANK_TRANSFER' %}Virement bancaire
+                            {% elseif transaction.paymentMethod.value == 'CHECK' %}Chèque
+                            {% else %}{{ transaction.paymentMethod.value }}{% endif %}
+                        </strong>
+                    </div>
+                    {% if transaction.dueDate and transaction.remainingAmount > 0 %}
+                        <div style="font-size: 9.5px; color: #b45309; margin-top: 3px;">
+                            Date d'échéance convenue : <strong>{{ transaction.dueDate|date('d/m/Y') }}</strong>
+                        </div>
+                    {% endif %}
+                    <div style="font-size: 8.5px; color: #9ca3af; margin-top: 6px; line-height: 1.3;">
+                        Les marchandises vendues demeurent la propriété légale de l'exploitation jusqu'au règlement intégral du montant dû.
+                    </div>
+                </div>
+            </td>
+
+            {# Colonne droite : Décompte financier #}
+            <td style="width: 50%; vertical-align: top;">
+                <table class="data-table" style="margin-bottom: 0;">
+                    <tr>
+                        <td style="font-size: 10px; color: #4b5563;">Montant Total Vente :</td>
+                        <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 11px; color: #111827;">
+                            {{ transaction.amount|number_format(0, ',', ' ') }} FCFA
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-size: 10px; color: #047857; font-weight: bold;">Acompte / Payé :</td>
+                        <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 11px; color: #047857;">
+                            {{ transaction.paidAmount|number_format(0, ',', ' ') }} FCFA
+                        </td>
+                    </tr>
+                    {% if transaction.remainingAmount > 0 %}
+                        <tr style="background-color: #fef2f2;">
+                            <td style="font-size: 10.5px; color: #b91c1c; font-weight: bold;">Reste Dû :</td>
+                            <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 12px; color: #b91c1c;">
+                                {{ transaction.remainingAmount|number_format(0, ',', ' ') }} FCFA
+                            </td>
+                        </tr>
+                    {% endif %}
+                </table>
+            </td>
+        </tr>
+    </table>
+{% endblock %}

@@ -34,8 +34,14 @@ class InventoryItem
     #[ORM\Column(type: Types::STRING, length: 30, enumType: InventoryCategory::class)]
     private InventoryCategory $category = InventoryCategory::FEED;
 
+    #[ORM\Column(type: Types::STRING, length: 100, nullable: true)]
+    private ?string $customCategory = null;
+
     #[ORM\Column(type: Types::STRING, length: 30, enumType: InventoryUnit::class)]
     private InventoryUnit $unit = InventoryUnit::BAG_50KG;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2, nullable: true)]
+    private ?string $packageWeightKg = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
     private string $currentStock = '0.00';
@@ -119,6 +125,17 @@ class InventoryItem
         return $this;
     }
 
+    public function getCustomCategory(): ?string
+    {
+        return $this->customCategory;
+    }
+
+    public function setCustomCategory(?string $customCategory): self
+    {
+        $this->customCategory = $customCategory;
+        return $this;
+    }
+
     public function getUnit(): InventoryUnit
     {
         return $this->unit;
@@ -127,6 +144,19 @@ class InventoryItem
     public function setUnit(InventoryUnit $unit): self
     {
         $this->unit = $unit;
+        return $this;
+    }
+
+    public function getPackageWeightKg(): ?float
+    {
+        return $this->packageWeightKg !== null ? (float) $this->packageWeightKg : null;
+    }
+
+    public function setPackageWeightKg(?float $packageWeightKg): self
+    {
+        $this->packageWeightKg = $packageWeightKg !== null && $packageWeightKg > 0.0
+            ? number_format($packageWeightKg, 2, '.', '')
+            : null;
         return $this;
     }
 

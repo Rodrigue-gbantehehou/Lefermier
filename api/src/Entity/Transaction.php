@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Enum\PaymentMethod;
+use App\Enum\PaymentStatus;
 use App\Enum\TransactionCategory;
 use App\Enum\TransactionType;
 use App\Repository\TransactionRepository;
@@ -37,6 +38,15 @@ class Transaction
 
     #[ORM\Column(type: Types::BIGINT)]
     private string $amount;
+
+    #[ORM\Column(type: Types::STRING, length: 20, enumType: PaymentStatus::class)]
+    private PaymentStatus $paymentStatus = PaymentStatus::PAID;
+
+    #[ORM\Column(type: Types::BIGINT, nullable: true)]
+    private ?string $paidAmount = null;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $dueDate = null;
 
     #[ORM\Column(type: Types::STRING, length: 30, enumType: PaymentMethod::class)]
     private PaymentMethod $paymentMethod = PaymentMethod::CASH;
@@ -80,6 +90,9 @@ class Transaction
         ?Contact $contact = null,
         ?Flock $flock = null,
         ?User $recordedBy = null,
+        PaymentStatus $paymentStatus = PaymentStatus::PAID,
+        ?int $paidAmount = null,
+        ?\DateTimeImmutable $dueDate = null,
     ) {
         $this->id = new Ulid();
         $this->farm = $farm;
@@ -93,6 +106,9 @@ class Transaction
         $this->contact = $contact;
         $this->flock = $flock;
         $this->recordedBy = $recordedBy;
+        $this->paymentStatus = $paymentStatus;
+        $this->paidAmount = $paidAmount !== null ? (string) max(0, $paidAmount) : ($paymentStatus === PaymentStatus::UNPAID ? '0' : (string) max(1, $amount));
+        $this->dueDate = $dueDate;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -101,6 +117,57 @@ class Transaction
     public function onPreUpdate(): void
     {
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPaymentStatus(): PaymentStatus
+    {
+        return $this->paymentStatus ?? PaymentStatus::PAID;
+    }
+
+    public function setPaymentStatus(PaymentStatus $paymentStatus): self
+    {
+        $this->paymentStatus = $paymentStatus;
+        return $this;
+    }
+
+    public function getPaidAmount(): int
+    {
+        if ($this->paidAmount !== null) {
+            return (int) $this->paidAmount;
+        }
+
+        return $this->paymentStatus === PaymentStatus::UNPAID ? 0 : $this->getAmount();
+    }
+
+    public function setPaidAmount(?int $paidAmount): self
+    {
+        $this->paidAmount = $paidAmount !== null ? (string) max(0, $paidAmount) : null;
+        return $this;
+    }
+
+    public function getRemainingAmount(): int
+    {
+        return max(0, $this->getAmount() - $this->getPaidAmount());
+    }
+
+    public function getDueDate(): ?\DateTimeImmutable
+    {
+        return $this->dueDate;
+    }
+
+    public function setDueDate(?\DateTimeImmutable $dueDate): self
+    {
+        $this->dueDate = $dueDate;
+        return $this;
+    }
+
+    public function isOverdue(): bool
+    {
+        if ($this->getRemainingAmount() <= 0 || $this->dueDate === null) {
+            return false;
+        }
+
+        return $this->dueDate < new \DateTimeImmutable('today');
     }
 
     public function getId(): ?Ulid

@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\AuthService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -74,6 +75,58 @@ class AuthController extends AbstractController
 
         return $this->json([
             'data' => $this->authService->getUserProfile($user),
+        ]);
+    }
+
+    #[Route('/forgot-password', name: 'forgot_password', methods: ['POST'])]
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $identifier = (string) ($payload['identifier'] ?? $payload['email'] ?? $payload['phone'] ?? '');
+        $channel = (string) ($payload['channel'] ?? 'email');
+
+        if (empty($identifier)) {
+            return $this->json([
+                'title' => 'Paramètre manquant',
+                'detail' => 'Veuillez saisir votre adresse email ou votre numéro de téléphone.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $res = $this->authService->requestPasswordReset($identifier, $channel);
+
+        return $this->json([
+            'data' => $res,
+        ]);
+    }
+
+    #[Route('/reset-password', name: 'reset_password', methods: ['POST'])]
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $identifier = (string) ($payload['identifier'] ?? $payload['email'] ?? '');
+        $code = (string) ($payload['code'] ?? $payload['token'] ?? '');
+        $newPassword = (string) ($payload['newPassword'] ?? $payload['password'] ?? '');
+
+        if (empty($identifier) || empty($code) || empty($newPassword)) {
+            return $this->json([
+                'title' => 'Champs obligatoires manquants',
+                'detail' => 'L\'identifiant, le code de réinitialisation et le nouveau mot de passe sont obligatoires.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $this->authService->resetPassword($identifier, $code, $newPassword);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json([
+                'title' => 'Échec de réinitialisation',
+                'detail' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json([
+            'data' => [
+                'message' => 'Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.',
+            ],
         ]);
     }
 }

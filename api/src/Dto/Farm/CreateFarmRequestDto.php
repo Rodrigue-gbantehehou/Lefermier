@@ -26,6 +26,12 @@ final readonly class CreateFarmRequestDto
         public string $locationCountry = 'BJ',
 
         public string $currency = 'XOF',
+        public ?string $phone = null,
+        public ?string $email = null,
+        public ?string $address = null,
+        public ?string $ifu = null,
+        public ?string $rccm = null,
+        public ?string $description = null,
     ) {
     }
 }

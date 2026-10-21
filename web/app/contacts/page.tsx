@@ -16,6 +16,7 @@ import {
   RefreshCw,
   ExternalLink,
   Users,
+  AlertCircle,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -24,6 +25,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { Contact, ContactType } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -56,6 +58,7 @@ const CITY_PRESETS = ["Cotonou", "Abomey-Calavi", "Allada", "Porto-Novo", "Bohic
 
 export default function ContactsPage() {
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filterType, setFilterType] = useState<string>("ALL");
@@ -64,6 +67,7 @@ export default function ContactsPage() {
 
   // Modale Création / Édition
   const [modalOpen, setModalOpen] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [name, setName] = useState("");
   const [type, setType] = useState<ContactType>("CLIENT");
@@ -103,6 +107,7 @@ export default function ContactsPage() {
   }
 
   function openCreateModal(defaultType: ContactType = "CLIENT") {
+    setContactError(null);
     setEditingContact(null);
     setName("");
     setType(defaultType);
@@ -116,6 +121,7 @@ export default function ContactsPage() {
   }
 
   function openEditModal(c: Contact) {
+    setContactError(null);
     setEditingContact(c);
     setName(c.name);
     setType(c.type);
@@ -136,7 +142,7 @@ export default function ContactsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!activeFarm?.id || !name.trim()) return;
-
+    setContactError(null);
     setSubmitting(true);
     try {
       if (editingContact) {
@@ -150,6 +156,7 @@ export default function ContactsPage() {
           notes: notes.trim() || undefined,
           isActive,
         });
+        toast.success("Contact mis à jour avec succès !");
       } else {
         await api.contacts.create(activeFarm.id, {
           name: name.trim(),
@@ -160,12 +167,15 @@ export default function ContactsPage() {
           address: address.trim() || undefined,
           notes: notes.trim() || undefined,
         });
+        toast.success("Contact créé avec succès !");
       }
 
       setModalOpen(false);
       await loadContacts();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement du contact.");
+      const msg = err?.message || "Erreur lors de l'enregistrement du contact.";
+      setContactError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -178,9 +188,10 @@ export default function ContactsPage() {
       await api.contacts.delete(contactToDelete.id);
       setDeleteModalOpen(false);
       setContactToDelete(null);
+      toast.success("Contact supprimé avec succès.");
       await loadContacts();
     } catch (err: any) {
-      alert(err?.message || "Impossible de supprimer ce contact.");
+      toast.error(err?.message || "Impossible de supprimer ce contact.");
     } finally {
       setDeleting(false);
     }
@@ -327,7 +338,6 @@ export default function ContactsPage() {
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
                 Annuaire des Contacts & Tiers
               </h1>
-              <Badge variant="neutral">{stats.total} total</Badge>
             </div>
             <p className="text-sm text-muted mt-1">
               Gérez votre carnet de partenaires commerciaux : revendeuses d'œufs, grossistes, provenderies et vétérinaires.
@@ -600,10 +610,20 @@ export default function ContactsPage() {
               </div>
             )}
 
+            {contactError && (
+              <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex-1 font-medium leading-relaxed">{contactError}</div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setContactError(null);
+                }}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-border text-muted hover:text-foreground transition-colors"
               >
                 Annuler

@@ -35,24 +35,24 @@ Utilisée pour les matières premières (maïs, tourteau de soja, son de blé, c
 
 | Code Enum (`InventoryUnit`) | Libellé Complet | Symbole Court | Équivalence Unité de Base (kg) | Contexte d'Utilisation |
 | :--- | :--- | :--- | :--- | :--- |
-| `KG` | Kilogramme | `kg` | **1,00 kg** *(Unité de base)* | Pesées d'aliments, sacs ouverts, rations partielles |
-| `G` | Gramme | `g` | **0,001 kg** | Rations journalières par poule, prémix, additifs |
-| `BAG_50KG` | Sac de 50 kg | `sac (50kg)` | **50,00 kg** | Sac standard provenderie commerciale (Vano, etc.) |
-| `BAG_25KG` | Sac de 25 kg | `sac (25kg)` | **25,00 kg** | Sac demi-format provenderie |
-| `TON` | Tonne métrique | `t` | **1 000,00 kg** *(20 sacs de 50 kg)* | Approvisionnements en vrac, camions de maïs |
+| `BAG` / `BAG_50KG` | Sac (poids personnalisable) | `sac` | **Personnalisable** (défaut 50 kg) | Sac provenderie commerciale (poids net saisi librement par l'éleveur) |
+| `BAG_25KG` | Sac demi-format | `sac` | **25,00 kg** (ou personnalisable) | Sac demi-format provenderie |
+| `KG` | Kilogramme | `kg` | **1,00 kg** *(Unité de base)* | Pesées d'aliments, balance de poulailler, rations partielles |
+| `G` | Gramme | `g` | **0,001 kg** | Rations journalières, prémix, vitamines en poudre |
+| `TON` | Tonne métrique | `t` | **1 000,00 kg** | Approvisionnements en vrac, camions de maïs |
 
 #### Règle de Conversion Automatique (Masse) :
 $$Q_{\text{cible}} = Q_{\text{source}} \times \left( \frac{\text{Facteur}_{\text{source}}}{\text{Facteur}_{\text{cible}}} \right)$$
 
 *Exemple pratique :*
-- Stock géré en `BAG_50KG` : L'éleveur dispose de **10 sacs** (500 kg).
-- Sortie de consommation pour le poulailler : **25 kg**.
-- Conversion : $25 \text{ kg} / 50 = 0,5 \text{ sac}$.
-- Stock restant en base : **9,50 sacs** (soit 475 kg).
+- Stock géré en sacs de **40 kg** : L'éleveur dispose de **10 sacs** (400 kg).
+- Sortie de consommation pour le poulailler : **20 kg**.
+- Conversion : $20 \text{ kg} / 40 = 0,5 \text{ sac}$.
+- Stock restant en base : **9,50 sacs** (soit 380 kg).
 
 ---
 
-### 3.2. Famille VOLUME (Liquides, Traitement de l'eau, Désinfectants)
+### 3.2. Famille VOLUME (Liquides, Traitement de l'eau, Vitamines liquides, Désinfectants)
 Utilisée pour les vitamines liquides, vermifuges buvables, désinfectants de pédiluve et assainissants d'eau.
 
 | Code Enum | Libellé Complet | Symbole Court | Équivalence Base (L) | Contexte d'Utilisation |
@@ -70,6 +70,12 @@ Utilisée pour les vaccins (Newcastle, Gumboro, Bronchite Infectieuse), vitamine
 | `DOSE` | Dose vaccinale | `dose` | Unité biologique individuelle (1 dose = protection pour 1 sujet). |
 | `VIAL` | Flacon / Ampoule | `flacon` | Conditionnement vétérinaire (ex: flacon de 500, 1 000 ou 2 500 doses). |
 | `SACHET` | Sachet poudre | `sachet` | Sachet hydrosoluble (ex: anti-stress de 100 g). |
+
+#### Mesures Pratiques de Terrain (Vitamines & Soins en Élevage Avicole) :
+En pratique quotidienne dans les fermes avicoles ouest-africaines, l'éleveur mesure fréquemment les vitamines et médicaments liquides ou en poudre avec des repères volumétriques usuels :
+- **Cuillère à soupe (liquide)** : **1 cuillère à soupe = 15 mL** (1 cuillère à café = 5 mL).
+- **Cuillère à soupe (poudre)** : **1 cuillère à soupe rase ≈ 15 g** (1 cuillère à café rase ≈ 5 g).
+Le système fournit une indication automatique discrète de conversion pour faciliter la préparation des abreuvoirs sans surcharge visuelle.
 
 ---
 

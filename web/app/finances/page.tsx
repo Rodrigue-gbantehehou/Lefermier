@@ -1,19 +1,42 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Filter } from "lucide-react";
+import {
+  Plus,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Filter,
+  Download,
+  Printer,
+  AlertTriangle,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
+import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
-import { Transaction, TransactionType, PaymentMethod, Contact } from "@/lib/types";
+import {
+  Transaction,
+  TransactionType,
+  PaymentMethod,
+  Contact,
+  PaymentStatus,
+} from "@/lib/types";
 import { formatFcfa, formatDate } from "@/lib/utils";
+import { exportTransactionsToCsv } from "@/lib/export";
+import { SalesReceiptModal } from "@/components/finances/sales-receipt-modal";
 
 export default function FinancesPage() {
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -22,14 +45,25 @@ export default function FinancesPage() {
 
   // New Transaction Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [type, setType] = useState<TransactionType>("INCOME");
   const [amountFcfa, setAmountFcfa] = useState<number | string>(0);
   const [category, setCategory] = useState("Vente Oeufs");
+  const [customCategory, setCustomCategory] = useState("");
   const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [txDate, setTxDate] = useState("");
+
+  // Credit / Partial Payment State
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("PAID");
+  const [paidAmount, setPaidAmount] = useState<number | string>("");
+  const [dueDate, setDueDate] = useState<string>("");
+
+  // Sales Receipt Modal
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
 
   useEffect(() => {
     setTxDate(new Date().toISOString().split("T")[0]);
@@ -61,6 +95,7 @@ export default function FinancesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!activeFarm?.id) return;
+    setFormError(null);
     setSubmitting(true);
     try {
       await api.finance.createTransaction({
@@ -68,20 +103,35 @@ export default function FinancesPage() {
         type,
         amountFcfa: Number(amountFcfa),
         category,
+        customCategory: (category === "Autre Recette" || category === "Autre Depense") ? customCategory.trim() : undefined,
         paymentMethod,
         reference: reference || undefined,
         notes: notes || undefined,
         contactId: selectedContactId || undefined,
         date: txDate,
+        paymentStatus: type === "INCOME" ? paymentStatus : "PAID",
+        paidAmount: type === "INCOME" && paymentStatus === "PARTIAL" ? Number(paidAmount) || 0 : undefined,
+        dueDate: type === "INCOME" && paymentStatus !== "PAID" ? (dueDate || undefined) : undefined,
       });
       setModalOpen(false);
       setAmountFcfa(0);
+      setCustomCategory("");
       setReference("");
       setNotes("");
       setSelectedContactId("");
+      setPaymentStatus("PAID");
+      setPaidAmount("");
+      setDueDate("");
+      toast.success(
+        type === "INCOME"
+          ? "Recette enregistrée avec succès !"
+          : "Dépense enregistrée avec succès !"
+      );
       await loadTransactions();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la création de la transaction");
+      const msg = err?.message || "Erreur lors de la création de la transaction";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -89,7 +139,7 @@ export default function FinancesPage() {
 
   const totalIncome = transactions
     .filter((t) => t.type === "INCOME")
-    .reduce((sum, t) => sum + t.amountFcfa, 0);
+    .reduce((sum, t) => sum + (t.paidAmount !== undefined && t.paymentStatus !== "PAID" ? t.paidAmount : t.amountFcfa), 0);
 
   const totalExpense = transactions
     .filter((t) => t.type === "EXPENSE")
@@ -97,8 +147,19 @@ export default function FinancesPage() {
 
   const netBalance = totalIncome - totalExpense;
 
+  const totalReceivables = transactions
+    .filter((t) => t.type === "INCOME" && (t.paymentStatus === "PARTIAL" || t.paymentStatus === "UNPAID"))
+    .reduce((sum, t) => {
+      if (t.remainingAmount !== undefined) return sum + t.remainingAmount;
+      const paid = t.paidAmount ?? 0;
+      return sum + Math.max(0, t.amountFcfa - paid);
+    }, 0);
+
   const filteredTransactions = transactions.filter((t) => {
     if (filterType === "ALL") return true;
+    if (filterType === "CREDIT") {
+      return t.type === "INCOME" && (t.paymentStatus === "PARTIAL" || t.paymentStatus === "UNPAID");
+    }
     return t.type === filterType;
   });
 
@@ -132,13 +193,6 @@ export default function FinancesPage() {
           </span>
         );
       },
-    },
-    {
-      key: "category",
-      header: "Catégorie",
-      sortable: true,
-      accessor: (tx) => tx.category,
-      cell: (tx) => <span className="font-semibold text-foreground">{tx.category}</span>,
     },
     {
       key: "paymentMethod",
@@ -176,6 +230,52 @@ export default function FinancesPage() {
       ),
     },
     {
+      key: "paymentStatus",
+      header: "Règlement & Échéance",
+      sortable: true,
+      cell: (tx) => {
+        if (tx.type !== "INCOME") return <span className="text-muted text-xs">—</span>;
+        const status = tx.paymentStatus || "PAID";
+        if (status === "PAID") {
+          return (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">
+              <CheckCircle2 className="h-3 w-3" /> Réglé
+            </span>
+          );
+        }
+        if (status === "PARTIAL") {
+          const remaining = tx.remainingAmount ?? (tx.amountFcfa - (tx.paidAmount ?? 0));
+          return (
+            <div className="flex flex-col">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning bg-warning/10 px-2 py-0.5 rounded-full w-fit">
+                <Clock className="h-3 w-3" /> Acompte
+              </span>
+              <span className="text-[10px] text-muted mt-0.5">
+                Reste : <strong className="text-foreground">{formatFcfa(remaining)}</strong>
+              </span>
+              {tx.dueDate && (
+                <span className={`text-[10px] ${tx.isOverdue ? "text-danger font-bold" : "text-muted"}`}>
+                  Éch. : {formatDate(tx.dueDate)}
+                </span>
+              )}
+            </div>
+          );
+        }
+        return (
+          <div className="flex flex-col">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-danger bg-danger/10 px-2 py-0.5 rounded-full w-fit">
+              <AlertTriangle className="h-3 w-3" /> Non réglé
+            </span>
+            {tx.dueDate && (
+              <span className={`text-[10px] ${tx.isOverdue ? "text-danger font-bold" : "text-muted"} mt-0.5`}>
+                Éch. : {formatDate(tx.dueDate)}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: "amountFcfa",
       header: "Montant (FCFA)",
       sortable: true,
@@ -184,13 +284,43 @@ export default function FinancesPage() {
       cell: (tx) => {
         const isIncome = tx.type === "INCOME";
         return (
-          <span
-            className={`font-mono font-bold text-sm ${
-              isIncome ? "text-success" : "text-danger"
-            }`}
+          <div className="flex flex-col items-end">
+            <span
+              className={`font-mono font-bold text-sm ${
+                isIncome ? "text-success" : "text-danger"
+              }`}
+            >
+              {isIncome ? "+" : "-"} {formatFcfa(tx.amountFcfa)}
+            </span>
+            {isIncome && tx.paymentStatus === "PARTIAL" && tx.paidAmount !== undefined && (
+              <span className="text-[10px] text-muted font-mono">
+                Reçu : {formatFcfa(tx.paidAmount)}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      cell: (tx) => {
+        if (tx.type !== "INCOME") return null;
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTxForReceipt(tx);
+              setReceiptModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-surface-hover hover:text-primary transition-colors"
+            title="Imprimer le reçu de vente officiel"
           >
-            {isIncome ? "+" : "-"} {formatFcfa(tx.amountFcfa)}
-          </span>
+            <Printer className="h-3.5 w-3.5" />
+            <span>Reçu</span>
+          </button>
         );
       },
     },
@@ -209,20 +339,31 @@ export default function FinancesPage() {
           </p>
         </div>
 
-        {hasPermission("finance:create") && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+            onClick={() => exportTransactionsToCsv(transactions, activeFarm?.name || "ferme")}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
           >
-            <Plus className="h-4 w-4" />
-            <span>Nouvelle Transaction</span>
+            <Download className="h-4 w-4 text-muted" />
+            <span>Exporter CSV</span>
           </button>
-        )}
+
+          {hasPermission("finance:create") && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouvelle Transaction</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Ventes encaissées"
           value={formatFcfa(totalIncome)}
@@ -256,6 +397,17 @@ export default function FinancesPage() {
             isPositive: netBalance >= 0,
           }}
         />
+        <StatCard
+          title="Créances clients"
+          value={formatFcfa(totalReceivables)}
+          subtitle="Solde impayé des ventes à crédit / acompte"
+          accent={totalReceivables > 0 ? "amber" : "zinc"}
+          icon={<Clock className="h-5 w-5 text-warning" />}
+          trend={{
+            value: totalReceivables > 0 ? "À encaisser" : "Aucun impayé",
+            isPositive: totalReceivables === 0,
+          }}
+        />
       </div>
 
       {/* Transactions Table */}
@@ -279,6 +431,7 @@ export default function FinancesPage() {
                 { label: "Toutes", value: "ALL" },
                 { label: "Recettes", value: "INCOME" },
                 { label: "Dépenses", value: "EXPENSE" },
+                { label: "Créances & Impayés", value: "CREDIT" },
               ].map((tab) => (
                 <button
                   key={tab.value}
@@ -310,7 +463,7 @@ export default function FinancesPage() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Nouvelle transaction de trésorerie"
-        description="Enregistrez une entrée ou sortie de fonds avec le mode de paiement."
+        description="Enregistrez une entrée ou sortie de fonds avec le mode de paiement et suivi du règlement."
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -347,7 +500,7 @@ export default function FinancesPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Montant en FCFA
+                {type === "INCOME" ? "Montant total de la vente" : "Montant en FCFA"}
               </label>
               <input
                 type="number"
@@ -381,6 +534,110 @@ export default function FinancesPage() {
             </div>
           </div>
 
+          {/* Payment Status (for sales / receivables tracking) */}
+          {type === "INCOME" && (
+            <div className="rounded-xl border border-border/80 bg-surface-muted/50 p-3 space-y-3">
+              <label className="block text-xs font-semibold text-foreground">
+                Modalité de règlement client
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentStatus("PAID")}
+                  className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-all ${
+                    paymentStatus === "PAID"
+                      ? "border-success bg-success/15 text-success font-bold"
+                      : "border-border bg-surface text-muted"
+                  }`}
+                >
+                  ✓ Réglé 100%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentStatus("PARTIAL");
+                    if (!paidAmount && amountFcfa) {
+                      setPaidAmount(Math.round(Number(amountFcfa) / 2));
+                    }
+                  }}
+                  className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-all ${
+                    paymentStatus === "PARTIAL"
+                      ? "border-warning bg-warning/15 text-warning font-bold"
+                      : "border-border bg-surface text-muted"
+                  }`}
+                >
+                  ⏳ Acompte
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentStatus("UNPAID");
+                    setPaidAmount(0);
+                  }}
+                  className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-all ${
+                    paymentStatus === "UNPAID"
+                      ? "border-danger bg-danger/15 text-danger font-bold"
+                      : "border-border bg-surface text-muted"
+                  }`}
+                >
+                  ⚠ À crédit
+                </button>
+              </div>
+
+              {paymentStatus === "PARTIAL" && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-foreground mb-1">
+                      Acompte encaissé (FCFA)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={Number(amountFcfa) || undefined}
+                      value={paidAmount}
+                      onChange={(e) => setPaidAmount(e.target.value)}
+                      placeholder="Montant perçu"
+                      required
+                      className="w-full rounded-lg border border-border bg-surface p-2 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
+                    />
+                    <div className="mt-1 text-[10px] text-muted">
+                      Reste dû : <strong className="text-foreground">{formatFcfa(Math.max(0, (Number(amountFcfa) || 0) - (Number(paidAmount) || 0)))}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-foreground mb-1">
+                      Date d'échéance du solde
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-surface p-2 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {paymentStatus === "UNPAID" && (
+                <div className="pt-1">
+                  <label className="block text-[11px] font-semibold text-foreground mb-1">
+                    Date d'échéance convenue (Règlement total attendu)
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface p-2 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                  />
+                  <p className="mt-1 text-[10px] text-danger">
+                    La totalité ({formatFcfa(Number(amountFcfa) || 0)}) sera inscrite dans les créances clients à recouvrer.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
@@ -410,6 +667,19 @@ export default function FinancesPage() {
                   </>
                 )}
               </select>
+
+              {(category === "Autre Recette" || category === "Autre Depense") && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    required
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="Précisez la catégorie (ex. Subvention, Vente sacs...)"
+                    className="w-full rounded-xl border border-border bg-surface p-2 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -434,7 +704,7 @@ export default function FinancesPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-foreground">
-                Tiers associé ({type === "INCOME" ? "Client / Acheteur" : "Fournisseur"})
+                Tiers associé ({type === "INCOME" ? "Client / Revendeuse" : "Fournisseur"})
               </label>
               <a
                 href="/contacts"
@@ -477,10 +747,20 @@ export default function FinancesPage() {
             />
           </div>
 
+          {formError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{formError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setModalOpen(false)}
+              onClick={() => {
+                setModalOpen(false);
+                setFormError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler
@@ -495,6 +775,17 @@ export default function FinancesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* SALES RECEIPT MODAL */}
+      <SalesReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => {
+          setReceiptModalOpen(false);
+          setSelectedTxForReceipt(null);
+        }}
+        transaction={selectedTxForReceipt}
+        farm={activeFarm}
+      />
     </Shell>
   );
 }

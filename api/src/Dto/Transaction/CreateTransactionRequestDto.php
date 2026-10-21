@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Dto\Transaction;
 
 use App\Enum\PaymentMethod;
+use App\Enum\PaymentStatus;
 use App\Enum\TransactionCategory;
 use App\Enum\TransactionType;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -25,6 +26,14 @@ final readonly class CreateTransactionRequestDto
         public string $transactionDate,
 
         public PaymentMethod $paymentMethod = PaymentMethod::CASH,
+
+        public PaymentStatus $paymentStatus = PaymentStatus::PAID,
+
+        #[Assert\PositiveOrZero(message: "Le montant réglé doit être positif ou nul.")]
+        public ?int $paidAmount = null,
+
+        #[Assert\Date(message: "La date d'échéance doit être au format YYYY-MM-DD.")]
+        public ?string $dueDate = null,
 
         #[Assert\Length(max: 100, maxMessage: "La référence ne doit pas dépasser 100 caractères.")]
         public ?string $reference = null,

@@ -11,10 +11,13 @@ use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\User;
 use App\Enum\FlockStatus;
+use App\Repository\EggProductionRepository;
 use App\Repository\FlockRepository;
+use App\Repository\TransactionRepository;
 use App\Security\Voter\FarmVoter;
 use App\Security\Voter\FlockVoter;
 use App\Service\FlockService;
+use App\Service\PdfService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,6 +32,9 @@ class FlockController extends AbstractController
     public function __construct(
         private readonly FlockService $flockService,
         private readonly FlockRepository $flockRepository,
+        private readonly TransactionRepository $transactionRepository,
+        private readonly EggProductionRepository $eggProductionRepository,
+        private readonly PdfService $pdfService,
     ) {
     }
 
@@ -124,5 +130,46 @@ class FlockController extends AbstractController
                 'totalItems' => count($movements),
             ],
         ]);
+    }
+
+    #[Route('/api/flocks/{id}/report/pdf', name: 'api_flocks_report_pdf', methods: ['GET'])]
+    #[IsGranted(FlockVoter::VIEW, subject: 'flock')]
+    public function reportPdf(Flock $flock, Request $request): Response
+    {
+        $farm = $flock->getFarm();
+        $isDownload = $request->query->getBoolean('download', false);
+
+        $financialSummary = $this->transactionRepository->getFinancialSummary(
+            farm: $farm,
+            flock: $flock
+        );
+
+        $eggStats = null;
+        if ($flock->getPoultryType()->value === 'LAYER') {
+            $eggStats = $this->eggProductionRepository->getSummaryStats($flock);
+        }
+
+        $isClosed = $flock->getStatus() === FlockStatus::COMPLETED;
+        $ref = 'BIL-' . ($flock->getCode() ?: strtoupper(substr((string) $flock->getId(), -6)));
+
+        return $this->pdfService->createPdfResponse(
+            template: 'pdf/flock_summary.html.twig',
+            params: [
+                'farm' => $farm,
+                'flock' => $flock,
+                'financialSummary' => $financialSummary,
+                'eggStats' => $eggStats,
+                'documentTitle' => 'Bilan de Bande Avicole',
+                'documentSubtitle' => sprintf('Synthèse zootechnique & compte d\'exploitation — Lot %s', $flock->getName()),
+                'documentReference' => $ref,
+                'documentDate' => (new \DateTimeImmutable())->format('d/m/Y'),
+                'documentBadge' => $isClosed ? 'Lot Clôturé / Réformé' : 'Actif en Production',
+                'badgeVariant' => $isClosed ? 'neutral' : 'success',
+                'watermark' => $isClosed ? 'CLÔTURÉ' : 'ACTIF',
+                'notes' => $flock->getNotes() ?: "Lot conduit selon le calendrier prophylactique standard de l'exploitation. Performances conformes aux fiches techniques de la souche.",
+            ],
+            filename: sprintf('bilan-bande-%s.pdf', strtolower($flock->getCode() ?: 'lot')),
+            inline: !$isDownload,
+        );
     }
 }

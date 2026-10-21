@@ -1,31 +1,28 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package,
   ArrowLeft,
-  Calendar,
   AlertTriangle,
-  TrendingDown,
-  TrendingUp,
+  AlertCircle,
   Wallet,
   Plus,
   Minus,
-  Sliders,
   Edit2,
   RefreshCw,
   CheckCircle2,
   Bird,
-  Truck,
-  Building,
   Info,
   Tag,
-  Clock,
   Layers,
+  Utensils,
   Archive,
   RotateCcw,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -34,6 +31,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import {
   InventoryItem,
@@ -48,6 +46,8 @@ import {
   formatInventoryUnit,
   getUnitLabel,
   getUnitShortLabel,
+  getCompatibleMovementUnits,
+  getPracticalMeasurementHint,
   ALL_UNITS_LIST,
 } from "@/lib/units";
 
@@ -60,10 +60,16 @@ const CATEGORY_LABELS: Record<InventoryCategory, { label: string; badge: "defaul
 };
 
 const MOVEMENT_CONFIG: Record<
-  StockMovementType,
-  { label: string; badge: "success" | "warning" | "info" | "neutral"; sign: string; color: string }
+  string,
+  { label: string; badge: "success" | "warning" | "danger" | "info" | "neutral"; sign: string; color: string }
 > = {
   IN: {
+    label: "Approvisionnement (Entrée)",
+    badge: "success",
+    sign: "+",
+    color: "text-success",
+  },
+  INCOMING: {
     label: "Approvisionnement (Entrée)",
     badge: "success",
     sign: "+",
@@ -75,6 +81,18 @@ const MOVEMENT_CONFIG: Record<
     sign: "-",
     color: "text-warning",
   },
+  FEEDING: {
+    label: "Nourrissage des volailles",
+    badge: "warning",
+    sign: "-",
+    color: "text-warning",
+  },
+  LOSS: {
+    label: "Perte / Avarie",
+    badge: "danger",
+    sign: "-",
+    color: "text-danger",
+  },
   ADJUSTMENT: {
     label: "Ajustement d'inventaire",
     badge: "info",
@@ -83,10 +101,11 @@ const MOVEMENT_CONFIG: Record<
   },
 };
 
-export default function InventoryItemDetailPage() {
+function InventoryItemDetailContent() {
   const params = useParams();
   const router = useRouter();
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
   const itemId = params?.id as string;
 
   // Main state
@@ -99,19 +118,37 @@ export default function InventoryItemDetailPage() {
 
   // Modals state
   const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [moveType, setMoveType] = useState<StockMovementType>("IN");
-  const [moveQty, setMoveQty] = useState<number | string>(10);
+  const [moveUnit, setMoveUnit] = useState<string>("KG");
+  const [moveQty, setMoveQty] = useState<number | string>(15);
   const [moveUnitPrice, setMoveUnitPrice] = useState<number | string>("");
   const [moveDate, setMoveDate] = useState(new Date().toISOString().split("T")[0]);
   const [moveReason, setMoveReason] = useState("");
   const [moveFlockId, setMoveFlockId] = useState("");
   const [submittingMove, setSubmittingMove] = useState(false);
 
+  // Détection article aliment / provende & conditionnement en sacs
+  const isFeed = Boolean(
+    item?.category === "FEED" ||
+    item?.name?.toLowerCase().includes("aliment") ||
+    item?.name?.toLowerCase().includes("provende") ||
+    item?.name?.toLowerCase().includes("farine") ||
+    item?.name?.toLowerCase().includes("granul")
+  );
+  const isBagItem = Boolean(
+    item?.unit === "BAG" || item?.unit === "BAG_50KG" || item?.unit === "BAG_25KG"
+  );
+  const itemBagWeight = item?.packageWeightKg || (item?.unit === "BAG_25KG" ? 25 : 50);
+
   // Edit Item Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState<InventoryCategory>("FEED");
+  const [editCustomCategory, setEditCustomCategory] = useState("");
   const [editUnit, setEditUnit] = useState("BAG_50KG");
+  const [editPackageWeightKg, setEditPackageWeightKg] = useState<number | string>(50);
   const [editMinThreshold, setEditMinThreshold] = useState<number | string>(10);
   const [editUnitCost, setEditUnitCost] = useState<number | string>(0);
   const [editNotes, setEditNotes] = useState("");
@@ -138,7 +175,9 @@ export default function InventoryItemDetailPage() {
       setItem(data);
       setEditName(data.name || "");
       setEditCategory(data.category || "FEED");
+      setEditCustomCategory(data.customCategory || "");
       setEditUnit(data.unit || "BAG_50KG");
+      setEditPackageWeightKg(data.packageWeightKg || (data.unit === "BAG_25KG" ? 25 : 50));
       setEditMinThreshold(data.minThreshold || 0);
       setEditUnitCost(data.unitCostFcfa || 0);
       setEditNotes(data.notes || "");
@@ -151,18 +190,43 @@ export default function InventoryItemDetailPage() {
   }
 
   function openMovementModal(type: StockMovementType) {
+    setMoveError(null);
     setMoveType(type);
-    setMoveQty(type === "OUT" ? 1 : 10);
     setMoveUnitPrice(item?.unitCostFcfa || 0);
     setMoveDate(new Date().toISOString().split("T")[0]);
     setMoveFlockId(flocks[0]?.id || "");
-    setMoveReason(
-      type === "IN"
-        ? "Réception commande fournisseur / provenderie"
-        : type === "OUT"
-        ? "Distribution aliment bande"
-        : "Inventaire physique périodique"
-    );
+
+    const compatible = getCompatibleMovementUnits(item?.unit, item?.packageWeightKg);
+    const defaultUnit = compatible[0]?.code || item?.unit || "UNIT";
+
+    if (type === "OUT") {
+      if (isFeed) {
+        setMoveUnit("KG"); // Pour la provende : pesée balance en kg
+        setMoveQty(15);
+        setMoveReason("Ration repas");
+      } else if (item?.unit === "LITER" || item?.unit === "ML") {
+        setMoveUnit("ML"); // Pour les vitamines liquides : millilitres
+        setMoveQty(30);
+        setMoveReason("Traitement eau de boisson");
+      } else if (item?.unit === "KG" || item?.unit === "G") {
+        setMoveUnit("G"); // Pour les vitamines poudre : grammes
+        setMoveQty(15);
+        setMoveReason("Vitamines / Poudre");
+      } else {
+        setMoveUnit(defaultUnit);
+        setMoveQty(1);
+        setMoveReason("Consommation");
+      }
+    } else if (type === "IN") {
+      setMoveUnit(item?.unit || defaultUnit);
+      setMoveQty(isBagItem ? 10 : 1);
+      setMoveReason("Approvisionnement");
+    } else {
+      setMoveUnit(item?.unit || defaultUnit);
+      setMoveQty(item?.currentStock || 0);
+      setMoveReason("Ajustement inventaire");
+    }
+
     setMoveModalOpen(true);
   }
 
@@ -170,22 +234,26 @@ export default function InventoryItemDetailPage() {
     e.preventDefault();
     if (!item?.id) return;
 
+    setMoveError(null);
     setSubmittingMove(true);
     try {
       await api.inventory.addMovement(item.id, {
         type: moveType,
         quantity: Number(moveQty),
-        unit: item.unit,
+        unit: moveUnit,
         unitPrice: moveUnitPrice ? Number(moveUnitPrice) : undefined,
         movementDate: moveDate,
         flockId: moveType === "OUT" && moveFlockId ? moveFlockId : undefined,
-        reason: moveReason || undefined,
+        reason: moveReason.trim() || undefined,
       });
 
       setMoveModalOpen(false);
+      toast.success("Mouvement de stock enregistré avec succès !");
       await loadItemData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement du mouvement.");
+      const msg = err?.message || "Erreur lors de l'enregistrement du mouvement.";
+      setMoveError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingMove(false);
     }
@@ -195,12 +263,16 @@ export default function InventoryItemDetailPage() {
     e.preventDefault();
     if (!item?.id) return;
 
+    setEditError(null);
     setSubmittingEdit(true);
     try {
+      const isBagEdit = editUnit === "BAG" || editUnit === "BAG_50KG" || editUnit === "BAG_25KG";
       await api.inventory.update(item.id, {
         name: editName.trim(),
         category: editCategory,
+        customCategory: editCategory === "OTHER" ? editCustomCategory.trim() : null,
         unit: editUnit,
+        packageWeightKg: isBagEdit ? Math.max(0.1, Number(editPackageWeightKg) || 50) : null,
         minThreshold: Number(editMinThreshold) || 0,
         unitCostFcfa: Number(editUnitCost) || 0,
         notes: editNotes.trim() || null,
@@ -208,9 +280,12 @@ export default function InventoryItemDetailPage() {
       });
 
       setEditModalOpen(false);
+      toast.success("Article mis à jour avec succès !");
       await loadItemData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la modification de l'article.");
+      const msg = err?.message || "Erreur lors de la modification de l'article.";
+      setEditError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingEdit(false);
     }
@@ -222,9 +297,10 @@ export default function InventoryItemDetailPage() {
       await api.inventory.update(item.id, {
         isActive: !item.isActive,
       });
+      toast.success(item.isActive ? "Article archivé avec succès." : "Article restauré avec succès.");
       await loadItemData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors du changement de statut d'archivage.");
+      toast.error(err?.message || "Erreur lors du changement de statut d'archivage.");
     }
   }
 
@@ -308,12 +384,33 @@ export default function InventoryItemDetailPage() {
       header: "Quantité",
       align: "right",
       cell: (m: StockMovement) => {
-        const conf = MOVEMENT_CONFIG[m.type as StockMovementType] || { sign: "", color: "text-foreground" };
+        const conf = MOVEMENT_CONFIG[m.type as string] || { sign: "", color: "text-foreground" };
         const unitName = m.unitShortLabel || getUnitShortLabel(m.unit || item?.unit || "UNIT");
+
+        // Équivalence sac <-> kg selon le poids réel du sac
+        const isMovementInKg = m.unit === "KG" || unitName.toLowerCase() === "kg";
+        const isMovementInBags = m.unit === "BAG" || m.unit === "BAG_50KG" || m.unit === "BAG_25KG" || unitName.toLowerCase() === "sac";
+
+        let equivLabel: string | null = null;
+        if (isBagItem && isMovementInKg) {
+          const bags = (Number(m.quantity) / itemBagWeight).toFixed(2);
+          equivLabel = `≈ ${bags} sac (${itemBagWeight} kg)`;
+        } else if (isBagItem && isMovementInBags) {
+          const totalKg = (Number(m.quantity) * itemBagWeight).toLocaleString("fr-FR");
+          equivLabel = `≈ ${totalKg} kg`;
+        }
+
         return (
-          <span className={`font-mono text-xs font-bold ${conf.color}`}>
-            {conf.sign} {formatNumber(m.quantity)} <span className="text-[10px] text-muted font-normal">{unitName}</span>
-          </span>
+          <div className="flex flex-col items-end">
+            <span className={`font-mono text-xs font-bold ${conf.color}`}>
+              {conf.sign} {formatNumber(m.quantity)} <span className="text-[10px] text-muted font-normal">{unitName}</span>
+            </span>
+            {equivLabel && (
+              <span className="text-[10px] font-mono text-muted">
+                {equivLabel}
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -360,11 +457,11 @@ export default function InventoryItemDetailPage() {
     },
     {
       key: "reason",
-      header: "Motif / Justificatif",
+      header: "Motif / Remarque",
       cell: (m: StockMovement) => (
-        <div className="max-w-[200px] truncate text-xs text-muted" title={m.reason || ""}>
-          {m.reason || "—"}
-        </div>
+        <span className="truncate text-xs text-muted max-w-[220px]" title={m.reason || "—"}>
+          {m.reason ? m.reason.replace(/^\[(Matin|Midi|Soir|Journée)\]\s*/i, "") : "—"}
+        </span>
       ),
     },
     {
@@ -434,26 +531,26 @@ export default function InventoryItemDetailPage() {
                 {item.name}
               </h1>
               <Badge variant={categoryBadge.badge} size="sm">
-                {categoryBadge.label}
+                {item.category === "OTHER" && item.customCategory
+                  ? item.customCategory
+                  : categoryBadge.label}
               </Badge>
-              {item.sku && (
-                <span className="font-mono text-xs rounded-lg bg-surface-muted px-2 py-0.5 text-muted border border-border font-semibold">
-                  {item.sku}
-                </span>
-              )}
               {item.isActive === false && (
                 <Badge variant="neutral" size="sm">
                   Archivé
                 </Badge>
               )}
-              {isLowStock && (
-                <Badge variant="danger" size="sm">
-                  Stock Bas (Sous-seuil !)
-                </Badge>
-              )}
+            
             </div>
             <p className="mt-1 text-xs text-muted flex items-center gap-2">
-              <span>Unité standard : <strong className="text-foreground">{unitLabel}</strong></span>
+              <span>
+                Unité standard : <strong className="text-foreground">{unitLabel}</strong>
+                {isBagItem && (
+                  <span className="font-mono text-primary font-semibold ml-1">
+                    ({itemBagWeight} kg / sac)
+                  </span>
+                )}
+              </span>
               <span>•</span>
               <span>Seuil de sécurité : <strong className="text-foreground">{formatNumber(item.minThreshold)} {unitShort}</strong></span>
             </p>
@@ -467,26 +564,20 @@ export default function InventoryItemDetailPage() {
               <button
                 type="button"
                 onClick={() => openMovementModal("IN")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-success px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-success/90 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-success px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-success/90 transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Approvisionner</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => openMovementModal("OUT")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors cursor-pointer"
+                title={isFeed ? "Distribuer la provende aux volailles" : "Enregistrer une sortie ou un traitement"}
               >
-                <Minus className="h-4 w-4" />
-                <span>Sortie / Consommation</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openMovementModal("ADJUSTMENT")}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-hover transition-colors"
-              >
-                <Sliders className="h-3.5 w-3.5 text-muted" />
-                <span>Ajuster</span>
+                {isFeed ? <Utensils className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+                <span>{isFeed ? "Nourrir" : "Distribuer"}</span>
               </button>
             </>
           )}
@@ -550,9 +641,11 @@ export default function InventoryItemDetailPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <StatCard
           title="Stock Actuel Disponible"
-          value={formatInventoryUnit(item.currentStock, item.unit)}
+          value={formatInventoryUnit(item.currentStock, item.unit, { packageWeightKg: item.packageWeightKg })}
           subtitle={
-            isLowStock
+            isBagItem
+              ? `Soit ~${formatNumber(item.currentStock * itemBagWeight)} kg au total`
+              : isLowStock
               ? `Alerte sous le seuil (${formatNumber(item.minThreshold)} ${unitShort})`
               : `Seuil d'alerte à ${formatNumber(item.minThreshold)} ${unitShort}`
           }
@@ -729,6 +822,21 @@ export default function InventoryItemDetailPage() {
                 <dd className="font-bold text-foreground">{unitLabel} ({unitShort})</dd>
               </div>
 
+              {isBagItem && (
+                <>
+                  <div className="flex justify-between py-1 border-b border-border/50">
+                    <dt className="text-muted">Poids net d'un sac :</dt>
+                    <dd className="font-mono font-bold text-primary">{itemBagWeight} kg / sac</dd>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-border/50">
+                    <dt className="text-muted">Masse totale en stock :</dt>
+                    <dd className="font-mono font-bold text-foreground">
+                      ~{formatNumber(item.currentStock * itemBagWeight)} kg ({formatNumber(item.currentStock)} sacs)
+                    </dd>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between py-1 border-b border-border/50">
                 <dt className="text-muted">Seuil d'alerte sécurité :</dt>
                 <dd className="font-mono font-bold text-foreground">{formatNumber(item.minThreshold)} {unitShort}</dd>
@@ -810,40 +918,65 @@ export default function InventoryItemDetailPage() {
         </div>
       )}
 
-      {/* MODAL ENREGISTRER MOUVEMENT DE STOCK */}
+      {/* MODAL MOUVEMENT DE STOCK (Distribution, Nourrissage, Entrée, Ajustement) */}
       <Modal
         isOpen={moveModalOpen}
         onClose={() => setMoveModalOpen(false)}
         title={
           moveType === "IN"
-            ? "Approvisionnement de stock (Entrée)"
+            ? "Approvisionnement de stock"
             : moveType === "OUT"
-            ? "Consommation bande de volailles (Sortie)"
-            : "Ajustement d'inventaire physique"
+            ? isFeed
+              ? "Distribution d'aliment"
+              : "Sortie de stock"
+            : "Ajustement d'inventaire"
         }
-        description={`Article : ${item.name} (${unitLabel})`}
+        description={`${item.name} • Stock disponible : ${formatInventoryUnit(item.currentStock, item.unit, { packageWeightKg: item.packageWeightKg })}`}
         maxWidth="md"
       >
         <form onSubmit={handleRecordMovement} className="space-y-4">
+          {/* Ligne 1 : Type d'opération & Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Type de mouvement *
+                Type d'opération *
               </label>
               <select
                 value={moveType}
-                onChange={(e) => setMoveType(e.target.value as StockMovementType)}
+                onChange={(e) => {
+                  const newType = e.target.value as StockMovementType;
+                  setMoveType(newType);
+                  const compatible = getCompatibleMovementUnits(item.unit, item.packageWeightKg);
+                  if (newType === "IN") {
+                    setMoveUnit(item.unit || compatible[0]?.code || "UNIT");
+                    setMoveReason("Approvisionnement");
+                  } else if (newType === "OUT") {
+                    if (isFeed) {
+                      setMoveUnit("KG");
+                      setMoveReason("Ration repas");
+                    } else if (item.unit === "LITER" || item.unit === "ML") {
+                      setMoveUnit("ML");
+                      setMoveReason("Traitement eau de boisson");
+                    } else if (item.unit === "KG" || item.unit === "G") {
+                      setMoveUnit("G");
+                      setMoveReason("Vitamines / Poudre");
+                    } else {
+                      setMoveUnit(compatible[0]?.code || item.unit || "UNIT");
+                      setMoveReason("Sortie consommation");
+                    }
+                  }
+                }}
                 className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
               >
-                <option value="IN">Entrée (Approvisionnement)</option>
-                <option value="OUT">Sortie (Consommation / Perte)</option>
-                <option value="ADJUSTMENT">Ajustement d'inventaire</option>
+                <option value="OUT">Sortie / Distribution</option>
+                <option value="IN">Entrée / Approvisionnement</option>
+                <option value="ADJUSTMENT">Ajustement inventaire</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Date de l'opération *
+                Date *
               </label>
               <input
                 type="date"
@@ -851,57 +984,30 @@ export default function InventoryItemDetailPage() {
                 value={moveDate}
                 onChange={(e) => setMoveDate(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
-              >
-              </input>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Quantité ({unitShort}) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={moveQty}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setMoveQty(e.target.value)}
-                placeholder="ex. 10"
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Prix unitaire FCFA (Optionnel)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={moveUnitPrice}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setMoveUnitPrice(e.target.value)}
-                placeholder={item.unitCostFcfa ? String(item.unitCostFcfa) : "0"}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>
           </div>
 
-          {/* Bande de volailles destinataire pour une sortie */}
-          {moveType === "OUT" && (
+          {/* Bande de volailles destinataire (si Sortie) */}
+          {moveType === "OUT" && flocks.length > 0 && (
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Bande / Lot de volailles destinataire
+              <label className="block text-xs font-semibold text-foreground mb-1 flex items-center justify-between">
+                <span>Bande de volailles</span>
+                {(() => {
+                  const f = flocks.find((fl) => fl.id === moveFlockId);
+                  return f ? (
+                    <span className="text-[11px] font-mono text-muted">
+                      {formatNumber(f.currentQuantity)} sujets
+                    </span>
+                  ) : null;
+                })()}
               </label>
               <select
                 value={moveFlockId}
                 onChange={(e) => setMoveFlockId(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden font-medium"
               >
-                <option value="">-- Consommation générale / Non rattachée --</option>
+                <option value="">-- Aucune bande spécifique --</option>
                 {flocks.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name} ({f.code}) — {formatNumber(f.currentQuantity)} sujets
@@ -911,34 +1017,123 @@ export default function InventoryItemDetailPage() {
             </div>
           )}
 
-          {/* Motif / Commentaire */}
+          {/* Quantité & Choix de l'unité */}
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Motif / Justificatif
+              Quantité & Unité *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                step="any"
+                min="0.001"
+                required
+                value={moveQty}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setMoveQty(e.target.value)}
+                placeholder="ex. 15"
+                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-sm font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
+              />
+              <select
+                value={moveUnit}
+                onChange={(e) => setMoveUnit(e.target.value)}
+                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
+              >
+                {getCompatibleMovementUnits(item.unit, item.packageWeightKg).map((u) => (
+                  <option key={u.code} value={u.code}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Indication sobre et discrète de dosage (cuillère à soupe, décompte sacs, etc.) */}
+            {(() => {
+              const hint = getPracticalMeasurementHint(moveQty, moveUnit, {
+                packageWeightKg: item.packageWeightKg,
+                itemUnit: item.unit,
+              });
+              return hint ? (
+                <p className="mt-1.5 text-[11px] text-muted flex items-center gap-1.5">
+                  <span className="font-semibold text-primary">•</span>
+                  <span>{hint}</span>
+                </p>
+              ) : null;
+            })()}
+          </div>
+
+          {/* Prix unitaire (si Entrée) */}
+          {moveType === "IN" && (
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Prix unitaire d'achat (FCFA / {getUnitShortLabel(moveUnit)})
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={moveUnitPrice}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setMoveUnitPrice(e.target.value)}
+                placeholder={item.unitCostFcfa ? `Prix habituel : ${item.unitCostFcfa} FCFA` : "Optionnel"}
+                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
+              />
+            </div>
+          )}
+
+          {/* Motif / Remarque avec suggestions discrètes */}
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Motif / Remarque
             </label>
             <input
               type="text"
               value={moveReason}
               onChange={(e) => setMoveReason(e.target.value)}
-              placeholder="ex. Achat provenderie Allada, Aliment démarrage semaine 2..."
+              placeholder={isFeed ? "ex. Ration matin, distribution repas..." : "ex. Traitement eau de boisson, vitamines..."}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-muted">Suggestions :</span>
+              {(isFeed
+                ? ["Ration matin", "Ration midi", "Ration soir", "Réassort"]
+                : ["Traitement eau", "Vitamines", "Soins", "Approvisionnement"]
+              ).map((sug) => (
+                <button
+                  key={sug}
+                  type="button"
+                  onClick={() => setMoveReason(sug)}
+                  className="text-[10px] px-2 py-0.5 rounded-md border border-border bg-surface hover:bg-surface-hover text-muted hover:text-foreground transition-colors cursor-pointer"
+                >
+                  {sug}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {moveError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{moveError}</div>
+            </div>
+          )}
 
           <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setMoveModalOpen(false)}
-              className="rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
+              onClick={() => {
+                setMoveModalOpen(false);
+                setMoveError(null);
+              }}
+              className="rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors cursor-pointer"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={submittingMove}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <span>{submittingMove ? "Enregistrement..." : "Confirmer l'opération"}</span>
+              <span>{submittingMove ? "Enregistrement..." : "Enregistrer le mouvement"}</span>
             </button>
           </div>
         </form>
@@ -990,7 +1185,13 @@ export default function InventoryItemDetailPage() {
               </label>
               <select
                 value={editUnit}
-                onChange={(e) => setEditUnit(e.target.value)}
+                onChange={(e) => {
+                  const newU = e.target.value;
+                  setEditUnit(newU);
+                  if (newU === "BAG_25KG" && (!editPackageWeightKg || editPackageWeightKg === 50)) {
+                    setEditPackageWeightKg(25);
+                  }
+                }}
                 className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
               >
                 {ALL_UNITS_LIST.map((u) => (
@@ -1001,6 +1202,49 @@ export default function InventoryItemDetailPage() {
               </select>
             </div>
           </div>
+
+          {/* Précision personnalisée si catégorie Autre */}
+          {editCategory === "OTHER" && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Précisez la catégorie / nature de l'intrant *
+              </label>
+              <input
+                type="text"
+                required
+                value={editCustomCategory}
+                onChange={(e) => setEditCustomCategory(e.target.value)}
+                placeholder="ex. Litière & Copeaux, Désinfectant, Carton d'alvéoles..."
+                className="w-full rounded-xl border border-border bg-surface p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
+              />
+            </div>
+          )}
+
+          {/* Saisie personnalisée du poids par sac */}
+          {(editUnit === "BAG" || editUnit === "BAG_50KG" || editUnit === "BAG_25KG") && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+              <label className="block text-xs font-semibold text-foreground">
+                Poids net par sac (kg) *
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0.1"
+                  max="1000"
+                  step="0.1"
+                  required
+                  value={editPackageWeightKg}
+                  onChange={(e) => setEditPackageWeightKg(e.target.value)}
+                  placeholder="ex. 50, 40, 25..."
+                  className="w-full rounded-xl border border-border bg-surface p-2.5 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
+                />
+                <span className="text-xs font-bold text-muted whitespace-nowrap">kg / sac</span>
+              </div>
+              <p className="text-[11px] text-muted">
+                Définit le poids exact d'un sac pour calculer fidèlement le poids total en magasin ({formatNumber(item.currentStock)} sacs = ~{formatNumber(item.currentStock * (Number(editPackageWeightKg) || 50))} kg) et convertir les pesées de machine.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1048,10 +1292,20 @@ export default function InventoryItemDetailPage() {
             />
           </div>
 
+          {editError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{editError}</div>
+            </div>
+          )}
+
           <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setEditModalOpen(false)}
+              onClick={() => {
+                setEditModalOpen(false);
+                setEditError(null);
+              }}
               className="rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
             >
               Annuler
@@ -1067,5 +1321,24 @@ export default function InventoryItemDetailPage() {
         </form>
       </Modal>
     </Shell>
+  );
+}
+
+export default function InventoryItemDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <Shell>
+          <div className="flex h-96 items-center justify-center">
+            <div className="flex flex-col items-center gap-2 text-xs text-muted">
+              <Package className="h-5 w-5 animate-pulse text-primary" />
+              <span>Chargement de la fiche article...</span>
+            </div>
+          </div>
+        </Shell>
+      }
+    >
+      <InventoryItemDetailContent />
+    </Suspense>
   );
 }

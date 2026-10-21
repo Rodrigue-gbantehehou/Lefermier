@@ -66,6 +66,7 @@ export interface DataTableProps<T> {
   viewMode?: "table" | "grid";
   onViewModeChange?: (mode: "table" | "grid") => void;
   renderGridItem?: (item: T) => React.ReactNode;
+  renderMobileCard?: (item: T) => React.ReactNode;
 
   // Pagination
   pageSize?: number;
@@ -109,6 +110,7 @@ export function DataTable<T>({
   viewMode = "table",
   onViewModeChange,
   renderGridItem,
+  renderMobileCard,
   pageSize = 15,
   onRowClick,
   rowClassName,
@@ -250,7 +252,7 @@ export function DataTable<T>({
   };
 
   return (
-    <div className={`rounded-2xl border border-border bg-surface p-5 shadow-xs ${className}`}>
+    <div className={`rounded-2xl border border-border bg-surface p-3.5 sm:p-5 shadow-xs ${className}`}>
       {/* 1. Header Toolbar */}
       <div className="flex flex-col gap-4 pb-4 border-b border-border">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -258,11 +260,7 @@ export function DataTable<T>({
             {title && (
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-foreground">{title}</h2>
-                {badge || (
-                  <Badge variant="default" size="sm" dot>
-                    {totalItems} élément{totalItems > 1 ? "s" : ""}
-                  </Badge>
-                )}
+                
               </div>
             )}
             {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
@@ -403,101 +401,215 @@ export function DataTable<T>({
           ))}
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-surface-muted text-muted">
-              <tr>
-                {columns.map((col, idx) => {
-                  const isSorted = sortState?.key === col.key;
-                  const isFirst = idx === 0;
-                  const isLast = idx === columns.length - 1;
-                  const alignClass =
-                    col.align === "right"
-                      ? "text-right"
-                      : col.align === "center"
-                      ? "text-center"
-                      : "text-left";
+        <>
+          {/* VUE MOBILE (< 768px) : Cartes tactiles empilées sans aucun défilement horizontal forcé */}
+          <div className="mt-4 space-y-3 md:hidden">
+            {paginatedData.map((item, idx) => {
+              const rowKey = getKey(item, idx);
+              const customRowClass = rowClassName ? rowClassName(item) : "";
+              const isClickable = !!onRowClick;
 
-                  return (
-                    <th
-                      key={col.key}
-                      className={`py-2.5 px-3 font-semibold ${alignClass} ${
-                        isFirst ? "rounded-l-lg" : ""
-                      } ${isLast ? "rounded-r-lg" : ""} ${col.headerClassName || ""}`}
-                    >
-                      {col.sortable ? (
-                        <button
-                          type="button"
-                          onClick={() => handleSort(col.key)}
-                          className={`inline-flex items-center gap-1 hover:text-foreground transition-colors group ${
-                            alignClass === "text-right" ? "justify-end ml-auto" : ""
-                          }`}
-                        >
-                          <span>{col.header}</span>
-                          {isSorted ? (
-                            sortState?.direction === "asc" ? (
-                              <ArrowUp className="h-3.5 w-3.5 text-primary" />
-                            ) : (
-                              <ArrowDown className="h-3.5 w-3.5 text-primary" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
-                          )}
-                        </button>
-                      ) : (
-                        <span>{col.header}</span>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginatedData.map((item, idx) => {
-                const rowKey = getKey(item, idx);
-                const customRowClass = rowClassName ? rowClassName(item) : "";
-                const isClickable = !!onRowClick;
-
+              if (renderMobileCard) {
                 return (
-                  <tr
+                  <div
                     key={rowKey}
                     onClick={() => onRowClick?.(item)}
-                    className={`transition-colors ${
-                      isClickable ? "cursor-pointer hover:bg-surface-hover/80" : "hover:bg-surface-hover/50"
-                    } ${customRowClass}`}
+                    className={isClickable ? "cursor-pointer" : ""}
                   >
-                    {columns.map((col) => {
-                      const alignClass =
-                        col.align === "right"
-                          ? "text-right"
-                          : col.align === "center"
-                          ? "text-center"
-                          : "text-left";
-
-                      let content: React.ReactNode;
-                      if (col.cell) {
-                        content = col.cell(item);
-                      } else if (col.accessor) {
-                        content = col.accessor(item);
-                      } else {
-                        content = (item as any)[col.key];
-                      }
-
-                      return (
-                        <td
-                          key={col.key}
-                          className={`py-3 px-3 ${alignClass} ${col.className || ""}`}
-                        >
-                          {content}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                    {renderMobileCard(item)}
+                  </div>
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              }
+
+              // Rendu automatique intelligent en carte mobile
+              const firstCol = columns[0];
+              const actionCol = columns.find(
+                (c) => c.key === "actions" || c.key === "action" || (!c.header && c.cell)
+              );
+              const rightCol =
+                columns.find(
+                  (c) =>
+                    c !== firstCol &&
+                    c !== actionCol &&
+                    (c.align === "right" ||
+                      c.key.toLowerCase().includes("amount") ||
+                      c.key.toLowerCase().includes("montant") ||
+                      c.key.toLowerCase().includes("total"))
+                ) ||
+                (columns.length > 2 && columns[columns.length - (actionCol ? 2 : 1)] !== firstCol
+                  ? columns[columns.length - (actionCol ? 2 : 1)]
+                  : null);
+
+              const middleCols = columns.filter(
+                (c) => c !== firstCol && c !== actionCol && c !== rightCol
+              );
+
+              return (
+                <div
+                  key={rowKey}
+                  onClick={() => onRowClick?.(item)}
+                  className={`rounded-2xl border border-border bg-surface p-4 shadow-xs space-y-2.5 transition-all ${
+                    isClickable ? "cursor-pointer active:scale-[0.99] hover:border-primary/50" : ""
+                  } ${customRowClass}`}
+                >
+                  {/* Haut de la carte : Titre / Date principale + Montant ou Statut */}
+                  <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
+                    <div className="min-w-0 font-bold text-xs text-foreground">
+                      {firstCol?.cell
+                        ? firstCol.cell(item)
+                        : firstCol?.accessor
+                        ? firstCol.accessor(item)
+                        : (item as any)[firstCol?.key || ""]}
+                    </div>
+                    {rightCol && (
+                      <div className="text-right shrink-0">
+                        {rightCol.cell
+                          ? rightCol.cell(item)
+                          : rightCol.accessor
+                          ? rightCol.accessor(item)
+                          : (item as any)[rightCol.key]}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Corps de la carte : Détails en paires clé/valeur */}
+                  {middleCols.length > 0 && (
+                    <div className="space-y-1.5 text-xs py-0.5">
+                      {middleCols.map((col) => {
+                        const content = col.cell
+                          ? col.cell(item)
+                          : col.accessor
+                          ? col.accessor(item)
+                          : (item as any)[col.key];
+
+                        if (content === null || content === undefined || content === "") return null;
+
+                        return (
+                          <div key={col.key} className="flex items-center justify-between gap-2 py-0.5">
+                            <span className="text-[11px] text-muted font-medium shrink-0">
+                              {col.header} :
+                            </span>
+                            <span className="text-right text-xs font-semibold text-foreground truncate max-w-[65%]">
+                              {content}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Bas de la carte : Actions (bouton Reçu, détails, etc.) */}
+                  {actionCol && (
+                    <div className="pt-2 border-t border-border/50 flex items-center justify-end">
+                      {actionCol.cell
+                        ? actionCol.cell(item)
+                        : actionCol.accessor
+                        ? actionCol.accessor(item)
+                        : (item as any)[actionCol.key]}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* VUE TABLEAU DESKTOP & TABLETTE (>= 768px) */}
+          <div className="hidden md:block mt-4 overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-surface-muted text-muted">
+                <tr>
+                  {columns.map((col, idx) => {
+                    const isSorted = sortState?.key === col.key;
+                    const isFirst = idx === 0;
+                    const isLast = idx === columns.length - 1;
+                    const alignClass =
+                      col.align === "right"
+                        ? "text-right"
+                        : col.align === "center"
+                        ? "text-center"
+                        : "text-left";
+
+                    return (
+                      <th
+                        key={col.key}
+                        className={`py-2.5 px-3 font-semibold whitespace-nowrap ${alignClass} ${
+                          isFirst ? "rounded-l-lg" : ""
+                        } ${isLast ? "rounded-r-lg" : ""} ${col.headerClassName || ""}`}
+                      >
+                        {col.sortable ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSort(col.key)}
+                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors group ${
+                              alignClass === "text-right" ? "justify-end ml-auto" : ""
+                            }`}
+                          >
+                            <span>{col.header}</span>
+                            {isSorted ? (
+                              sortState?.direction === "asc" ? (
+                                <ArrowUp className="h-3.5 w-3.5 text-primary" />
+                              ) : (
+                                <ArrowDown className="h-3.5 w-3.5 text-primary" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </button>
+                        ) : (
+                          <span>{col.header}</span>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paginatedData.map((item, idx) => {
+                  const rowKey = getKey(item, idx);
+                  const customRowClass = rowClassName ? rowClassName(item) : "";
+                  const isClickable = !!onRowClick;
+
+                  return (
+                    <tr
+                      key={rowKey}
+                      onClick={() => onRowClick?.(item)}
+                      className={`transition-colors ${
+                        isClickable ? "cursor-pointer hover:bg-surface-hover/80" : "hover:bg-surface-hover/50"
+                      } ${customRowClass}`}
+                    >
+                      {columns.map((col) => {
+                        const alignClass =
+                          col.align === "right"
+                            ? "text-right"
+                            : col.align === "center"
+                            ? "text-center"
+                            : "text-left";
+
+                        let content: React.ReactNode;
+                        if (col.cell) {
+                          content = col.cell(item);
+                        } else if (col.accessor) {
+                          content = col.accessor(item);
+                        } else {
+                          content = (item as any)[col.key];
+                        }
+
+                        return (
+                          <td
+                            key={col.key}
+                            className={`py-3 px-3 ${alignClass} ${col.className || ""}`}
+                          >
+                            {content}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* 4. Footer Pagination & Status */}

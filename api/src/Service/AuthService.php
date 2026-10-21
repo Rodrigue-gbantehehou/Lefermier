@@ -108,6 +108,12 @@ class AuthService
                     'currency' => $farm->getCurrency(),
                     'locationCity' => $farm->getLocationCity(),
                     'locationCountry' => $farm->getLocationCountry(),
+                    'phone' => $farm->getPhone(),
+                    'email' => $farm->getEmail(),
+                    'address' => $farm->getAddress(),
+                    'ifu' => $farm->getIfu(),
+                    'rccm' => $farm->getRccm(),
+                    'description' => $farm->getDescription(),
                     'role' => $membership->getRole()->value,
                     'roleName' => $membership->getRoleDefinition()?->getName() ?? $membership->getRole()->value,
                     'permissions' => $membership->getPermissions(),
@@ -125,5 +131,64 @@ class AuthService
             'roles' => $user->getRoles(),
             'farms' => $farms,
         ];
+    }
+
+    /**
+     * Demande de réinitialisation de mot de passe par Email ou SMS.
+     *
+     * @return array<string, mixed>
+     */
+    public function requestPasswordReset(string $identifier, string $channel = 'email'): array
+    {
+        $clean = trim($identifier);
+        $user = $this->userRepository->findOneBy(['email' => strtolower($clean)]);
+        if ($user === null && !empty($clean)) {
+            $user = $this->userRepository->findOneBy(['phone' => $clean]);
+        }
+
+        if ($user === null) {
+            return [
+                'message' => 'Si un compte est associé à ces coordonnées, des instructions de réinitialisation ont été envoyées.',
+            ];
+        }
+
+        $code = sprintf('%06d', random_int(100000, 999999));
+        $user->setPasswordResetToken($code);
+        $user->setPasswordResetExpiresAt(new \DateTimeImmutable('+15 minutes'));
+
+        $this->entityManager->flush();
+
+        return [
+            'message' => 'Si un compte est associé à ces coordonnées, des instructions de réinitialisation ont été envoyées.',
+            'devCode' => $code,
+            'channel' => $channel,
+        ];
+    }
+
+    /**
+     * Validation du code et changement de mot de passe.
+     */
+    public function resetPassword(string $identifier, string $code, string $newPassword): void
+    {
+        $clean = trim($identifier);
+        $user = $this->userRepository->findOneBy(['email' => strtolower($clean)]);
+        if ($user === null && !empty($clean)) {
+            $user = $this->userRepository->findOneBy(['phone' => $clean]);
+        }
+
+        if ($user === null || !$user->isPasswordResetTokenValid(trim($code))) {
+            throw new \InvalidArgumentException('Le code de réinitialisation est invalide ou a expiré.');
+        }
+
+        if (strlen($newPassword) < 8) {
+            throw new \InvalidArgumentException('Le nouveau mot de passe doit comporter au moins 8 caractères.');
+        }
+
+        $hashed = $this->passwordHasher->hashPassword($user, $newPassword);
+        $user->setPassword($hashed);
+        $user->setPasswordResetToken(null);
+        $user->setPasswordResetExpiresAt(null);
+
+        $this->entityManager->flush();
     }
 }

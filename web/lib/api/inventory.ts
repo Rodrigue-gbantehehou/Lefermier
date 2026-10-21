@@ -14,7 +14,9 @@ export const inventoryApi = {
       name: i.name,
       sku: i.code || i.sku || (i.name ? i.name.slice(0, 4).toUpperCase() : "ART"),
       category: i.category === "MEDICATION" ? "MEDICINE" : i.category,
+      customCategory: i.customCategory || undefined,
       unit: i.unit,
+      packageWeightKg: i.packageWeightKg ? Number(i.packageWeightKg) : undefined,
       minThreshold: i.alertThreshold !== undefined ? i.alertThreshold : (i.minThreshold || 0),
       currentStock: i.currentStock || 0,
       unitCostFcfa: i.unitPrice !== undefined ? i.unitPrice : (i.unitCostFcfa || 0),
@@ -29,7 +31,8 @@ export const inventoryApi = {
 
     let unit = data.unit || "BAG_50KG";
     const u = String(unit).toLowerCase().trim();
-    if (u.includes("50") || u.includes("sac 50")) unit = "BAG_50KG";
+    if (u === "bag" || u === "sac") unit = "BAG";
+    else if (u.includes("50") || u.includes("sac 50")) unit = "BAG_50KG";
     else if (u.includes("25") || u.includes("sac 25")) unit = "BAG_25KG";
     else if (u.includes("kg") || u.includes("kilo")) unit = "KG";
     else if (u === "g" || u.includes("gramme")) unit = "G";
@@ -40,17 +43,19 @@ export const inventoryApi = {
     else if (u.includes("ml") || u.includes("milli")) unit = "ML";
     else if (u.includes("l") || u.includes("litre") || u.includes("liter")) unit = "LITER";
     else if (
-      ["BAG_50KG", "BAG_25KG", "KG", "G", "TON", "DOSE", "VIAL", "SACHET", "LITER", "ML", "UNIT"].includes(unit)
+      ["BAG", "BAG_50KG", "BAG_25KG", "KG", "G", "TON", "DOSE", "VIAL", "SACHET", "LITER", "ML", "UNIT"].includes(unit)
     ) {
       // valid
     } else {
       unit = "UNIT";
     }
 
-    const payload = {
+    const payload: any = {
       name: data.name,
       category,
+      customCategory: data.customCategory || undefined,
       unit,
+      packageWeightKg: data.packageWeightKg ? Number(data.packageWeightKg) : undefined,
       initialStock: Number(data.initialStock !== undefined ? data.initialStock : (data.currentStock || 0)),
       alertThreshold: Number(data.alertThreshold !== undefined ? data.alertThreshold : (data.minThreshold || 0)),
       unitPrice: Number(data.unitPrice !== undefined ? data.unitPrice : (data.unitCostFcfa || 0)),
@@ -71,8 +76,13 @@ export const inventoryApi = {
     ) {
       unit = undefined;
     }
+
+    let type = movement.type || "FEEDING";
+    if (type === "OUT") type = "FEEDING";
+    else if (type === "IN") type = "INCOMING";
+
     const payload = {
-      type: movement.type || "OUT",
+      type,
       quantity: Number(movement.quantity),
       movementDate: movement.movementDate || movement.date || new Date().toISOString().split("T")[0],
       unit,
@@ -99,9 +109,11 @@ export const inventoryApi = {
       name: i.name,
       sku: i.code || i.sku || (i.name ? i.name.slice(0, 4).toUpperCase() : "ART"),
       category: i.category === "MEDICATION" ? "MEDICINE" : i.category,
+      customCategory: i.customCategory || undefined,
       unit: i.unit,
       unitLabel: i.unitLabel,
       unitShortLabel: i.unitShortLabel,
+      packageWeightKg: i.packageWeightKg ? Number(i.packageWeightKg) : undefined,
       minThreshold: i.alertThreshold !== undefined ? i.alertThreshold : (i.minThreshold || 0),
       currentStock: i.currentStock || 0,
       unitCostFcfa: i.unitPrice !== undefined ? i.unitPrice : (i.unitCostFcfa || 0),
@@ -134,7 +146,9 @@ export const inventoryApi = {
     data: {
       name?: string;
       category?: string;
+      customCategory?: string | null;
       unit?: string;
+      packageWeightKg?: number | null;
       alertThreshold?: number;
       minThreshold?: number;
       unitPrice?: number;
@@ -146,7 +160,9 @@ export const inventoryApi = {
     const payload: any = {};
     if (data.name !== undefined) payload.name = data.name;
     if (data.category !== undefined) payload.category = data.category === "MEDICINE" ? "MEDICATION" : data.category;
+    if (data.customCategory !== undefined) payload.customCategory = data.customCategory;
     if (data.unit !== undefined) payload.unit = data.unit;
+    if (data.packageWeightKg !== undefined) payload.packageWeightKg = data.packageWeightKg ? Number(data.packageWeightKg) : null;
     if (data.alertThreshold !== undefined) payload.alertThreshold = Number(data.alertThreshold);
     else if (data.minThreshold !== undefined) payload.alertThreshold = Number(data.minThreshold);
     if (data.unitPrice !== undefined) payload.unitPrice = Number(data.unitPrice);

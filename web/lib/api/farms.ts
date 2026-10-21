@@ -43,6 +43,12 @@ export const farmsApi = {
       locationCity?: string;
       locationCountry?: string;
       code?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      ifu?: string;
+      rccm?: string;
+      description?: string;
     }
   ): Promise<any> => {
     const res = await apiRequest<any>(`/farms/${id}`, {

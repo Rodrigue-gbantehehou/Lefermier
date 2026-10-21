@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Egg, Layers, TrendingUp, Edit3, AlertTriangle } from "lucide-react";
+import { Plus, Egg, Layers, TrendingUp, Edit3, AlertTriangle, AlertCircle } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { EggProduction, EggSession, Flock } from "@/lib/types";
 import { formatNumber, formatPercent, calcEggTrays, formatDate } from "@/lib/utils";
 
 export default function EggsPage() {
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [productions, setProductions] = useState<EggProduction[]>([]);
   const [flocks, setFlocks] = useState<Flock[]>([]);
@@ -26,6 +28,7 @@ export default function EggsPage() {
 
   // New Collection Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [eggError, setEggError] = useState<string | null>(null);
   const [selectedFlockId, setSelectedFlockId] = useState("");
   const [collectionDate, setCollectionDate] = useState("");
 
@@ -41,6 +44,7 @@ export default function EggsPage() {
   const [editingEggId, setEditingEggId] = useState<string | null>(null);
 
   function openCreateModal() {
+    setEggError(null);
     setEditingEggId(null);
     setCollectionDate(new Date().toISOString().split("T")[0]);
     setSession("MORNING");
@@ -55,6 +59,7 @@ export default function EggsPage() {
   }
 
   function openEditModal(p: EggProduction) {
+    setEggError(null);
     setEditingEggId(p.id);
     setSelectedFlockId(p.flockId);
     setCollectionDate(p.date);
@@ -96,6 +101,7 @@ export default function EggsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedFlockId) return;
+    setEggError(null);
     setSubmitting(true);
     try {
       if (editingEggId) {
@@ -105,6 +111,7 @@ export default function EggsPage() {
           abnormalEggs: Number(abnormalEggs),
           notes: notes || undefined,
         });
+        toast.success("Collecte mise à jour avec succès !");
       } else {
         await api.eggs.create({
           flockId: selectedFlockId,
@@ -116,6 +123,7 @@ export default function EggsPage() {
           notes: notes || undefined,
           allowUpdate: true,
         });
+        toast.success("Collecte d'œufs enregistrée avec succès !");
       }
       setModalOpen(false);
       setEditingEggId(null);
@@ -125,7 +133,9 @@ export default function EggsPage() {
       setNotes("");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement de la collecte");
+      const msg = err?.message || "Erreur lors de l'enregistrement de la collecte";
+      setEggError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -493,12 +503,20 @@ export default function EggsPage() {
             />
           </div>
 
+          {eggError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{eggError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => {
                 setModalOpen(false);
                 setEditingEggId(null);
+                setEggError(null);
               }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >

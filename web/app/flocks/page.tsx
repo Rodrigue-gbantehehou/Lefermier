@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye } from "lucide-react";
+import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye, AlertCircle } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { Flock, FlockType } from "@/lib/types";
 import { formatNumber, formatDate } from "@/lib/utils";
@@ -16,6 +17,7 @@ import { CreateBuildingModal } from "@/components/farms/create-building-modal";
 
 export default function FlocksPage() {
   const { activeFarm, hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const [flocks, setFlocks] = useState<Flock[]>([]);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
@@ -28,6 +30,7 @@ export default function FlocksPage() {
 
   // New Flock Modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [flockName, setFlockName] = useState("");
   const [flockType, setFlockType] = useState<FlockType>("LAYER");
   const [breed, setBreed] = useState("Lohmann Brown");
@@ -61,6 +64,7 @@ export default function FlocksPage() {
 
   // Movement Modal
   const [movementModalOpen, setMovementModalOpen] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [activeFlock, setActiveFlock] = useState<Flock | null>(null);
   const [moveType, setMoveType] = useState<"MORTALITY" | "SALE" | "CULL">("MORTALITY");
   const [moveQty, setMoveQty] = useState<number | string>(1);
@@ -92,6 +96,7 @@ export default function FlocksPage() {
   async function handleCreateFlock(e: React.FormEvent) {
     e.preventDefault();
     if (!activeFarm?.id) return;
+    setCreateError(null);
     setSubmitting(true);
     try {
       const autoCode = `LOT-${new Date().getFullYear()}-${(flockName || "BAN")
@@ -117,9 +122,12 @@ export default function FlocksPage() {
       setCreateModalOpen(false);
       setFlockName("");
       setSelectedBuildingId("");
+      toast.success("Bande créée avec succès !");
       await loadFlocks();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la création de la bande");
+      const msg = err?.message || "Erreur lors de la création de la bande";
+      setCreateError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -128,6 +136,7 @@ export default function FlocksPage() {
   async function handleAddMovement(e: React.FormEvent) {
     e.preventDefault();
     if (!activeFlock) return;
+    setMoveError(null);
     setSubmittingMove(true);
     try {
       await api.flocks.addMovement(activeFlock.id, {
@@ -139,9 +148,16 @@ export default function FlocksPage() {
       setMovementModalOpen(false);
       setMoveQty(1);
       setMoveReason("");
+      toast.success(
+        moveType === "MORTALITY"
+          ? "Perte / mortalité enregistrée avec succès."
+          : "Mouvement enregistré avec succès."
+      );
       await loadFlocks();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'enregistrement du mouvement");
+      const msg = err?.message || "Erreur lors de l'enregistrement du mouvement";
+      setMoveError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingMove(false);
     }
@@ -163,12 +179,13 @@ export default function FlocksPage() {
               {flock.name}
               <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-              <span className={`h-1.5 w-1.5 rounded-full ${flock.status === "ACTIVE" ? "bg-success" : "bg-muted"}`} />
-              {flock.status === "ACTIVE" ? "Actif" : "Clôturé"}
-            </span>
+
           </div>
           {flock.code && <span className="text-[10px] font-mono text-muted">{flock.code}</span>}
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <span className={`h-1.5 w-1.5 rounded-full ${flock.status === "ACTIVE" ? "bg-success" : "bg-muted"}`} />
+            {flock.status === "ACTIVE" ? "Actif" : "Clôturé"}
+          </span>
         </div>
       ),
     },
@@ -181,33 +198,13 @@ export default function FlocksPage() {
           {flock.type === "LAYER"
             ? "Pondeuses"
             : flock.type === "BROILER"
-            ? "Chair"
-            : "Mixte"}
+              ? "Chair"
+              : "Mixte"}
         </span>
       ),
     },
-    {
-      key: "building",
-      header: "Bâtiment",
-      sortable: true,
-      accessor: (f) => f.buildingName || "",
-      cell: (flock) =>
-        flock.buildingName ? (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-            <Warehouse className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span>{flock.buildingName}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted/60 italic">-</span>
-        ),
-    },
-    {
-      key: "breed",
-      header: "Race / Souche",
-      sortable: true,
-      accessor: (f) => f.breed || "-",
-      cell: (flock) => <span className="text-muted">{flock.breed || "-"}</span>,
-    },
+
+
     {
       key: "startDate",
       header: "Date d'arrivée",
@@ -254,7 +251,7 @@ export default function FlocksPage() {
         const mortalityRate = flock.initialQuantity > 0 ? (losses / flock.initialQuantity) * 100 : 0;
         return (
           <span className={`font-mono font-semibold ${losses > 0 ? "text-danger" : "text-muted"}`}>
-            {losses} {losses > 0 ? `(${mortalityRate.toFixed(1)} %)` : ""}
+            {losses}
           </span>
         );
       },
@@ -296,7 +293,7 @@ export default function FlocksPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Groupes de poules (Bandes)
+            Groupes de poules
           </h1>
           <p className="mt-1 text-xs text-muted">
             Suivi des poules pondeuses et poulets de chair, des effectifs vivants, des pertes et des ventes.
@@ -331,7 +328,7 @@ export default function FlocksPage() {
       {/* Main Table */}
       <div className="mt-6">
         <DataTable<Flock>
-          title="Vos groupes de poules en élevage"
+          title="Vos groupes de volaille en élevage"
           subtitle="Effectifs vivants, race, pertes constatées et suivi de vos bandes."
           data={flocks}
           columns={flockColumns}
@@ -369,10 +366,10 @@ export default function FlocksPage() {
                         )}
                       </div>
                     </div>
-                  
-                      {flock.type === "LAYER"
-                        ? "Pondeuses"
-                        : flock.type === "BROILER"
+
+                    {flock.type === "LAYER"
+                      ? "Pondeuses"
+                      : flock.type === "BROILER"
                         ? "Chair"
                         : "Mixte"}
                   </div>
@@ -392,7 +389,7 @@ export default function FlocksPage() {
                         Pertes (morts)
                       </span>
                       <p className="text-lg font-bold font-mono text-danger font-semibold">
-                        {losses} ({mortalityRate.toFixed(1)} %)
+                        {losses}
                       </p>
                     </div>
                   </div>
@@ -605,10 +602,20 @@ export default function FlocksPage() {
             />
           </div>
 
+          {createError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{createError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setCreateModalOpen(false)}
+              onClick={() => {
+                setCreateModalOpen(false);
+                setCreateError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler
@@ -636,33 +643,30 @@ export default function FlocksPage() {
             <button
               type="button"
               onClick={() => setMoveType("MORTALITY")}
-              className={`rounded-xl border py-2 text-xs font-bold ${
-                moveType === "MORTALITY"
+              className={`rounded-xl border py-2 text-xs font-bold ${moveType === "MORTALITY"
                   ? "border-danger bg-danger text-white"
                   : "border-border bg-surface text-muted"
-              }`}
+                }`}
             >
               Morts (Pertes)
             </button>
             <button
               type="button"
               onClick={() => setMoveType("SALE")}
-              className={`rounded-xl border py-2 text-xs font-bold ${
-                moveType === "SALE"
+              className={`rounded-xl border py-2 text-xs font-bold ${moveType === "SALE"
                   ? "border-success bg-success text-white"
                   : "border-border bg-surface text-muted"
-              }`}
+                }`}
             >
               Poules vendues
             </button>
             <button
               type="button"
               onClick={() => setMoveType("CULL")}
-              className={`rounded-xl border py-2 text-xs font-bold ${
-                moveType === "CULL"
+              className={`rounded-xl border py-2 text-xs font-bold ${moveType === "CULL"
                   ? "border-warning bg-warning text-white"
                   : "border-border bg-surface text-muted"
-              }`}
+                }`}
             >
               Retirées (Réforme)
             </button>
@@ -699,10 +703,20 @@ export default function FlocksPage() {
             />
           </div>
 
+          {moveError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{moveError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setMovementModalOpen(false)}
+              onClick={() => {
+                setMovementModalOpen(false);
+                setMoveError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler

@@ -86,6 +86,12 @@ class FarmService
         $farm->setLocationCity($dto->locationCity);
         $farm->setLocationCountry($dto->locationCountry);
         $farm->setCurrency($dto->currency ?? 'XOF');
+        $farm->setPhone($dto->phone);
+        $farm->setEmail($dto->email);
+        $farm->setAddress($dto->address);
+        $farm->setIfu($dto->ifu);
+        $farm->setRccm($dto->rccm);
+        $farm->setDescription($dto->description);
 
         $this->entityManager->persist($farm);
 
@@ -105,6 +111,12 @@ class FarmService
         $farm->setProductionType($dto->productionType);
         $farm->setLocationCity($dto->locationCity);
         $farm->setLocationCountry($dto->locationCountry);
+        $farm->setPhone($dto->phone);
+        $farm->setEmail($dto->email);
+        $farm->setAddress($dto->address);
+        $farm->setIfu($dto->ifu);
+        $farm->setRccm($dto->rccm);
+        $farm->setDescription($dto->description);
 
         $this->entityManager->flush();
 
@@ -204,6 +216,12 @@ class FarmService
             'currency' => $farm->getCurrency(),
             'locationCity' => $farm->getLocationCity(),
             'locationCountry' => $farm->getLocationCountry(),
+            'phone' => $farm->getPhone(),
+            'email' => $farm->getEmail(),
+            'address' => $farm->getAddress(),
+            'ifu' => $farm->getIfu(),
+            'rccm' => $farm->getRccm(),
+            'description' => $farm->getDescription(),
             'createdAt' => $farm->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $farm->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];

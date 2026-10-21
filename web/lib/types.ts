@@ -19,6 +19,12 @@ export interface Farm {
   locationCity?: string | null;
   locationCountry?: string | null;
   currency?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  ifu?: string | null;
+  rccm?: string | null;
+  description?: string | null;
   surfaceAreaM2?: number | null;
   status: string;
   createdAt: string;
@@ -155,12 +161,14 @@ export interface InventoryItem {
   name: string;
   sku: string;
   category: InventoryCategory;
+  customCategory?: string | null;
   unit: string;
   unitLabel?: string;
   unitShortLabel?: string;
   unitFamily?: string;
   minThreshold: number;
   currentStock: number;
+  packageWeightKg?: number;
   unitCostFcfa: number;
   totalValueFcfa?: number;
   isLowStock?: boolean;
@@ -210,6 +218,7 @@ export interface Contact {
  * Finance
  */
 export type TransactionType = "INCOME" | "EXPENSE";
+export type PaymentStatus = "PAID" | "PARTIAL" | "UNPAID";
 export type PaymentMethod =
   | "CASH"
   | "MTN_MOMO"
@@ -233,6 +242,13 @@ export interface Transaction {
   type: TransactionType;
   category: string;
   amountFcfa: number;
+  paymentStatus?: PaymentStatus;
+  paidAmountFcfa?: number;
+  paidAmount?: number;
+  remainingAmountFcfa?: number;
+  remainingAmount?: number;
+  dueDate?: string | null;
+  isOverdue?: boolean;
   paymentMethod: PaymentMethod;
   reference?: string | null;
   date: string;

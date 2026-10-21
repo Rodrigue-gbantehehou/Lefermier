@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>{% block title %}{{ documentTitle|default('Document Officiel') }}{% endblock %}</title>
+    <style>
+        @page {
+            margin: 12mm 14mm 15mm 14mm;
+            size: A4 portrait;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'DejaVu Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.45;
+            color: #18181b;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Utilitaires typographiques */
+        .text-left { text-align: left; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-uppercase { text-transform: uppercase; }
+        .font-bold { font-weight: bold; }
+        .font-normal { font-weight: normal; }
+        .font-mono { font-family: 'Courier New', Courier, monospace; }
+
+        .text-xs { font-size: 9.5px; }
+        .text-sm { font-size: 11px; }
+        .text-base { font-size: 13px; }
+        .text-lg { font-size: 15px; }
+        .text-xl { font-size: 18px; }
+
+        .text-primary { color: #065f46; }
+        .text-muted { color: #52525b; }
+        .text-dark { color: #09090b; }
+        .text-danger { color: #b91c1c; }
+        .text-success { color: #047857; }
+        .text-warning { color: #b45309; }
+
+        /* Filigrane (Watermark) */
+        .watermark {
+            position: fixed;
+            top: 35%;
+            left: 5%;
+            width: 90%;
+            text-align: center;
+            opacity: 0.05;
+            transform: rotate(-35deg);
+            font-size: 75px;
+            font-weight: 900;
+            color: #000000;
+            z-index: -1000;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+        }
+
+        /* Layout Tables */
+        table.w-full {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        /* En-tête principal */
+        .header-table {
+            width: 100%;
+            border-bottom: 2.5px solid #065f46;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .header-table td {
+            vertical-align: top;
+        }
+
+        .farm-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #065f46;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+        .farm-description {
+            font-size: 10px;
+            font-weight: bold;
+            color: #4b5563;
+            margin-bottom: 5px;
+        }
+        .farm-meta {
+            font-size: 9.5px;
+            color: #4b5563;
+            line-height: 1.35;
+        }
+
+        .doc-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #09090b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .doc-subtitle {
+            font-size: 9.5px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+        .doc-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+        .badge-success { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .badge-warning { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+        .badge-danger  { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .badge-neutral { background-color: #f4f4f5; color: #3f3f46; border: 1px solid #e4e4e7; }
+        .badge-primary { background-color: #065f46; color: #ffffff; border: 1px solid #065f46; }
+
+        .ref-box {
+            display: inline-block;
+            background-color: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 10px;
+            color: #18181b;
+            margin-bottom: 4px;
+        }
+
+        /* Cartes & Blocs */
+        .card-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+        }
+        .card-title {
+            font-size: 9px;
+            font-weight: bold;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        /* Tableaux de données */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+        table.data-table th {
+            background-color: #f9fafb;
+            color: #4b5563;
+            font-size: 9.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 7px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        table.data-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 10px;
+            vertical-align: middle;
+        }
+        table.data-table tr:last-child td {
+            border-bottom: none;
+        }
+        table.data-table tr.total-row td {
+            background-color: #f9fafb;
+            font-weight: bold;
+            border-top: 1.5px solid #d1d5db;
+            color: #111827;
+        }
+
+        /* Grilles métriques (2 ou 4 colonnes) */
+        .metric-card {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .metric-label {
+            font-size: 8.5px;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        .metric-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #111827;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* Observations / Notes */
+        .notes-box {
+            background-color: #fafafa;
+            border: 1px dashed #d4d4d8;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 9.5px;
+            color: #52525b;
+            margin-top: 14px;
+            page-break-inside: avoid;
+        }
+        .notes-title {
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 2px;
+        }
+
+        /* Signatures */
+        .signatures-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 12px 0;
+            margin-top: 20px;
+            page-break-inside: avoid;
+        }
+        .signature-box {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 8px 12px;
+            height: 95px;
+            vertical-align: top;
+            background-color: #ffffff;
+        }
+        .stamp-placeholder {
+            margin-top: 25px;
+            border-top: 1px dashed #d1d5db;
+            padding-top: 4px;
+            color: #9ca3af;
+            font-style: italic;
+            font-size: 8.5px;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* Pied de page fixe */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 5px;
+            font-size: 8.5px;
+            color: #9ca3af;
+        }
+        .footer table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+    </style>
+    {% block stylesheets %}{% endblock %}
+</head>
+<body>
+    {# Filigrane optionnel #}
+    {% if watermark is defined and watermark %}
+        <div class="watermark">{{ watermark }}</div>
+    {% endif %}
+
+    {# En-tête officiel #}
+    <table class="header-table">
+        <tr>
+            {# Identité de l'exploitation #}
+            <td style="width: 58%; text-align: left;">
+                <div class="farm-name">{{ farm.name|default("Lefermier - Exploitation Avicole") }}</div>
+                <div class="farm-description">
+                    {{ farm.description|default("Production Avicole, Vente d'Œufs & Poulets de Chair") }}
+                </div>
+                <div class="farm-meta">
+                    {% if farm.address is defined and farm.address %}
+                        <div>Lieu : {{ farm.address }}{% if farm.locationCity is defined and farm.locationCity %}, {{ farm.locationCity }}{% endif %}</div>
+                    {% elseif farm.locationCity is defined and farm.locationCity %}
+                        <div>Lieu : {{ farm.locationCity }}, République du Bénin</div>
+                    {% elseif farm.location is defined and farm.location %}
+                        <div>Lieu : {{ farm.location }}, République du Bénin</div>
+                    {% endif %}
+
+                    <div>
+                        {% if farm.phone is defined and farm.phone %}Tél : <strong>{{ farm.phone }}</strong>{% endif %}
+                        {% if farm.email is defined and farm.email %} &bull; Email : {{ farm.email }}{% endif %}
+                    </div>
+
+                    {% if (farm.ifu is defined and farm.ifu) or (farm.rccm is defined and farm.rccm) %}
+                        <div style="margin-top: 2px;">
+                            {% if farm.ifu is defined and farm.ifu %}N° IFU : <strong>{{ farm.ifu }}</strong>{% endif %}
+                            {% if farm.rccm is defined and farm.rccm %} &bull; RCCM : <strong>{{ farm.rccm }}</strong>{% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </td>
+
+            {# Référence et métadonnées du document #}
+            <td style="width: 42%; text-align: right;">
+                <div class="doc-title">{% block document_title %}{{ documentTitle|default('DOCUMENT OFFICIEL') }}{% endblock %}</div>
+                {% if documentSubtitle is defined and documentSubtitle %}
+                    <div class="doc-subtitle">{{ documentSubtitle }}</div>
+                {% endif %}
+
+                <div style="margin-top: 6px;">
+                    {% if documentReference is defined and documentReference %}
+                        <div><span class="ref-box">Réf : {{ documentReference }}</span></div>
+                    {% endif %}
+
+                    <div style="font-size: 9.5px; color: #4b5563; margin-top: 3px;">
+                        Date d'émission : <strong style="color: #111827;">{{ documentDate|default('now'|date('d/m/Y')) }}</strong>
+                    </div>
+
+                    {% if documentBadge is defined and documentBadge %}
+                        <div style="margin-top: 4px;">
+                            <span class="doc-badge badge-{{ badgeVariant|default('neutral') }}">
+                                {{ documentBadge }}
+                            </span>
+                        </div>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    {# Destinataire / Tiers (Client, Vétérinaire, Partenaire) #}
+    {% if recipient is defined and recipient %}
+        <div class="card-box">
+            <div class="card-title">{{ recipient.label|default('Destinataire / Tiers') }}</div>
+            <table class="w-full">
+                <tr>
+                    <td style="font-size: 11px; font-weight: bold; color: #111827;">
+                        {{ recipient.name }}
+                    </td>
+                    {% if recipient.phone is defined and recipient.phone %}
+                        <td class="text-right font-mono" style="font-size: 10px; color: #374151;">
+                            Tél : <strong>{{ recipient.phone }}</strong>
+                        </td>
+                    {% endif %}
+                </tr>
+            </table>
+            {% if (recipient.address is defined and recipient.address) or (recipient.email is defined and recipient.email) %}
+                <div style="font-size: 9.5px; color: #6b7280; margin-top: 2px;">
+                    {% if recipient.address is defined and recipient.address %}Adresse : {{ recipient.address }}{% endif %}
+                    {% if recipient.email is defined and recipient.email %} &bull; Email : {{ recipient.email }}{% endif %}
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {# Contenu spécifique au document #}
+    {% block content %}{% endblock %}
+
+    {# Observations / Conditions générales #}
+    {% if notes is defined and notes %}
+        <div class="notes-box">
+            <div class="notes-title">Observations & Modalités :</div>
+            <div>{{ notes|nl2br }}</div>
+        </div>
+    {% endif %}
+
+    {# Bloc des Signatures et Tampons #}
+    {% block signatures %}
+        <table class="signatures-table">
+            <tr>
+                <td class="signature-box" style="width: 50%;">
+                    <div class="font-bold text-dark" style="font-size: 10px;">{{ signature1_title|default("Visa du Responsable d'Exploitation") }}</div>
+                    <div class="text-muted" style="font-size: 8.5px;">{{ signature1_subtitle|default("Exploitation Avicole") }}</div>
+                    <div class="stamp-placeholder">[ Cachet & Signature ]</div>
+                </td>
+                <td class="signature-box" style="width: 50%; text-align: right;">
+                    <div class="font-bold text-dark" style="font-size: 10px;">{{ signature2_title|default("Décharge / Signature du Tiers") }}</div>
+                    <div class="text-muted" style="font-size: 8.5px;">{{ signature2_subtitle|default("Mention manuscrite 'Reçu conforme'") }}</div>
+                    <div class="stamp-placeholder">[ Signature ]</div>
+                </td>
+            </tr>
+        </table>
+    {% endblock %}
+
+    {# Pied de page légal #}
+    <div class="footer">
+        <table>
+            <tr>
+                <td style="text-align: left;">
+                    Édité le {{ 'now'|date('d/m/Y à H:i') }} via <strong>Lefermier ERP</strong> &bull; Logiciel de gestion avicole certifié
+                </td>
+                <td style="text-align: right; font-family: 'Courier New', Courier, monospace;">
+                    Pièce officielle &bull; Page 1/1
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

@@ -47,6 +47,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: Types::BOOLEAN)]
     private bool $isActive = true;
 
+    #[ORM\Column(type: Types::STRING, length: 100, nullable: true)]
+    private ?string $passwordResetToken = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $passwordResetExpiresAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -194,6 +200,41 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getFarmMemberships(): Collection
     {
         return $this->farmMemberships;
+    }
+
+    public function getPasswordResetToken(): ?string
+    {
+        return $this->passwordResetToken;
+    }
+
+    public function setPasswordResetToken(?string $passwordResetToken): self
+    {
+        $this->passwordResetToken = $passwordResetToken;
+        return $this;
+    }
+
+    public function getPasswordResetExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->passwordResetExpiresAt;
+    }
+
+    public function setPasswordResetExpiresAt(?\DateTimeImmutable $passwordResetExpiresAt): self
+    {
+        $this->passwordResetExpiresAt = $passwordResetExpiresAt;
+        return $this;
+    }
+
+    public function isPasswordResetTokenValid(string $token): bool
+    {
+        if ($this->passwordResetToken === null || $this->passwordResetExpiresAt === null) {
+            return false;
+        }
+
+        if ($this->passwordResetExpiresAt < new \DateTimeImmutable()) {
+            return false;
+        }
+
+        return hash_equals($this->passwordResetToken, $token);
     }
 
     public function eraseCredentials(): void

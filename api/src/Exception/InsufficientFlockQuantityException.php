@@ -11,9 +11,9 @@ class InsufficientFlockQuantityException extends UnprocessableEntityHttpExceptio
     public function __construct(int $requested, int $available)
     {
         parent::__construct(sprintf(
-            "Impossible d'enregistrer une sortie de %d sujets : l'effectif actuel vivant n'est que de %d sujets.",
-            $requested,
-            $available
+            "Effectif insuffisant : vous enregistrez une sortie de %s sujets, mais cette bande ne compte que %s sujet(s) vivant(s).",
+            number_format($requested, 0, ',', ' '),
+            number_format($available, 0, ',', ' ')
         ));
     }
 }

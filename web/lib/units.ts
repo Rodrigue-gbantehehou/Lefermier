@@ -6,10 +6,11 @@
 export type UnitFamily = "MASS" | "VOLUME" | "VET_DOSE" | "PIECE";
 
 export type InventoryUnitCode =
-  | "KG"
-  | "G"
+  | "BAG"
   | "BAG_50KG"
   | "BAG_25KG"
+  | "KG"
+  | "G"
   | "TON"
   | "DOSE"
   | "VIAL"
@@ -28,21 +29,29 @@ export interface UnitDefinition {
 }
 
 export const UNIT_DEFINITIONS: Record<InventoryUnitCode, UnitDefinition> = {
-  BAG_50KG: {
-    code: "BAG_50KG",
-    label: "Sac de 50 kg",
-    shortLabel: "sac (50kg)",
+  BAG: {
+    code: "BAG",
+    label: "Sac",
+    shortLabel: "sac",
     family: "MASS",
     multiplierToBase: 50.0,
-    categoryHint: "Aliments complets provenderie",
+    categoryHint: "Sacs de provende ou intrants (poids libre)",
+  },
+  BAG_50KG: {
+    code: "BAG_50KG",
+    label: "Sac",
+    shortLabel: "sac",
+    family: "MASS",
+    multiplierToBase: 50.0,
+    categoryHint: "Aliments provenderie / sacs",
   },
   BAG_25KG: {
     code: "BAG_25KG",
-    label: "Sac de 25 kg",
-    shortLabel: "sac (25kg)",
+    label: "Sac",
+    shortLabel: "sac",
     family: "MASS",
     multiplierToBase: 25.0,
-    categoryHint: "Aliments demi-sac / concentrés",
+    categoryHint: "Demi-sacs / concentrés",
   },
   KG: {
     code: "KG",
@@ -145,7 +154,8 @@ export function getUnitShortLabel(unitCode: string | null | undefined): string {
 export function convertUnit(
   quantity: number,
   fromUnitCode: string,
-  toUnitCode: string
+  toUnitCode: string,
+  options?: { packageWeightKg?: number }
 ): number | null {
   if (fromUnitCode === toUnitCode) return quantity;
 
@@ -156,22 +166,116 @@ export function convertUnit(
     return null; // Incompatible
   }
 
-  const baseQty = quantity * source.multiplierToBase;
-  return Number((baseQty / target.multiplierToBase).toFixed(4));
+  let sourceMultiplier = source.multiplierToBase;
+  if ((fromUnitCode === "BAG" || fromUnitCode === "BAG_50KG" || fromUnitCode === "BAG_25KG") && options?.packageWeightKg && options.packageWeightKg > 0) {
+    sourceMultiplier = options.packageWeightKg;
+  }
+
+  let targetMultiplier = target.multiplierToBase;
+  if ((toUnitCode === "BAG" || toUnitCode === "BAG_50KG" || toUnitCode === "BAG_25KG") && options?.packageWeightKg && options.packageWeightKg > 0) {
+    targetMultiplier = options.packageWeightKg;
+  }
+
+  const baseQty = quantity * sourceMultiplier;
+  return Number((baseQty / targetMultiplier).toFixed(4));
+}
+
+/**
+ * Retourne la liste des unités de mouvement compatibles pour un article de stock.
+ */
+export function getCompatibleMovementUnits(
+  itemUnit: string | null | undefined,
+  packageWeightKg?: number
+): { code: string; label: string; shortLabel: string }[] {
+  const code = (itemUnit || "UNIT") as InventoryUnitCode;
+  const def = UNIT_DEFINITIONS[code];
+  const bagWeight = packageWeightKg || 50;
+
+  if (!def) return [{ code: "UNIT", label: "Unité (u)", shortLabel: "u" }];
+
+  if (def.family === "MASS") {
+    const isBag = code === "BAG" || code === "BAG_50KG" || code === "BAG_25KG";
+    return [
+      ...(isBag ? [{ code, label: `Sac (${bagWeight} kg)`, shortLabel: "sac" }] : []),
+      { code: "KG", label: "Kilogramme (kg - Pesée balance)", shortLabel: "kg" },
+      { code: "G", label: "Gramme (g - Poudre / Vitamines)", shortLabel: "g" },
+    ];
+  }
+
+  if (def.family === "VOLUME") {
+    return [
+      { code: "ML", label: "Millilitre (mL - Dose liquide)", shortLabel: "mL" },
+      { code: "LITER", label: "Litre (L - Bidon / Bouteille)", shortLabel: "L" },
+    ];
+  }
+
+  if (def.family === "VET_DOSE") {
+    const res = [{ code: def.code, label: `${def.label} (${def.shortLabel})`, shortLabel: def.shortLabel }];
+    if (def.code !== "DOSE") res.push({ code: "DOSE", label: "Dose vaccinale", shortLabel: "dose" });
+    if (def.code !== "VIAL") res.push({ code: "VIAL", label: "Flacon", shortLabel: "flacon" });
+    if (def.code !== "SACHET") res.push({ code: "SACHET", label: "Sachet", shortLabel: "sachet" });
+    return res;
+  }
+
+  return [{ code: def.code, label: `${def.label} (${def.shortLabel})`, shortLabel: def.shortLabel }];
+}
+
+/**
+ * Retourne une indication pratique de dosage agricole (cuillère à soupe, sac, etc.)
+ */
+export function getPracticalMeasurementHint(
+  quantity: number | string | null | undefined,
+  movementUnit: string,
+  options?: { packageWeightKg?: number; itemUnit?: string }
+): string | null {
+  const qty = Number(quantity);
+  if (!qty || isNaN(qty) || qty <= 0) return null;
+
+  // Vitamines / Médicaments liquides : 1 cuillère à soupe = 15 mL, 1 cuillère à café = 5 mL
+  if (movementUnit === "ML") {
+    const spoons = (qty / 15).toFixed(1).replace(/\.0$/, "");
+    return qty >= 5
+      ? `≈ ${spoons} c. à soupe (1 c. à soupe = 15 mL)`
+      : null;
+  }
+
+  // Vitamines / Médicaments en poudre : 1 cuillère à soupe rase ≈ 15 g
+  if (movementUnit === "G") {
+    const spoons = (qty / 15).toFixed(1).replace(/\.0$/, "");
+    return qty >= 5
+      ? `≈ ${spoons} c. à soupe rase (1 c. à soupe ≈ 15 g)`
+      : null;
+  }
+
+  // Provende / Intrants : Pesée en kg convertie en sacs
+  const isBag = options?.itemUnit === "BAG" || options?.itemUnit === "BAG_50KG" || options?.itemUnit === "BAG_25KG";
+  const bagWeight = options?.packageWeightKg || 50;
+
+  if (movementUnit === "KG" && isBag) {
+    const bags = (qty / bagWeight).toFixed(2);
+    return `≈ ${bags} sac (sac de ${bagWeight} kg)`;
+  }
+
+  if ((movementUnit === "BAG" || movementUnit === "BAG_50KG" || movementUnit === "BAG_25KG")) {
+    const totalKg = (qty * bagWeight).toLocaleString("fr-FR");
+    return `Soit ~${totalKg} kg au total`;
+  }
+
+  return null;
 }
 
 /**
  * Formate une quantité de stock avec son unité explicite.
  * Exemples :
- * - (45, "BAG_50KG") => "45 sacs (50kg)"
- * - (1, "BAG_50KG") => "1 sac (50kg)"
+ * - (45, "BAG_50KG", { packageWeightKg: 50 }) => "45 sacs (50 kg)"
+ * - (1, "BAG") => "1 sac"
  * - (25.5, "KG") => "25.5 kg"
  * - (10, "LITER") => "10 L"
  */
 export function formatInventoryUnit(
   quantity: number | string | null | undefined,
   unitCode: string | null | undefined,
-  options?: { short?: boolean }
+  options?: { short?: boolean; packageWeightKg?: number }
 ): string {
   if (quantity === null || quantity === undefined || isNaN(Number(quantity))) {
     return `0 ${getUnitShortLabel(unitCode)}`;
@@ -189,12 +293,10 @@ export function formatInventoryUnit(
     return `${formattedNum} ${def ? def.shortLabel : code}`;
   }
 
-  // Format complet et grammaticalement accordé
-  if (code === "BAG_50KG") {
-    return num > 1 ? `${formattedNum} sacs (50kg)` : `${formattedNum} sac (50kg)`;
-  }
-  if (code === "BAG_25KG") {
-    return num > 1 ? `${formattedNum} sacs (25kg)` : `${formattedNum} sac (25kg)`;
+  // Format accordé pour les sacs avec poids personnalisable
+  if (code === "BAG" || code === "BAG_50KG" || code === "BAG_25KG") {
+    const weightLabel = options?.packageWeightKg ? ` (${options.packageWeightKg} kg)` : "";
+    return num > 1 ? `${formattedNum} sacs${weightLabel}` : `${formattedNum} sac${weightLabel}`;
   }
   if (code === "DOSE") {
     return num > 1 ? `${formattedNum} doses` : `${formattedNum} dose`;

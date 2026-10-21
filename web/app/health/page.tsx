@@ -21,6 +21,7 @@ import {
   Building,
   User,
   Coins,
+  AlertCircle,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import {
   Flock,
@@ -41,6 +43,7 @@ import { formatDate, formatNumber } from "@/lib/utils";
 
 export default function HealthPage() {
   const { activeFarm } = useAuth();
+  const { toast } = useToast();
 
   const [treatments, setTreatments] = useState<HealthTreatment[]>([]);
   const [flocks, setFlocks] = useState<Flock[]>([]);
@@ -59,10 +62,13 @@ export default function HealthPage() {
 
   // Modale Nouveau Soin
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [createFlockId, setCreateFlockId] = useState("");
   const [createTitle, setCreateTitle] = useState("");
   const [createType, setCreateType] = useState<HealthTreatmentType>("VACCINATION");
+  const [createCustomType, setCreateCustomType] = useState("");
   const [createMethod, setCreateMethod] = useState<AdministrationMethod>("DRINKING_WATER");
+  const [createCustomMethod, setCreateCustomMethod] = useState("");
   const [createScheduledDate, setCreateScheduledDate] = useState("");
   const [createTargetAgeDays, setCreateTargetAgeDays] = useState<number | string>("");
   const [createInventoryItemId, setCreateInventoryItemId] = useState("");
@@ -74,12 +80,14 @@ export default function HealthPage() {
 
   // Modale Génération Programme Automatique
   const [programModalOpen, setProgramModalOpen] = useState(false);
+  const [programError, setProgramError] = useState<string | null>(null);
   const [programFlockId, setProgramFlockId] = useState("");
   const [programType, setProgramType] = useState("AUTO");
   const [generatingProgram, setGeneratingProgram] = useState(false);
 
   // Modale Valider l'administration
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const [selectedTreatment, setSelectedTreatment] = useState<HealthTreatment | null>(null);
   const [completeDate, setCompleteDate] = useState("");
   const [completeCostFcfa, setCompleteCostFcfa] = useState<number | string>("");
@@ -204,8 +212,11 @@ export default function HealthPage() {
 
   async function handleCreateTreatment(e: React.FormEvent) {
     e.preventDefault();
+    setCreateError(null);
     if (!activeFarm?.id || !createFlockId || !createTitle || !createScheduledDate) {
-      alert("Veuillez remplir les champs obligatoires (bande, titre, date prévue).");
+      const msg = "Veuillez remplir les champs obligatoires (bande, titre, date prévue).";
+      setCreateError(msg);
+      toast.warning(msg);
       return;
     }
 
@@ -222,13 +233,22 @@ export default function HealthPage() {
         quantityUsed: createQuantityUsed || undefined,
         costFcfa: createCostFcfa !== "" ? Number(createCostFcfa) : undefined,
         veterinarian: createVeterinarian || undefined,
-        notes: createNotes || undefined,
+        notes: [
+          createType === "OTHER" && createCustomType ? `Intervention: ${createCustomType.trim()}` : "",
+          createMethod === "OTHER" && createCustomMethod ? `Méthode: ${createCustomMethod.trim()}` : "",
+          createNotes,
+        ].filter(Boolean).join(" | ") || undefined,
       });
 
       setCreateModalOpen(false);
+      setCreateCustomType("");
+      setCreateCustomMethod("");
+      toast.success("Soin planifié avec succès !");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la planification du soin.");
+      const msg = err?.message || "Erreur lors de la planification du soin.";
+      setCreateError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingCreate(false);
     }
@@ -236,8 +256,11 @@ export default function HealthPage() {
 
   async function handleGenerateProgram(e: React.FormEvent) {
     e.preventDefault();
+    setProgramError(null);
     if (!activeFarm?.id || !programFlockId) {
-      alert("Veuillez sélectionner une bande.");
+      const msg = "Veuillez sélectionner une bande.";
+      setProgramError(msg);
+      toast.warning(msg);
       return;
     }
 
@@ -248,11 +271,13 @@ export default function HealthPage() {
         programType: programType !== "AUTO" ? programType : undefined,
       });
 
-      alert(`Succès : ${res.length} interventions programmées avec succès pour cette bande !`);
+      toast.success(`${res.length} interventions programmées avec succès pour cette bande !`);
       setProgramModalOpen(false);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la génération du programme.");
+      const msg = err?.message || "Erreur lors de la génération du programme.";
+      setProgramError(msg);
+      toast.error(msg);
     } finally {
       setGeneratingProgram(false);
     }
@@ -287,9 +312,12 @@ export default function HealthPage() {
       });
 
       setCompleteModalOpen(false);
+      toast.success("Administration du soin validée avec succès !");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la validation du soin.");
+      const msg = err?.message || "Erreur lors de la validation du soin.";
+      setCompleteError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingComplete(false);
     }
@@ -299,9 +327,10 @@ export default function HealthPage() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette intervention ?")) return;
     try {
       await api.health.delete(id);
+      toast.success("Intervention supprimée avec succès.");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la suppression.");
+      toast.error(err?.message || "Erreur lors de la suppression.");
     }
   }
 
@@ -334,9 +363,10 @@ export default function HealthPage() {
             <button
               onClick={() => {
                 if (flocks.length === 0) {
-                  alert("Veuillez d'abord créer une bande de volailles.");
+                  toast.warning("Veuillez d'abord créer une bande de volailles.");
                   return;
                 }
+                setProgramError(null);
                 setProgramModalOpen(true);
               }}
               className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2 text-sm font-semibold text-accent hover:bg-accent/20 transition-colors shadow-sm"
@@ -449,7 +479,7 @@ export default function HealthPage() {
           <EmptyState
             title="Aucune intervention sanitaire trouvée"
             description="Créez une intervention ou utilisez la génération de programme en 1-clic pour planifier automatiquement les vaccins de votre bande."
-            actionLabel="⚡ Générer le programme vaccinal"
+            actionLabel="Générer le programme vaccinal"
             onAction={() => setProgramModalOpen(true)}
           />
         ) : (
@@ -678,6 +708,18 @@ export default function HealthPage() {
                 <option value="DISINFECTION">Désinfection des locaux</option>
                 <option value="OTHER">Autre intervention</option>
               </select>
+              {createType === "OTHER" && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    required
+                    value={createCustomType}
+                    onChange={(e) => setCreateCustomType(e.target.value)}
+                    placeholder="Précisez l'intervention (ex. Épointage, Pesée...)"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -697,6 +739,18 @@ export default function HealthPage() {
                 <option value="TOPICAL">Application alaire / cutanée</option>
                 <option value="OTHER">Autre méthode</option>
               </select>
+              {createMethod === "OTHER" && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    required
+                    value={createCustomMethod}
+                    onChange={(e) => setCreateCustomMethod(e.target.value)}
+                    placeholder="Précisez la méthode (ex. Sonde, Gavage...)"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -797,10 +851,20 @@ export default function HealthPage() {
             />
           </div>
 
+          {createError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{createError}</div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setCreateModalOpen(false)}
+              onClick={() => {
+                setCreateModalOpen(false);
+                setCreateError(null);
+              }}
               className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface transition-colors"
             >
               Annuler
@@ -872,10 +936,20 @@ export default function HealthPage() {
             </select>
           </div>
 
+          {programError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{programError}</div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setProgramModalOpen(false)}
+              onClick={() => {
+                setProgramModalOpen(false);
+                setProgramError(null);
+              }}
               className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface transition-colors"
             >
               Annuler
@@ -991,10 +1065,20 @@ export default function HealthPage() {
             />
           </div>
 
+          {completeError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{completeError}</div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
-              onClick={() => setCompleteModalOpen(false)}
+              onClick={() => {
+                setCompleteModalOpen(false);
+                setCompleteError(null);
+              }}
               className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface transition-colors"
             >
               Annuler

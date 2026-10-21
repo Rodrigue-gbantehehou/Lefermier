@@ -44,6 +44,24 @@ class Farm
     #[ORM\Column(type: Types::STRING, length: 2)]
     private string $locationCountry = 'BJ';
 
+    #[ORM\Column(type: Types::STRING, length: 50, nullable: true)]
+    private ?string $phone = null;
+
+    #[ORM\Column(type: Types::STRING, length: 150, nullable: true)]
+    private ?string $email = null;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $address = null;
+
+    #[ORM\Column(type: Types::STRING, length: 50, nullable: true)]
+    private ?string $ifu = null;
+
+    #[ORM\Column(type: Types::STRING, length: 50, nullable: true)]
+    private ?string $rccm = null;
+
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
+    private ?string $description = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -156,6 +174,61 @@ class Farm
         return $this;
     }
 
+    public function getPhone(): ?string
+    {
+        return $this->phone;
+    }
+
+    public function setPhone(?string $phone): self
+    {
+        $this->phone = $phone;
+        return $this;
+    }
+
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(?string $email): self
+    {
+        $this->email = $email;
+        return $this;
+    }
+
+    public function getAddress(): ?string
+    {
+        return $this->address;
+    }
+
+    public function setAddress(?string $address): self
+    {
+        $this->address = $address;
+        return $this;
+    }
+
+    public function getIfu(): ?string
+    {
+        return $this->ifu;
+    }
+
+    public function setIfu(?string $ifu): self
+    {
+        $this->ifu = $ifu;
+        return $this;
+    }
+
+    public function getRccm(): ?string
+    {
+        return $this->rccm;
+    }
+
+    public function setRccm(?string $rccm): self
+    {
+        $this->rccm = $rccm;
+        return $this;
+    }
+
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
@@ -204,6 +277,17 @@ class Farm
             // Building removal
         }
 
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = $description;
         return $this;
     }
 }

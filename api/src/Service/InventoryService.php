@@ -45,6 +45,8 @@ class InventoryService
 
         return $this->entityManager->wrapInTransaction(function () use ($farm, $dto, $recordedBy): InventoryItem {
             $item = new InventoryItem($farm, $dto->name, $dto->category, $dto->unit);
+            $item->setCustomCategory($dto->customCategory);
+            $item->setPackageWeightKg($dto->packageWeightKg);
             $item->setAlertThreshold($dto->alertThreshold);
             $item->setUnitPrice($dto->unitPrice);
             $item->setNotes($dto->notes);
@@ -77,7 +79,12 @@ class InventoryService
     public function updateItem(InventoryItem $item, UpdateInventoryItemRequestDto $dto): InventoryItem
     {
         $item->setName($dto->name);
+        if ($dto->category !== null) {
+            $item->setCategory($dto->category);
+        }
+        $item->setCustomCategory($dto->customCategory);
         $item->setUnit($dto->unit);
+        $item->setPackageWeightKg($dto->packageWeightKg);
         $item->setAlertThreshold($dto->alertThreshold);
         $item->setUnitPrice($dto->unitPrice);
         $item->setNotes($dto->notes);
@@ -96,16 +103,17 @@ class InventoryService
             $currentStock = $item->getCurrentStock();
             $movementUnit = $dto->unit ?? $item->getUnit();
             $itemUnit = $item->getUnit();
+            $bagWeight = $item->getPackageWeightKg();
 
-            // Conversion automatique vers l'unité de stockage de l'article (ex: KG <-> BAG_50KG)
-            $effectiveQtyInItemUnit = $movementUnit->convertTo($qty, $itemUnit);
+            // Conversion automatique vers l'unité de stockage avec le poids de sac spécifique de l'article si défini
+            $effectiveQtyInItemUnit = $movementUnit->convertTo($qty, $itemUnit, $bagWeight);
 
             // Règle métier : décompte ou ajout
             if (in_array($dto->type, [StockMovementType::FEEDING, StockMovementType::LOSS], true)) {
                 if ($effectiveQtyInItemUnit > $currentStock) {
                     throw new InsufficientStockException(
                         $qty,
-                        $itemUnit->convertTo($currentStock, $movementUnit),
+                        $itemUnit->convertTo($currentStock, $movementUnit, $bagWeight),
                         $movementUnit->getShortLabel()
                     );
                 }
@@ -162,10 +170,12 @@ class InventoryService
             'farmId' => $item->getFarm()->getId()?->toBase32(),
             'name' => $item->getName(),
             'category' => $item->getCategory()->value,
+            'customCategory' => $item->getCustomCategory(),
             'unit' => $unit->value,
             'unitLabel' => $unit->getLabel(),
             'unitShortLabel' => $unit->getShortLabel(),
             'unitFamily' => $unit->getFamily(),
+            'packageWeightKg' => $item->getPackageWeightKg(),
             'currentStock' => $item->getCurrentStock(),
             'alertThreshold' => $item->getAlertThreshold(),
             'isLowStock' => $item->isLowStock(),

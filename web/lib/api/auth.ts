@@ -44,4 +44,19 @@ export const authApi = {
       roles: string[];
       farms: any[];
     }>("/auth/me"),
+
+  forgotPassword: (data: { identifier: string; channel?: "email" | "sms" }) =>
+    apiRequest<{ message: string; devCode?: string; channel?: string }>(
+      "/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+
+  resetPassword: (data: { identifier: string; code: string; newPassword: string }) =>
+    apiRequest<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

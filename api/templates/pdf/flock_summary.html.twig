@@ -1,0 +1,213 @@
+{% extends 'pdf/base.html.twig' %}
+
+{% block title %}Bilan de Bande {{ flock.code }}{% endblock %}
+
+{% block content %}
+    {# 1. Fiche d'identité du lot #}
+    <div class="card-box">
+        <div class="card-title">Fiche d'Identité de la Bande</div>
+        <table class="w-full">
+            <tr>
+                <td style="width: 25%; padding-bottom: 6px;">
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Code Bande :</div>
+                    <div class="font-mono font-bold" style="font-size: 11px; color: #111827;">{{ flock.code }}</div>
+                </td>
+                <td style="width: 25%; padding-bottom: 6px;">
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Nom du Lot :</div>
+                    <div class="font-bold" style="font-size: 11px; color: #111827;">{{ flock.name }}</div>
+                </td>
+                <td style="width: 25%; padding-bottom: 6px;">
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Type / Souche :</div>
+                    <div class="font-bold" style="font-size: 10px; color: #111827;">
+                        {% if flock.poultryType.value == 'LAYER' %}Pondeuses{% else %}Poulets de chair{% endif %}
+                        {% if flock.strain %}({{ flock.strain }}){% endif %}
+                    </div>
+                </td>
+                <td style="width: 25%; padding-bottom: 6px;">
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Bâtiment :</div>
+                    <div class="font-bold" style="font-size: 10px; color: #111827;">
+                        {% if flock.building %}{{ flock.building.name }}{% else %}Non assigné{% endif %}
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Date d'arrivée :</div>
+                    <div class="font-mono" style="font-size: 10px; color: #374151;">{{ flock.startDate|date('d/m/Y') }}</div>
+                </td>
+                <td>
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Date de Clôture :</div>
+                    <div class="font-mono" style="font-size: 10px; color: #374151;">
+                        {% if flock.actualEndDate %}
+                            {{ flock.actualEndDate|date('d/m/Y') }}
+                        {% elseif flock.estimatedEndDate %}
+                            {{ flock.estimatedEndDate|date('d/m/Y') }} (estimée)
+                        {% else %}
+                            En cours
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Âge atteint :</div>
+                    <div class="font-bold text-primary" style="font-size: 10px;">
+                        {% if flock.ageInWeeks %}
+                            {{ flock.ageInWeeks }} semaines ({{ flock.ageInDays }} j)
+                        {% else %}
+                            {{ flock.ageInDays }} jours
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <div style="font-size: 8.5px; color: #6b7280; text-transform: uppercase;">Statut :</div>
+                    <div class="font-bold" style="font-size: 10px; color: #111827;">
+                        {% if flock.status.value == 'COMPLETED' %}Clôturé / Réformé
+                        {% elseif flock.status.value == 'ACTIVE' %}Actif en production
+                        {% elseif flock.status.value == 'PREPARATION' %}En préparation
+                        {% else %}{{ flock.status.value }}{% endif %}
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    {# 2. Performances Zootechniques & Mortalité #}
+    <div style="margin-bottom: 14px;">
+        <div style="font-size: 11px; font-weight: bold; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb;">
+            1. Performances Zootechniques & Mortalité
+        </div>
+
+        {% set initialQty = flock.initialQuantity %}
+        {% set currentQty = flock.currentQuantity %}
+        {% set losses = initialQty - currentQty %}
+        {% set mortalityRate = initialQty > 0 ? ((losses / initialQty) * 100) : 0 %}
+
+        <table class="w-full">
+            <tr>
+                <td style="width: 25%; padding-right: 6px;">
+                    <div class="metric-card">
+                        <div class="metric-label">Effectif Initial</div>
+                        <div class="metric-value">{{ initialQty|number_format(0, ',', ' ') }} <span style="font-size: 9px; font-weight: normal; color: #6b7280;">sujets</span></div>
+                    </div>
+                </td>
+                <td style="width: 25%; padding-right: 6px; padding-left: 3px;">
+                    <div class="metric-card">
+                        <div class="metric-label">Effectif Sorti / Vivant</div>
+                        <div class="metric-value text-primary">{{ currentQty|number_format(0, ',', ' ') }} <span style="font-size: 9px; font-weight: normal; color: #6b7280;">sujets</span></div>
+                    </div>
+                </td>
+                <td style="width: 25%; padding-right: 6px; padding-left: 3px;">
+                    <div class="metric-card">
+                        <div class="metric-label">Pertes (Mortalités)</div>
+                        <div class="metric-value text-danger">{{ losses|number_format(0, ',', ' ') }} <span style="font-size: 9px; font-weight: normal; color: #6b7280;">sujets</span></div>
+                    </div>
+                </td>
+                <td style="width: 25%; padding-left: 6px;">
+                    <div class="metric-card">
+                        <div class="metric-label">Taux Mortalité Final</div>
+                        <div class="metric-value {% if mortalityRate > 5 %}text-danger{% else %}text-success{% endif %}">
+                            {{ mortalityRate|number_format(1, ',', ' ') }} %
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        {# Section Pontes si Pondeuses #}
+        {% if flock.poultryType.value == 'LAYER' and eggStats is defined and eggStats %}
+            <div class="card-box" style="margin-top: 8px; margin-bottom: 0;">
+                <table class="w-full">
+                    <tr>
+                        <td style="width: 55%; vertical-align: middle;">
+                            <div style="font-size: 10px; font-weight: bold; color: #111827;">Production Cumulée d'Œufs de table :</div>
+                            <div style="font-size: 8.5px; color: #6b7280;">Standard ouest-africain (conditionnement en plateaux alvéolés de 30 œufs).</div>
+                        </td>
+                        <td style="width: 45%; text-align: right; vertical-align: middle;">
+                            <span class="font-mono font-bold text-primary" style="font-size: 13px;">
+                                {{ eggStats.totalEggs|number_format(0, ',', ' ') }} œufs
+                            </span>
+                            <span style="font-size: 10px; font-weight: bold; color: #1f2937; margin-left: 8px;">
+                                ({{ eggStats.totalTrays }} plateaux{% if eggStats.totalLooseEggs > 0 %} + {{ eggStats.totalLooseEggs }} œufs{% endif %})
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    {# 3. Compte d'Exploitation & Marge Nette du Lot #}
+    <div>
+        <div style="font-size: 11px; font-weight: bold; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb;">
+            2. Compte d'Exploitation & Marge Nette du Lot
+        </div>
+
+        {% set income = financialSummary.totalIncome|default(0) %}
+        {% set expense = financialSummary.totalExpense|default(0) %}
+        {% set margin = financialSummary.netBalance|default(income - expense) %}
+        {% set marginPerBird = initialQty > 0 ? (margin / initialQty)|round : 0 %}
+        {% set incomePerBird = initialQty > 0 ? (income / initialQty)|round : 0 %}
+        {% set expensePerBird = initialQty > 0 ? (expense / initialQty)|round : 0 %}
+
+        <table class="data-table" style="margin-bottom: 0;">
+            <thead>
+                <tr>
+                    <th style="width: 50%; text-align: left;">Poste Comptable</th>
+                    <th style="width: 25%; text-align: right;">Montant (FCFA)</th>
+                    <th style="width: 25%; text-align: right;">Par Sujet Initial</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color: #047857; font-weight: bold;">
+                        (+) Recettes Totales (Ventes d'œufs & volailles)
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #047857;">
+                        {{ income|number_format(0, ',', ' ') }} FCFA
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #4b5563;">
+                        {{ incomePerBird|number_format(0, ',', ' ') }} FCFA / sujet
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color: #b91c1c; font-weight: bold;">
+                        (-) Charges Opérationnelles (Aliments, intrants, prophylaxie)
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #b91c1c;">
+                        {{ expense|number_format(0, ',', ' ') }} FCFA
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; color: #4b5563;">
+                        {{ expensePerBird|number_format(0, ',', ' ') }} FCFA / sujet
+                    </td>
+                </tr>
+                <tr class="total-row">
+                    <td style="font-size: 11px; text-transform: uppercase;">
+                        Marge Nette Dégagée (Bénéfice Réalisé)
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-size: 12px; font-weight: bold; {% if margin >= 0 %}color: #047857;{% else %}color: #b91c1c;{% endif %}">
+                        {{ margin|number_format(0, ',', ' ') }} FCFA
+                    </td>
+                    <td style="text-align: right; font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: bold; {% if margin >= 0 %}color: #047857;{% else %}color: #b91c1c;{% endif %}">
+                        {{ marginPerBird|number_format(0, ',', ' ') }} FCFA / sujet
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block signatures %}
+    <table class="signatures-table">
+        <tr>
+            <td class="signature-box" style="width: 50%;">
+                <div class="font-bold text-dark" style="font-size: 10px;">Le Chef d'Exploitation Avicole</div>
+                <div class="text-muted" style="font-size: 8.5px;">Gestionnaire technique & financier</div>
+                <div class="stamp-placeholder">[ Cachet & Signature ]</div>
+            </td>
+            <td class="signature-box" style="width: 50%; text-align: right;">
+                <div class="font-bold text-dark" style="font-size: 10px;">Le Vétérinaire Conseil / Auditeur</div>
+                <div class="text-muted" style="font-size: 8.5px;">Contrôle sanitaire et prophylactique</div>
+                <div class="stamp-placeholder">[ Cachet & Signature ]</div>
+            </td>
+        </tr>
+    </table>
+{% endblock %}

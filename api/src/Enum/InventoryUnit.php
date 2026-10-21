@@ -8,10 +8,11 @@ use App\Exception\IncompatibleUnitException;
 
 enum InventoryUnit: string
 {
+    case BAG = 'BAG';           // Sac (poids unitaire personnalisable en kg)
+    case BAG_50KG = 'BAG_50KG'; // Sac
+    case BAG_25KG = 'BAG_25KG'; // Sac
     case KG = 'KG';             // Kilogramme
     case G = 'G';               // Gramme
-    case BAG_50KG = 'BAG_50KG'; // Sac de 50 kg
-    case BAG_25KG = 'BAG_25KG'; // Sac de 25 kg
     case TON = 'TON';           // Tonne métrique (1 000 kg)
     case DOSE = 'DOSE';         // Dose vaccinale
     case VIAL = 'VIAL';         // Flacon / Ampoule
@@ -23,10 +24,9 @@ enum InventoryUnit: string
     public function getLabel(): string
     {
         return match ($this) {
+            self::BAG, self::BAG_50KG, self::BAG_25KG => 'Sac',
             self::KG => 'Kilogramme (kg)',
             self::G => 'Gramme (g)',
-            self::BAG_50KG => 'Sac de 50 kg',
-            self::BAG_25KG => 'Sac de 25 kg',
             self::TON => 'Tonne (t)',
             self::DOSE => 'Dose vaccinale',
             self::VIAL => 'Flacon / Ampoule',
@@ -40,10 +40,9 @@ enum InventoryUnit: string
     public function getShortLabel(): string
     {
         return match ($this) {
+            self::BAG, self::BAG_50KG, self::BAG_25KG => 'sac',
             self::KG => 'kg',
             self::G => 'g',
-            self::BAG_50KG => 'sac (50kg)',
-            self::BAG_25KG => 'sac (25kg)',
             self::TON => 't',
             self::DOSE => 'dose',
             self::VIAL => 'flacon',
@@ -57,7 +56,7 @@ enum InventoryUnit: string
     public function getFamily(): string
     {
         return match ($this) {
-            self::KG, self::G, self::BAG_50KG, self::BAG_25KG, self::TON => 'MASS',
+            self::BAG, self::BAG_50KG, self::BAG_25KG, self::KG, self::G, self::TON => 'MASS',
             self::LITER, self::ML => 'VOLUME',
             self::DOSE, self::VIAL, self::SACHET => 'VET_DOSE',
             self::UNIT => 'PIECE',
@@ -67,13 +66,13 @@ enum InventoryUnit: string
     /**
      * Facteur multiplicateur par rapport à l'unité de référence de la famille (KG pour MASS, LITER pour VOLUME).
      */
-    public function getBaseMultiplier(): float
+    public function getBaseMultiplier(?float $customBagWeight = null): float
     {
         return match ($this) {
+            self::BAG, self::BAG_50KG => ($customBagWeight !== null && $customBagWeight > 0.0) ? $customBagWeight : 50.0,
+            self::BAG_25KG => ($customBagWeight !== null && $customBagWeight > 0.0) ? $customBagWeight : 25.0,
             self::KG => 1.0,
             self::G => 0.001,
-            self::BAG_50KG => 50.0,
-            self::BAG_25KG => 25.0,
             self::TON => 1000.0,
             self::LITER => 1.0,
             self::ML => 0.001,
@@ -90,7 +89,7 @@ enum InventoryUnit: string
      * Convertit une quantité depuis cette unité vers l'unité cible.
      * Lance IncompatibleUnitException si les familles sont incompatibles.
      */
-    public function convertTo(float $quantity, self $targetUnit): float
+    public function convertTo(float $quantity, self $targetUnit, ?float $customBagWeight = null): float
     {
         if ($this === $targetUnit) {
             return $quantity;
@@ -100,8 +99,8 @@ enum InventoryUnit: string
             throw new IncompatibleUnitException($this, $targetUnit);
         }
 
-        $sourceMultiplier = $this->getBaseMultiplier();
-        $targetMultiplier = $targetUnit->getBaseMultiplier();
+        $sourceMultiplier = $this->getBaseMultiplier($customBagWeight);
+        $targetMultiplier = $targetUnit->getBaseMultiplier($customBagWeight);
 
         if ($targetMultiplier == 0.0) {
             return $quantity;

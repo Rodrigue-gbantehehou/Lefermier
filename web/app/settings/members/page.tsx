@@ -13,18 +13,22 @@ import {
   Edit2,
   Trash2,
   Lock,
+  AlertCircle,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Modal } from "@/components/ui/modal";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { FarmMember, FarmRole } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 export default function MembersManagementPage() {
   const { activeFarm, hasPermission, user: currentUser, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
 
   const [members, setMembers] = useState<FarmMember[]>([]);
   const [roles, setRoles] = useState<FarmRole[]>([]);
@@ -33,6 +37,7 @@ export default function MembersManagementPage() {
 
   // Modal Ajout Collaborateur
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newFirstName, setNewFirstName] = useState("");
   const [newLastName, setNewLastName] = useState("");
@@ -44,6 +49,7 @@ export default function MembersManagementPage() {
 
   // Modal Modification Collaborateur
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<FarmMember | null>(null);
   const [editRoleId, setEditRoleId] = useState("");
   const [editRoleEnum, setEditRoleEnum] = useState("");
@@ -86,6 +92,7 @@ export default function MembersManagementPage() {
     e.preventDefault();
     if (!activeFarm?.id || !newEmail || !newFirstName || !newLastName) return;
 
+    setCreateError(null);
     setSubmittingCreate(true);
     setFeedbackMsg(null);
     try {
@@ -99,10 +106,7 @@ export default function MembersManagementPage() {
         password: newPassword || undefined,
       });
 
-      setFeedbackMsg({
-        type: "success",
-        text: `Collaborateur ${newFirstName} ${newLastName} ajouté avec succès !`,
-      });
+      toast.success(`Collaborateur ${newFirstName} ${newLastName} ajouté avec succès !`);
       setCreateModalOpen(false);
       setNewEmail("");
       setNewFirstName("");
@@ -111,13 +115,16 @@ export default function MembersManagementPage() {
       setNewPassword("");
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de l'ajout du collaborateur.");
+      const msg = err?.message || "Erreur lors de l'ajout du collaborateur.";
+      setCreateError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingCreate(false);
     }
   }
 
   function openEditModal(member: FarmMember) {
+    setEditError(null);
     setSelectedMember(member);
     setEditRoleId(member.roleDefinition?.id || "");
     setEditRoleEnum(member.role || "MANAGER");
@@ -129,6 +136,7 @@ export default function MembersManagementPage() {
     e.preventDefault();
     if (!activeFarm?.id || !selectedMember) return;
 
+    setEditError(null);
     setSubmittingEdit(true);
     setFeedbackMsg(null);
     try {
@@ -138,14 +146,13 @@ export default function MembersManagementPage() {
         isActive: editIsActive,
       });
 
-      setFeedbackMsg({
-        type: "success",
-        text: `Accès et rôle de ${selectedMember.fullName} mis à jour avec succès.`,
-      });
+      toast.success(`Accès et rôle de ${selectedMember.fullName} mis à jour avec succès.`);
       setEditModalOpen(false);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la mise à jour du collaborateur.");
+      const msg = err?.message || "Erreur lors de la mise à jour du collaborateur.";
+      setEditError(msg);
+      toast.error(msg);
     } finally {
       setSubmittingEdit(false);
     }
@@ -153,7 +160,7 @@ export default function MembersManagementPage() {
 
   async function handleDeleteMember(member: FarmMember) {
     if (member.isOwner) {
-      alert("Le propriétaire de l'exploitation ne peut pas être retiré.");
+      toast.warning("Le propriétaire de l'exploitation ne peut pas être retiré.");
       return;
     }
 
@@ -168,19 +175,131 @@ export default function MembersManagementPage() {
     if (!activeFarm?.id) return;
     try {
       await api.members.delete(activeFarm.id, member.id);
-      setFeedbackMsg({
-        type: "success",
-        text: `${member.fullName} a été retiré de l'équipe avec succès.`,
-      });
+      toast.success(`${member.fullName} a été retiré de l'équipe avec succès.`);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || "Erreur lors de la dissociation du collaborateur.");
+      toast.error(err?.message || "Erreur lors de la dissociation du collaborateur.");
     }
   }
 
   // Calculs KPI
   const activeCount = members.filter((m) => m.isActive).length;
   const customRoleCount = members.filter((m) => m.roleDefinition).length;
+
+  const memberColumns: ColumnDef<FarmMember>[] = [
+    {
+      key: "name",
+      header: "Utilisateur / Employé",
+      sortable: true,
+      accessor: (m) => m.fullName,
+      cell: (m) => {
+        const isCurrent = currentUser?.id === m.userId;
+        return (
+          <div className="flex items-center gap-2.5">
+           
+            <div>
+              <span className="font-bold text-foreground block text-xs">
+                {m.fullName}
+                {isCurrent && (
+                  <span className="ml-1.5 text-[10px] font-normal text-muted">(Vous)</span>
+                )}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "contact",
+      header: "Contact",
+      cell: (m) => (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-muted text-xs">
+            <Mail className="h-3 w-3" />
+            <span>{m.email}</span>
+          </div>
+          {m.phone && (
+            <div className="flex items-center gap-1 text-muted text-xs">
+              <Phone className="h-3 w-3" />
+              <span>{m.phone}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      header: "Rôle Attribué",
+      sortable: true,
+      accessor: (m) => m.roleDefinition?.name || m.role || "Membre",
+      cell: (m) => {
+        const roleName = m.roleDefinition?.name || m.role || "Membre";
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-foreground">
+              {m.isOwner ? "Owner" : roleName}
+            </span>
+            {m.roleDefinition?.isSystem && (
+              <span title="Rôle système prédéfini">
+                <Lock className="h-3 w-3 text-muted" />
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Statut",
+      sortable: true,
+      accessor: (m) => (m.isActive ? "Actif" : "Suspendu"),
+      cell: (m) => (
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              m.isActive ? "bg-success" : "bg-danger"
+            }`}
+          />
+          {m.isActive ? "Actif" : "Suspendu"}
+        </span>
+      ),
+    },
+    {
+      key: "createdAt",
+      header: "Date d'embauche",
+      sortable: true,
+      accessor: (m) => m.createdAt,
+      cell: (m) => <span className="text-muted text-xs">{formatDate(m.createdAt)}</span>,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "center",
+      cell: (m) => {
+        if (!hasPermission("member:manage") || m.isOwner) return null;
+        return (
+          <div className="flex items-center justify-center gap-1">
+            <button
+              type="button"
+              onClick={() => openEditModal(m)}
+              className="rounded-lg p-1.5 text-muted hover:bg-surface-muted hover:text-foreground transition-colors"
+              title="Modifier le rôle ou statut"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteMember(m)}
+              className="rounded-lg p-1.5 text-danger hover:bg-danger-soft transition-colors"
+              title="Retirer de l'exploitation"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <Shell>
@@ -191,7 +310,7 @@ export default function MembersManagementPage() {
             Gestion des Utilisateurs & Employés
           </h1>
           <p className="mt-1 text-xs text-muted">
-            Employés, techniciens avicoles, vétérinaires, magasiniers et chefs d'élevage rattachés à{" "}
+            Employés, techniciens avicoles, vétérinaires, magasiniers ou chefs d'élevage rattachés à{" "}
             <span className="font-semibold text-foreground">{activeFarm?.name || "l'exploitation"}</span>.
           </p>
         </div>
@@ -260,171 +379,101 @@ export default function MembersManagementPage() {
         />
       </div>
 
-      {/* Members Table */}
-      <div className="mt-8 rounded-2xl border border-border bg-surface p-5 shadow-xs">
-        <div className="flex items-center justify-between pb-4 border-b border-border">
-          <div>
-            <h2 className="text-sm font-bold text-foreground">
-              Liste des Utilisateurs & Employés ({members.length})
-            </h2>
-            <p className="text-xs text-muted">
-              Attribution des accès et contrôle des privilèges par profil métier.
-            </p>
-          </div>
-        </div>
+      {/* DataTable Members */}
+      <div className="mt-8">
+        <DataTable<FarmMember>
+          title="Liste des Utilisateurs & Employés"
+          subtitle="Attribution des accès et contrôle des privilèges par profil métier."
+          data={members}
+          columns={memberColumns}
+          searchable={true}
+          searchPlaceholder="Rechercher par nom, e-mail, téléphone, rôle..."
+          searchAccessor={(m) => `${m.fullName} ${m.email} ${m.phone || ""} ${m.roleDefinition?.name || m.role}`}
+          pageSize={10}
+          initialSort={{ key: "createdAt", direction: "desc" }}
+          isLoading={isLoading}
+          renderMobileCard={(m) => {
+            const isCurrent = currentUser?.id === m.userId;
+            const roleName = m.roleDefinition?.name || m.role || "Membre";
+            return (
+              <div className="rounded-2xl border border-border bg-surface p-4 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft font-bold text-primary text-xs uppercase shadow-2xs">
+                      {m.firstName.charAt(0)}
+                      {m.lastName.charAt(0)}
+                      {m.isActive && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-surface" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-foreground block truncate">
+                        {m.fullName}
+                        {isCurrent && <span className="ml-1.5 text-[10px] text-muted font-normal">(Vous)</span>}
+                      </span>
+                      <span className="text-[11px] text-muted block truncate">{m.email}</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold shrink-0">
+                    <span className={`h-1.5 w-1.5 rounded-full ${m.isActive ? "bg-success" : "bg-danger"}`} />
+                    {m.isActive ? "Actif" : "Suspendu"}
+                  </span>
+                </div>
 
-        {isLoading ? (
-          <div className="py-12 text-center text-xs text-muted animate-pulse">
-            Chargement de l'équipe...
-          </div>
-        ) : members.length === 0 ? (
-          <EmptyState
-            icon={<Users className="h-6 w-6 text-primary" />}
-            title="Aucun utilisateur ou employé rattaché"
-            description="Ajoutez des employés ou techniciens pour leur attribuer des tâches opérationnelles."
-            actionLabel="Ajouter un employé"
-            onAction={() => setCreateModalOpen(true)}
-            className="my-6 border-none"
-          />
-        ) : (
-          <div className="overflow-x-auto mt-4">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface-muted text-muted">
-                <tr>
-                  <th className="py-2.5 px-3 font-semibold rounded-l-lg">Utilisateur / Employé</th>
-                  <th className="py-2.5 px-3 font-semibold">Contact</th>
-                  <th className="py-2.5 px-3 font-semibold">Rôle Attribué</th>
-                  <th className="py-2.5 px-3 font-semibold">Permissions</th>
-                  <th className="py-2.5 px-3 font-semibold">Statut</th>
-                  <th className="py-2.5 px-3 font-semibold">Date d'embauche</th>
-                  <th className="py-2.5 px-3 font-semibold text-center rounded-r-lg">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {members.map((m) => {
-                  const roleName = m.roleDefinition?.name || m.role || "Membre";
-                  const isCurrent = currentUser?.id === m.userId;
+                <div className="grid grid-cols-2 gap-2 text-xs py-0.5">
+                  <div>
+                    <span className="text-muted text-[11px] block">Rôle</span>
+                    <span className="font-semibold text-foreground text-xs">
+                      {m.isOwner ? "Owner" : roleName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted text-[11px] block">Permissions</span>
+                    <span className="text-muted text-xs font-mono">
+                      {m.isOwner ? "Accès total (22)" : `${m.permissions?.length || 0} perm.`}
+                    </span>
+                  </div>
+                  {m.phone && (
+                    <div className="col-span-2 flex items-center gap-1 text-muted text-xs">
+                      <Phone className="h-3 w-3 text-muted shrink-0" />
+                      <a href={`tel:${m.phone}`} className="text-primary hover:underline">
+                        {m.phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
 
-                  return (
-                    <tr
-                      key={m.id}
-                      className="hover:bg-surface-hover transition-colors"
+                {hasPermission("member:manage") && !m.isOwner && (
+                  <div className="pt-2 border-t border-border/50 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(m)}
+                      className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
                     >
-                      {/* Name & Avatar */}
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-soft font-bold text-primary text-xs uppercase shadow-2xs">
-                            {m.firstName.charAt(0)}
-                            {m.lastName.charAt(0)}
-                            {m.isActive && (
-                              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-surface" />
-                            )}
-                          </div>
-                          <div>
-                            <span className="font-bold text-foreground block">
-                              {m.fullName}
-                              {isCurrent && (
-                                <span className="ml-1.5 text-[10px] font-normal text-muted">(Vous)</span>
-                              )}
-                            </span>
-                            <span className="text-[11px] text-muted block">
-                              ID: {m.email}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Contact */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1 text-muted">
-                            <Mail className="h-3 w-3" />
-                            <span>{m.email}</span>
-                          </div>
-                          {m.phone && (
-                            <div className="flex items-center gap-1 text-muted">
-                              <Phone className="h-3 w-3" />
-                              <span>{m.phone}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Rôle */}
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          
-                            {m.isOwner ? "Owner" : roleName}
-                         
-                          {m.roleDefinition?.isSystem && (
-                            <span title="Rôle système prédéfini">
-                              <Lock className="h-3 w-3 text-muted" />
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Permissions atomiques */}
-                      <td className="py-3 px-3 font-mono text-[11px] text-muted">
-                        {m.isOwner
-                          ? "Accès total (22/22)"
-                          : `${m.permissions?.length || 0} permission(s)`}
-                      </td>
-
-                      {/* Statut */}
-                      <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              m.isActive ? "bg-success" : "bg-danger"
-                            }`}
-                          />
-                          {m.isActive ? "Actif" : "Suspendu"}
-                        </span>
-                      </td>
-
-                      {/* Date de création */}
-                      <td className="py-3 px-3 text-muted">
-                        {formatDate(m.createdAt)}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {hasPermission("member:manage") && !m.isOwner && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => openEditModal(m)}
-                                className="rounded-lg p-1.5 text-muted hover:bg-surface-muted hover:text-foreground transition-colors"
-                                title="Modifier le rôle ou statut"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteMember(m)}
-                                className="rounded-lg p-1.5 text-danger hover:bg-danger-soft transition-colors"
-                                title="Retirer de l'exploitation"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {m.isOwner && (
-                            <span className="text-[10px] text-muted italic">
-                              Protégé
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      <Edit2 className="h-3 w-3" />
+                      <span>Modifier</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMember(m)}
+                      className="flex items-center gap-1 rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Retirer</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          }}
+          emptyState={{
+            icon: <Users className="h-6 w-6 text-primary" />,
+            title: "Aucun utilisateur ou employé rattaché",
+            description: "Ajoutez des employés ou techniciens pour leur attribuer des tâches opérationnelles.",
+            actionLabel: "Ajouter un employé",
+            onAction: () => setCreateModalOpen(true),
+          }}
+        />
       </div>
 
       {/* CREATE MEMBER MODAL */}
@@ -432,7 +481,7 @@ export default function MembersManagementPage() {
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title="Ajouter un Utilisateur / Employé"
-        description={`Ajoutez un employé, technicien, chef d'élevage ou gestionnaire pour l'exploitation "${activeFarm?.name}".`}
+        description={`Ajoutez un employé, technicien, chef d'élevage, ... pour "${activeFarm?.name}".`}
       >
         <form onSubmit={handleAddMember} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -537,10 +586,20 @@ export default function MembersManagementPage() {
             </p>
           </div>
 
+          {createError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{createError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setCreateModalOpen(false)}
+              onClick={() => {
+                setCreateModalOpen(false);
+                setCreateError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler
@@ -614,10 +673,20 @@ export default function MembersManagementPage() {
             </div>
           </div>
 
+          {editError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium leading-relaxed">{editError}</div>
+            </div>
+          )}
+
           <div className="pt-2 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setEditModalOpen(false)}
+              onClick={() => {
+                setEditModalOpen(false);
+                setEditError(null);
+              }}
               className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
             >
               Annuler

@@ -56,6 +56,7 @@ class TransactionService
         }
 
         $transactionDate = new \DateTimeImmutable($dto->transactionDate);
+        $dueDate = $dto->dueDate !== null ? new \DateTimeImmutable($dto->dueDate) : null;
 
         $transaction = new Transaction(
             $farm,
@@ -68,7 +69,10 @@ class TransactionService
             $dto->description,
             $contact,
             $flock,
-            $recordedBy
+            $recordedBy,
+            $dto->paymentStatus,
+            $dto->paidAmount,
+            $dueDate
         );
 
         $this->entityManager->persist($transaction);
@@ -138,6 +142,11 @@ class TransactionService
             'category' => $t->getCategory()->value,
             'amount' => $t->getAmount(),
             'currency' => $t->getFarm()->getCurrency(),
+            'paymentStatus' => $t->getPaymentStatus()->value,
+            'paidAmount' => $t->getPaidAmount(),
+            'remainingAmount' => $t->getRemainingAmount(),
+            'dueDate' => $t->getDueDate()?->format('Y-m-d'),
+            'isOverdue' => $t->isOverdue(),
             'paymentMethod' => $t->getPaymentMethod()->value,
             'transactionDate' => $t->getTransactionDate()->format('Y-m-d'),
             'reference' => $t->getReference(),

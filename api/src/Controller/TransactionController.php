@@ -17,6 +17,7 @@ use App\Repository\FlockRepository;
 use App\Repository\TransactionRepository;
 use App\Security\Voter\FlockVoter;
 use App\Security\Voter\TransactionVoter;
+use App\Service\PdfService;
 use App\Service\TransactionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,6 +36,7 @@ class TransactionController extends AbstractController
         private readonly TransactionRepository $transactionRepository,
         private readonly ContactRepository $contactRepository,
         private readonly FlockRepository $flockRepository,
+        private readonly PdfService $pdfService,
     ) {
     }
 
@@ -166,5 +168,66 @@ class TransactionController extends AbstractController
                 ]),
             ],
         ]);
+    }
+
+    #[Route('/api/transactions/{id}/receipt/pdf', name: 'api_transactions_receipt_pdf', methods: ['GET'])]
+    #[IsGranted(TransactionVoter::VIEW, subject: 'transaction')]
+    public function receiptPdf(Transaction $transaction, Request $request): Response
+    {
+        $farm = $transaction->getFarm();
+        $isDownload = $request->query->getBoolean('download', false);
+
+        $ref = $transaction->getReference() ?? ('REC-' . strtoupper(substr((string) $transaction->getId(), -6)));
+        $paymentStatus = $transaction->getPaymentStatus()->value;
+        $isPartial = $paymentStatus === 'PARTIAL';
+        $isUnpaid = $paymentStatus === 'UNPAID';
+
+        $recipient = null;
+        if ($transaction->getContact() !== null) {
+            $contact = $transaction->getContact();
+            $recipient = [
+                'label' => 'Client / Revendeuse',
+                'name' => $contact->getName(),
+                'phone' => $contact->getPhone(),
+                'address' => $contact->getAddress(),
+                'email' => $contact->getEmail(),
+            ];
+        } else {
+            $recipient = [
+                'label' => 'Client / Acheteur',
+                'name' => 'Vente directe au comptoir / Client passage',
+            ];
+        }
+
+        $notes = $transaction->getDescription();
+        if ($transaction->getRemainingAmount() > 0) {
+            $dueNote = sprintf(
+                "Modalités de règlement : Solde restant dû de %s FCFA.",
+                number_format($transaction->getRemainingAmount(), 0, ',', ' ')
+            );
+            if ($transaction->getDueDate() !== null) {
+                $dueNote .= sprintf(" Date limite d'échéance : %s.", $transaction->getDueDate()->format('d/m/Y'));
+            }
+            $notes = $notes ? ($notes . "\n" . $dueNote) : $dueNote;
+        }
+
+        return $this->pdfService->createPdfResponse(
+            template: 'pdf/sales_receipt.html.twig',
+            params: [
+                'farm' => $farm,
+                'transaction' => $transaction,
+                'documentTitle' => 'Reçu de Vente Officiel',
+                'documentSubtitle' => 'Pièce justificative d\'encaissement et de livraison avicole',
+                'documentReference' => $ref,
+                'documentDate' => $transaction->getTransactionDate()->format('d/m/Y'),
+                'documentBadge' => $isPartial ? 'Acompte (Partiel)' : ($isUnpaid ? 'À Crédit (Non Réglé)' : 'Payé / Réglé 100%'),
+                'badgeVariant' => $isPartial ? 'warning' : ($isUnpaid ? 'danger' : 'success'),
+                'watermark' => $isPartial ? 'ACOMPTE' : ($isUnpaid ? 'À CRÉDIT' : 'PAYÉ'),
+                'recipient' => $recipient,
+                'notes' => $notes,
+            ],
+            filename: sprintf('recu-vente-%s.pdf', strtolower($ref)),
+            inline: !$isDownload,
+        );
     }
 }
