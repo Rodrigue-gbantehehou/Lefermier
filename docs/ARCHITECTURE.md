@@ -110,12 +110,19 @@ Lefermier/
 ├── docs/
 │   ├── DESIGN_SYSTEM.md
 │   ├── API_CONVENTIONS.md
+│   ├── API_REFERENCE.md        # API Métier & Éleveurs (/api/farms/*)
+│   ├── ADMIN_API_REFERENCE.md  # API Administration Plateforme (/api/admin/*)
 │   ├── DATA_MODEL.md
 │   └── decisions/
 ├── api/
-│   └── Symfony
-└── web/
-    └── Next.js
+│   └── Symfony 8.1 (Controllers: src/Controller/ & src/Controller/Admin/)
+├── web/
+│   └── Next.js (Application éleveur)
+├── admin/
+│   ├── ADMIN_RULES.md
+│   └── Next.js (Back-office plateforme)
+└── landing/
+    └── Next.js (Vitrine publique)
 ```
 
 Le répertoire Flutter pourra être ajouté ultérieurement :
@@ -400,28 +407,55 @@ Vérifier qu'un utilisateur ne peut ni lire, ni modifier, ni supprimer les donn�
 
 ---
 
-## 9. Authentification et permissions
+## 9. Authentification et Contrôle d'Accès (Dual-Scope RBAC)
 
-Le mécanisme d'authentification doit être choisi après examen des clients, de l'hébergement et des contraintes de sécurité.
+L'architecture de sécurité de Lefermier applique un cloisonnement strict entre les opérations quotidiennes des éleveurs et la gouvernance globale de la plateforme, selon un modèle d'autorisation granulaire inspiré de Microsoft Entra / Azure RBAC.
 
-Ne pas imposer JWT ou les sessions par habitude. Choisir une solution adaptée, documentée et cohérente entre l'API et l'application web.
+### 9.1. Mécanisme d'Authentification
+- **Standard** : JSON Web Token (JWT) asymétrique RSA 4096-bit généré par le bundle Lexik via `POST /api/auth/login`.
+- **Hachage des mots de passe** : Algorithme Argon2id (ou Bcrypt avec coût élevé) conforme aux standards de sécurité Symfony 8.
+- **Cycle de vie du jeton** : Durée de validité contrôlée avec renouvellement sécurisé. Les jetons ne sont jamais consignés en clair dans les journaux applicatifs.
 
-### Exigences
+### 9.2. Architecture à Double Périmètre d'Habilitation (Dual-Scope RBAC)
 
-- Stocker les mots de passe avec un mécanisme de hachage sécurisé adapté au framework.
-- Protéger les routes privées.
-- Vérifier les permissions côté serveur.
-- Prévoir les procédures de connexion, déconnexion et récupération d'accès.
-- Limiter les possibilités d'abus sur les opérations sensibles.
-- Protéger les mécanismes de renouvellement ou de révocation des sessions.
-- Ne pas stocker les secrets dans le dépôt.
-- Ne pas exposer de jetons ou d'identifiants sensibles dans les journaux.
+```text
+                                       UTILISATEUR (User)
+                                               │
+                    ┌──────────────────────────┴──────────────────────────┐
+                    ▼                                                     ▼
+      PÉRIMÈTRE EXPLOITATION (Scope Ferme)                 PÉRIMÈTRE PLATEFORME (Scope Admin)
+      Table : farm_memberships                             Table : admin_roles
+      Namespace : Farm Permissions                         Namespace : admin:* Permissions
+      Applications : web/ (Next.js), mobile/ (Flutter)     Application : admin/ (Next.js)
+      Contrôle : FarmVoters                                Contrôle : AdminPermissionVoter
+```
 
-Si des cookies sont utilisés pour l'authentification, configurer leurs attributs de sécurité et les protections CSRF appropriées.
+#### A. Périmètre Exploitation (Scope Ferme / Multi-Tenancy)
+1. **Cloisonnement par Ferme** : Un utilisateur n'accède qu'aux données des fermes au sein desquelles il dispose d'un enregistrement actif dans `farm_memberships`.
+2. **Matrice des 22 Permissions Métier** : Les actions zootechniques (saisie de ponte, gestion des bandes, mouvements d'aliment, traitements sanitaires) et comptables sont régies par des permissions fines évaluées par les Voters Symfony (`FarmVoter`, `FlockVoter`, `EggProductionVoter`, etc.).
+3. **Rôles d'exploitation** : `OWNER`, `FARM_MANAGER`, `PRODUCTION_LEAD`, `ACCOUNTANT`, `VETERINARIAN`. Ces rôles sont strictement limités au périmètre de la ferme affiliée et ne confèrent aucun droit d'administration sur le système.
 
-Si des jetons sont utilisés, définir leur durée de vie, leur stockage, leur renouvellement et leur révocation.
+#### B. Périmètre Plateforme (Scope Administration / Console Centrale)
+1. **Zéro Rôle Codé en Dur (Zero-Hardcoding Policy)** :
+   - Aucun rôle collaborateur n'est figé dans le code des contrôleurs Symfony.
+   - Les rôles d'administration sont stockés de façon dynamique dans la table `admin_roles` (`code`, `name`, `description`, `permissions` JSON, `is_system`).
+   - Les utilisateurs de l'équipe centrale sont rattachés à un rôle via la clé étrangère `users.admin_role_id`.
+2. **Catalogue des Permissions Granulaires (`AdminPermission`)** :
+   - Préfixées par l'espace de nom `admin:` (ex: `admin:dashboard:view`, `admin:organizations:suspend`, `admin:roles:manage`).
+   - Évaluées au niveau applicatif par `App\Security\Voter\AdminPermissionVoter` et l'attribut standard `#[IsGranted('admin:...')]`.
+   - Prise en charge du privilège absolu Wildcard (`*`) réservé au Super-Administrateur.
+3. **Rôles Modèles Prédéfinis (Système)** :
+   - `SUPER_ADMIN` : Permissions `['*']` (accès absolu à la console centrale).
+   - `ADMIN_GENERAL` : Supervision globale des organisations, fermes, abonnements et utilisateurs.
+   - `ADMIN_SUPPORT` : Accompagnement technique des éleveurs et consultation sans pouvoir de suspension.
+   - `ADMIN_FINANCE` : Gestion des plans commerciaux, quotas d'organisations et suivi du MRR.
+4. **Rôles Collaborateurs Personnalisés** :
+   - L'équipe de direction peut composer à tout moment de nouveaux rôles (ex: Auditeur Conformité, Chef de Projet Régional) en sélectionnant des permissions par cases à cocher dans l'interface `admin/app/roles/`.
 
-Les rôles définitifs doivent découler des besoins fonctionnels validés. Ne pas créer une matrice de permissions complexe avant de connaître les opérations réelles.
+### 9.3. Barrière d'Étanchéité et Isolation de Sécurité
+- **Rejet Immédiat à l'API** : Les routes sous `/api/admin/*` sont protégées par le pare-feu `security.yaml` exigeant au minimum `ROLE_ADMIN` (injecté dynamiquement dans `User::getRoles()` uniquement si `admin_role_id` est non nul). Un éleveur ordinaire recevant `ROLE_USER` essuie un refus `403 Forbidden` immédiat.
+- **Verrouillage Front-End (`AdminGuard`)** : Le back-office `admin/` masque l'intégralité du tableau de bord et de la navigation latérale tant que le profil de l'utilisateur n'est pas validé comme personnel plateforme. Les comptes éleveurs sont bloqués avec un écran explicatif et redirigés vers l'application d'exploitation `web/`.
+- **Résilience et Auditabilité** : La suppression d'un rôle personnalisé détache automatiquement les collaborateurs affiliés (`ON DELETE SET NULL`) sans corrompre leurs profils éleveurs. Les rôles système marqués `isSystem: true` sont protégés contre toute suppression accidentelle.
 
 ---
 

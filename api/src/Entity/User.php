@@ -65,6 +65,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: FarmMembership::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
     private Collection $farmMemberships;
 
+    #[ORM\ManyToOne(targetEntity: AdminRole::class)]
+    #[ORM\JoinColumn(name: 'admin_role_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?AdminRole $adminRole = null;
+
     public function __construct(string $email, string $firstName, string $lastName)
     {
         $this->id = new Ulid();
@@ -155,7 +159,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
 
+        if ($this->adminRole !== null) {
+            $roles[] = 'ROLE_ADMIN';
+            $roles[] = 'ROLE_' . $this->adminRole->getCode();
+            if ($this->adminRole->hasPermission('*')) {
+                $roles[] = 'ROLE_SUPER_ADMIN';
+            }
+        }
+
         return array_values(array_unique($roles));
+    }
+
+    public function getAdminRole(): ?AdminRole
+    {
+        return $this->adminRole;
+    }
+
+    public function setAdminRole(?AdminRole $adminRole): self
+    {
+        $this->adminRole = $adminRole;
+        return $this;
+    }
+
+    public function hasAdminPermission(string $permission): bool
+    {
+        if (in_array('ROLE_SUPER_ADMIN', $this->roles, true)) {
+            return true;
+        }
+
+        return $this->adminRole !== null && $this->adminRole->hasPermission($permission);
     }
 
     /**

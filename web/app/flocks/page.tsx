@@ -2,16 +2,17 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye, AlertCircle } from "lucide-react";
+import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye, AlertCircle, Utensils } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { RecordFeedingModal } from "@/components/dashboard";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
-import { Flock, FlockType } from "@/lib/types";
+import { Flock, FlockType, InventoryItem } from "@/lib/types";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { CreateBuildingModal } from "@/components/farms/create-building-modal";
 
@@ -71,6 +72,10 @@ export default function FlocksPage() {
   const [moveReason, setMoveReason] = useState("");
   const [submittingMove, setSubmittingMove] = useState(false);
 
+  // Feeding Modal
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [feedingModalOpen, setFeedingModalOpen] = useState(false);
+
   useEffect(() => {
     if (activeFarm?.id) {
       loadFlocks();
@@ -80,12 +85,14 @@ export default function FlocksPage() {
   async function loadFlocks() {
     setIsLoading(true);
     try {
-      const [flocksData, buildingsData] = await Promise.all([
+      const [flocksData, buildingsData, invData] = await Promise.all([
         api.flocks.list({ farmId: activeFarm?.id }),
         activeFarm?.id ? api.farms.listBuildings(activeFarm.id).catch(() => []) : Promise.resolve([]),
+        activeFarm?.id ? api.inventory.listItems({ farmId: activeFarm.id }).catch(() => []) : Promise.resolve([]),
       ]);
       setFlocks(flocksData);
       setBuildings(buildingsData || []);
+      setInventoryItems(invData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -269,17 +276,18 @@ export default function FlocksPage() {
             <Eye className="h-3 w-3 text-muted" />
             Fiche
           </Link>
-          {hasPermission("flock:update") && flock.status === "ACTIVE" ? (
+          {flock.status === "ACTIVE" ? (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveFlock(flock);
-                setMovementModalOpen(true);
+                setFeedingModalOpen(true);
               }}
-              className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:opacity-90 transition-opacity"
+              className="rounded-lg bg-amber-600/10 border border-amber-600/20 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-600 hover:text-white transition-colors inline-flex items-center gap-1"
             >
-              + Noter perte ou vente
+              <Utensils className="h-3 w-3" />
+              <span>Nourrir</span>
             </button>
           ) : null}
         </div>
@@ -413,16 +421,17 @@ export default function FlocksPage() {
                   >
                     Voir la fiche complète →
                   </Link>
-                  {hasPermission("flock:update") && flock.status === "ACTIVE" && (
+                  {flock.status === "ACTIVE" && (
                     <button
                       type="button"
                       onClick={() => {
                         setActiveFlock(flock);
-                        setMovementModalOpen(true);
+                        setFeedingModalOpen(true);
                       }}
-                      className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:opacity-90 transition-opacity"
+                      className="rounded-lg bg-amber-600/10 border border-amber-600/20 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-600 hover:text-white transition-colors inline-flex items-center gap-1"
                     >
-                      + Sortie
+                      <Utensils className="h-3 w-3" />
+                      <span>Nourrir</span>
                     </button>
                   )}
                 </div>
@@ -742,6 +751,16 @@ export default function FlocksPage() {
           setBuildings((prev) => [...prev, newBuilding]);
           setSelectedBuildingId(newBuilding.id);
         }}
+      />
+      {/* FEEDING MODAL */}
+      <RecordFeedingModal
+        isOpen={feedingModalOpen}
+        onClose={() => setFeedingModalOpen(false)}
+        onSuccess={loadFlocks}
+        flocks={flocks}
+        inventoryItems={inventoryItems}
+        activeFarmId={activeFarm?.id}
+        defaultFlockId={activeFlock?.id}
       />
     </Shell>
   );

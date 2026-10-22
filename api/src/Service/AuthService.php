@@ -129,6 +129,14 @@ class AuthService
             'fullName' => $user->getFullName(),
             'phone' => $user->getPhone(),
             'roles' => $user->getRoles(),
+            'adminRole' => $user->getAdminRole() ? [
+                'id' => $user->getAdminRole()->getId()->toBase32(),
+                'name' => $user->getAdminRole()->getName(),
+                'code' => $user->getAdminRole()->getCode(),
+            ] : null,
+            'adminPermissions' => $user->getAdminRole()
+                ? $user->getAdminRole()->getPermissions()
+                : (in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true) ? ['*'] : []),
             'farms' => $farms,
         ];
     }

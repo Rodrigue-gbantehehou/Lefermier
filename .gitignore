@@ -18,6 +18,24 @@ web/.env*.local
 web/.vercel/
 web/*.tsbuildinfo
 
+# Admin (Next.js / Node)
+admin/node_modules/
+admin/.next/
+admin/out/
+admin/build/
+admin/.env*.local
+admin/.vercel/
+admin/*.tsbuildinfo
+
+# Landing (Next.js / Node)
+landing/node_modules/
+landing/.next/
+landing/out/
+landing/build/
+landing/.env*.local
+landing/.vercel/
+landing/*.tsbuildinfo
+
 # API (Symfony / PHP)
 api/vendor/
 api/var/

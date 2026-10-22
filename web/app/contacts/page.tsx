@@ -249,7 +249,7 @@ export default function ContactsPage() {
       sortable: true,
       cell: (c) => {
         const conf = TYPE_CONFIG[c.type] || TYPE_CONFIG.CLIENT;
-        return <Badge variant={conf.badge}>{conf.label}</Badge>;
+        return <div>{conf.label}</div>;
       },
     },
     {
@@ -259,12 +259,11 @@ export default function ContactsPage() {
       cell: (c) =>
         c.phone ? (
           <a
-            href={`tel:${c.phone}`}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-semibold "
           >
-            <Phone className="h-3.5 w-3.5 text-primary/70" />
-            {c.phone}
+            {c.phone} <br /> {c.email}
           </a>
+          
         ) : (
           <span className="text-xs text-muted italic">Non renseigné</span>
         ),
@@ -277,9 +276,7 @@ export default function ContactsPage() {
         <div className="flex items-center gap-1 text-xs text-foreground">
           {c.city ? (
             <>
-              <MapPin className="h-3.5 w-3.5 text-muted shrink-0" />
               <span>{c.city}</span>
-              {c.address && <span className="text-muted truncate max-w-[140px]">({c.address})</span>}
             </>
           ) : (
             <span className="text-muted italic">-</span>
@@ -287,22 +284,7 @@ export default function ContactsPage() {
         </div>
       ),
     },
-    {
-      key: "email",
-      header: "Email",
-      cell: (c) =>
-        c.email ? (
-          <a
-            href={`mailto:${c.email}`}
-            className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground hover:underline"
-          >
-            <Mail className="h-3 w-3" />
-            {c.email}
-          </a>
-        ) : (
-          <span className="text-xs text-muted italic">-</span>
-        ),
-    },
+    
     {
       key: "actions",
       header: "Actions",

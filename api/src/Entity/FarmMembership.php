@@ -146,6 +146,13 @@ class FarmMembership
                 Permission::DASHBOARD_VIEW,
                 Permission::DASHBOARD_FINANCIALS,
             ], true),
+            FarmRole::VET_CONSULTANT => in_array($permission, [
+                Permission::HEALTH_VIEW,
+                Permission::HEALTH_MANAGE,
+                Permission::FLOCK_VIEW,
+                Permission::INVENTORY_VIEW,
+                Permission::DASHBOARD_VIEW,
+            ], true),
         };
     }
 
@@ -186,6 +193,13 @@ class FarmMembership
                 Permission::CONTACT_CREATE,
                 Permission::DASHBOARD_VIEW,
                 Permission::DASHBOARD_FINANCIALS,
+            ],
+            FarmRole::VET_CONSULTANT => [
+                Permission::HEALTH_VIEW,
+                Permission::HEALTH_MANAGE,
+                Permission::FLOCK_VIEW,
+                Permission::INVENTORY_VIEW,
+                Permission::DASHBOARD_VIEW,
             ],
         };
     }

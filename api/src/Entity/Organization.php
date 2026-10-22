@@ -90,7 +90,7 @@ class Organization
 
     public function setSubscriptionPlan(string $subscriptionPlan): self
     {
-        $this->subscriptionPlan = $subscriptionPlan;
+        $this->subscriptionPlan = strtoupper(trim($subscriptionPlan));
         return $this;
     }
 

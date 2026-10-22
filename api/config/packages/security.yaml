@@ -31,13 +31,27 @@ security:
                 - App\Security\ApiKeyAuthenticator
             jwt: ~
 
+    role_hierarchy:
+        ROLE_SUPER_ADMIN:
+            - ROLE_ADMIN
+            - ROLE_ADMIN_FINANCE
+            - ROLE_ADMIN_SUPPORT
+            - ROLE_ADMIN_AUDIT
+        ROLE_ADMIN:
+            - ROLE_ADMIN_FINANCE
+            - ROLE_ADMIN_SUPPORT
+            - ROLE_ADMIN_AUDIT
+
     # Note: Only the *first* matching rule is applied
     access_control:
         - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/forgot-password, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api/openapi, roles: PUBLIC_ACCESS }
         - { path: ^/api/permissions, roles: PUBLIC_ACCESS }
+        - { path: ^/api/admin, roles: [ROLE_ADMIN_SUPPORT, ROLE_ADMIN_FINANCE, ROLE_ADMIN_AUDIT, ROLE_ADMIN, ROLE_SUPER_ADMIN] }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

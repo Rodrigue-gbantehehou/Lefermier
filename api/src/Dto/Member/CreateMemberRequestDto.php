@@ -29,7 +29,7 @@ class CreateMemberRequestDto
     public ?string $roleId = null;
 
     /**
-     * Rôle standard (enum FarmRole : MANAGER, PRODUCTION_LEAD, STOCK_KEEPER, ACCOUNTANT).
+     * Rôle standard (enum FarmRole : MANAGER, PRODUCTION_LEAD, STOCK_KEEPER, ACCOUNTANT, VET_CONSULTANT).
      */
     public ?string $role = null;
 

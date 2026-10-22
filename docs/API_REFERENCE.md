@@ -16,6 +16,9 @@ Trois portails interactifs de documentation sont servis directement par l'applic
 | **Swagger UI** | [`http://127.0.0.1:8000/api/docs/swagger`](http://127.0.0.1:8000/api/docs/swagger) | Swagger UI v5 | Interface classique avec boutons d'essai direct (*Try it out*). |
 | **Spécification Brute OpenAPI 3.1** | [`http://127.0.0.1:8000/api/openapi.json`](http://127.0.0.1:8000/api/openapi.json) | JSON Schema OpenAPI 3.1 | Fichier machine-readable importable dans Postman, Insomnia, ou pour la génération de SDKs. |
 
+> [!NOTE]
+> Ce guide documente l'**API Métier & Éleveurs** (`/api/farms/*`). Pour l'**API d'Administration Plateforme (Back-Office)** réservée aux super-administrateurs (`/api/admin/*`), consultez le guide dédié : [ADMIN_API_REFERENCE.md](file:///c:/projets/Lefermier/docs/ADMIN_API_REFERENCE.md).
+
 ---
 
 ## 2. Normes & Standards de Conception

@@ -102,6 +102,20 @@ class RoleService
                 description: 'Facturation, encaissements MoMo/Espèces, dépenses et analyse des marges',
                 isSystem: false,
             ),
+            new Role(
+                farm: $farm,
+                name: 'Vétérinaire / Consultant sanitaire',
+                code: 'VET_CONSULTANT',
+                permissions: [
+                    Permission::HEALTH_VIEW,
+                    Permission::HEALTH_MANAGE,
+                    Permission::FLOCK_VIEW,
+                    Permission::INVENTORY_VIEW,
+                    Permission::DASHBOARD_VIEW,
+                ],
+                description: 'Suivi sanitaire, prophylaxie, ordonnances, calendrier vaccinal et observations médicales',
+                isSystem: false,
+            ),
         ];
 
         foreach ($roles as $role) {

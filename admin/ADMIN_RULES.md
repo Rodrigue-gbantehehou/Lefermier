@@ -24,6 +24,7 @@ Le back-office peut inclure les modules suivants, selon les besoins réels de la
 - **Tableau de bord :** indicateurs globaux sur l'activité de la plateforme.
 - **Gestion des fermes :** consultation des fermes inscrites, de leur statut et de leurs informations administratives.
 - **Gestion des comptes :** utilisateurs autorisés à accéder à la plateforme et administrateurs.
+- **Rôles & Habilitations :** matrice dynamique des autorisations plateforme (modèle Microsoft RBAC, catalogue de permissions granulaires, aucun rôle codé en dur).
 - **Abonnements :** offres, périodes, statuts et historique des changements.
 - **Paiements :** consultation des transactions et de leur état.
 - **Support :** suivi des demandes et incidents.

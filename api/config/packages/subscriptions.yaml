@@ -1,0 +1,132 @@
+# Configuration officielle des Formules Commerciales, Licences & Quotas Lefermier
+# Conforme à docs/ADMIN_API_REFERENCE.md et docs/DATA_MODEL.md
+# Modèle inspiré de Microsoft 365 Licensing & Azure Subscriptions
+
+parameters:
+    app.subscriptions.currency: 'XOF'
+    app.subscriptions.annual_discount_percent: 15
+
+    app.subscriptions.plans:
+        FREE:
+            sku: 'FREE'
+            name: 'Starter (Découverte)'
+            tier: 'Découverte'
+            badge: 'Gratuit'
+            description: 'Pour les éleveurs individuels qui démarrent leur première exploitation avicole.'
+            price_monthly: 0
+            price_annually: 0
+            currency: 'XOF'
+            quotas:
+                max_farms: 1
+                max_flocks: 2
+                max_members: 2
+                retention_months: 3
+            features:
+                - '1 exploitation avicole'
+                - 'Jusqu''à 2 bandes simultanées'
+                - '2 comptes collaborateurs'
+                - 'Saisie quotidienne ponte & mortalités'
+                - 'Calcul des alvéoles de 30 œufs'
+                - 'Support communautaire'
+            flags:
+                accounting_exports: false
+                health_alerts: false
+                iot_sensors: false
+                api_access: false
+                priority_support: false
+            is_popular: false
+            is_recommended: false
+
+        STANDARD:
+            sku: 'STANDARD'
+            name: 'Standard (Éleveur Pro)'
+            tier: 'Professionnel'
+            badge: 'Populaire'
+            description: 'Pour les fermes structurées nécessitant un pilotage rigoureux des stocks et de la ponte.'
+            price_monthly: 15000
+            price_annually: 153000
+            currency: 'XOF'
+            quotas:
+                max_farms: 3
+                max_flocks: 10
+                max_members: 5
+                retention_months: 12
+            features:
+                - 'Jusqu''à 3 exploitations avicoles'
+                - 'Jusqu''à 10 bandes actives'
+                - '5 comptes collaborateurs'
+                - 'Gestion des stocks d''aliments et intrants'
+                - 'Calcul automatique du taux de ponte standardisé'
+                - 'Rapports de marge brute en FCFA'
+                - 'Alertes automatiques de mortalité'
+                - 'Support email sous 24h'
+            flags:
+                accounting_exports: false
+                health_alerts: true
+                iot_sensors: false
+                api_access: false
+                priority_support: false
+            is_popular: true
+            is_recommended: false
+
+        PRO:
+            sku: 'PRO'
+            name: 'Professionnel (Coopérative)'
+            tier: 'Multi-Sites'
+            badge: 'Recommandé'
+            description: 'Pour les coopératives, exploitations multi-sites et groupements d''éleveurs.'
+            price_monthly: 35000
+            price_annually: 357000
+            currency: 'XOF'
+            quotas:
+                max_farms: 10
+                max_flocks: 50
+                max_members: 20
+                retention_months: 36
+            features:
+                - 'Jusqu''à 10 exploitations avicoles'
+                - 'Jusqu''à 50 bandes simultanées'
+                - '20 comptes collaborateurs avec permissions fines'
+                - 'Exports comptables SYSCOHADA (Grand livre & Journaux)'
+                - 'Génération automatique des programmes prophylactiques'
+                - 'Comparatifs de performances inter-bâtiments'
+                - 'Support téléphonique & WhatsApp prioritaire'
+            flags:
+                accounting_exports: true
+                health_alerts: true
+                iot_sensors: false
+                api_access: false
+                priority_support: true
+            is_popular: false
+            is_recommended: true
+
+        ENTERPRISE:
+            sku: 'ENTERPRISE'
+            name: 'Entreprise & Réseau Industriel'
+            tier: 'Grand Compte'
+            badge: 'Sur-Mesure'
+            description: 'Pour les intégrateurs avicoles industriels, accouveurs et fabricants d''aliments.'
+            price_monthly: 85000
+            price_annually: 867000
+            currency: 'XOF'
+            quotas:
+                max_farms: 9999
+                max_flocks: 9999
+                max_members: 9999
+                retention_months: 120
+            features:
+                - 'Nombre d''exploitations illimité'
+                - 'Nombre de bandes et de bâtiments illimité'
+                - 'Nombre de collaborateurs illimité'
+                - 'Intégration capteurs connectés IoT (Température/Hygrométrie)'
+                - 'Accès API REST complète pour ERP tiers'
+                - 'Archivage légal et historique décennal'
+                - 'Accompagnement zootechnique dédié & SLA 99.9%'
+            flags:
+                accounting_exports: true
+                health_alerts: true
+                iot_sensors: true
+                api_access: true
+                priority_support: true
+            is_popular: false
+            is_recommended: false

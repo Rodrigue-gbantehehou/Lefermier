@@ -6,140 +6,71 @@ import {
   Bird,
   Egg,
   AlertTriangle,
-  AlertCircle,
   Wallet,
-  TrendingUp,
   RefreshCw,
   ArrowRight,
-  Package,
   Plus,
-  CheckCircle2,
-  Calendar,
   Edit3,
   Building2,
   Utensils,
-  Droplet,
-  Trash2,
+  CheckCircle2,
+  TrendingUp,
+  Package,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
-import { Modal } from "@/components/ui/modal";
 import { CreateFarmModal } from "@/components/farms/create-farm-modal";
+import {
+  RecordEggModal,
+  RecordMovementModal,
+  RecordFeedingModal,
+  RecordTransactionModal,
+} from "@/components/dashboard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { useAuth } from "@/context/auth-context";
-import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import {
   DashboardKPI,
   Flock,
-  EggSession,
-  PaymentMethod,
   EggProduction,
   Transaction,
   InventoryItem,
 } from "@/lib/types";
-import { formatFcfa, formatNumber, formatPercent, calcEggTrays, formatEggTraysSummary, formatDate } from "@/lib/utils";
-import { formatInventoryUnit, getUnitShortLabel, getPracticalMeasurementHint } from "@/lib/units";
+import { formatFcfa, formatNumber, formatPercent, formatEggTraysSummary, formatDate } from "@/lib/utils";
+import { formatInventoryUnit } from "@/lib/units";
 
 export default function DashboardPage() {
   const { activeFarm, hasPermission } = useAuth();
-  const { toast } = useToast();
-
-  const [eggError, setEggError] = useState<string | null>(null);
-  const [moveError, setMoveError] = useState<string | null>(null);
-  const [feedingError, setFeedingError] = useState<string | null>(null);
-  const [financeError, setFinanceError] = useState<string | null>(null);
-
   const [kpi, setKpi] = useState<DashboardKPI | null>(null);
   const [flocks, setFlocks] = useState<Flock[]>([]);
   const [recentEggs, setRecentEggs] = useState<EggProduction[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [todayStr, setTodayStr] = useState<string>("");
-
-  useEffect(() => {
-    setTodayStr(new Date().toISOString().split("T")[0]);
-  }, []);
 
   // Modals state
   const [createFarmModalOpen, setCreateFarmModalOpen] = useState(false);
   const [eggModalOpen, setEggModalOpen] = useState(false);
+  const [editingEgg, setEditingEgg] = useState<EggProduction | null>(null);
   const [movementModalOpen, setMovementModalOpen] = useState(false);
+  const [feedingModalOpen, setFeedingModalOpen] = useState(false);
   const [financeModalOpen, setFinanceModalOpen] = useState(false);
-
-  // Egg Form state
   const [selectedFlockId, setSelectedFlockId] = useState("");
-  const [eggDate, setEggDate] = useState("");
-  const [eggSession, setEggSession] = useState<EggSession>("MORNING");
-  const [goodEggs, setGoodEggs] = useState<number | string>(0);
-  const [brokenEggs, setBrokenEggs] = useState<number | string>(0);
-  const [abnormalEggs, setAbnormalEggs] = useState<number | string>(0);
-  const [eggNotes, setEggNotes] = useState("");
-  const [submittingEgg, setSubmittingEgg] = useState(false);
-  const [editingEggId, setEditingEggId] = useState<string | null>(null);
+  const [todayStr, setTodayStr] = useState("");
 
   function openCreateEggModal() {
-    setEggError(null);
-    setEditingEggId(null);
-    setEggDate(todayStr || new Date().toISOString().split("T")[0]);
-    setEggSession("MORNING");
-    setGoodEggs(0);
-    setBrokenEggs(0);
-    setAbnormalEggs(0);
-    setEggNotes("");
-    if (flocks.length > 0 && !selectedFlockId) {
-      setSelectedFlockId(flocks[0].id);
-    }
+    setEditingEgg(null);
     setEggModalOpen(true);
   }
 
   function openEditEggModal(egg: EggProduction) {
-    setEggError(null);
-    setEditingEggId(egg.id);
-    setSelectedFlockId(egg.flockId);
-    setEggDate(egg.date);
-    setEggSession(egg.session);
-    setGoodEggs(egg.goodEggs);
-    setBrokenEggs(egg.brokenEggs);
-    setAbnormalEggs(egg.abnormalEggs);
-    setEggNotes(egg.notes || "");
+    setEditingEgg(egg);
     setEggModalOpen(true);
   }
 
-  // Movement Form state
-  const [moveFlockId, setMoveFlockId] = useState("");
-  const [moveType, setMoveType] = useState<"MORTALITY" | "SALE" | "CULL">("MORTALITY");
-  const [moveQuantity, setMoveQuantity] = useState<number | string>(1);
-  const [moveReason, setMoveReason] = useState("");
-  const [submittingMove, setSubmittingMove] = useState(false);
-
-  // Finance Form state
-  const [txType, setTxType] = useState<"INCOME" | "EXPENSE">("INCOME");
-  const [txAmount, setTxAmount] = useState<number | string>(0);
-  const [txCategory, setTxCategory] = useState("Vente Oeufs");
-  const [txCustomCategory, setTxCustomCategory] = useState("");
-  const [txPaymentMethod, setTxPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
-  const [txNotes, setTxNotes] = useState("");
-  const [submittingTx, setSubmittingTx] = useState(false);
-
-  // Feeding & Water Distribution Modal state
-  const [feedingModalOpen, setFeedingModalOpen] = useState(false);
-  const [feedFlockId, setFeedFlockId] = useState("");
-  const [feedSession, setFeedSession] = useState<"MORNING" | "NOON" | "EVENING">("MORNING");
-  const [feedDate, setFeedDate] = useState("");
-  const [feedItemId, setFeedItemId] = useState("");
-  const [feedWeightKg, setFeedWeightKg] = useState<number | string>(25);
-  const [feedNotes, setFeedNotes] = useState("");
-  const [waterMode, setWaterMode] = useState<"CLEAR" | "TREATED">("CLEAR");
-  const [waterVolumeLiters, setWaterVolumeLiters] = useState<number | string>(50);
-  const [waterProducts, setWaterProducts] = useState<
-    { id: string; itemId: string; quantity: number | string; unit: string; notes?: string }[]
-  >([]);
-  const [submittingFeeding, setSubmittingFeeding] = useState(false);
-
   useEffect(() => {
+    setTodayStr(new Date().toISOString().split("T")[0]);
     if (activeFarm?.id) {
       loadDashboardData();
     } else {
@@ -175,7 +106,6 @@ export default function DashboardPage() {
       setInventoryItems(Array.isArray(invData) ? invData : []);
       if (Array.isArray(flocksData) && flocksData.length > 0 && !selectedFlockId) {
         setSelectedFlockId(flocksData[0].id);
-        setMoveFlockId(flocksData[0].id);
       }
     } catch (err) {
       console.error("Erreur chargement dashboard:", err);
@@ -183,270 +113,6 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   }
-
-  // Handle Egg Submission
-  async function handleEggSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setEggError(null);
-    if (!selectedFlockId) {
-      const msg = "Veuillez sélectionner une bande.";
-      setEggError(msg);
-      toast.warning(msg);
-      return;
-    }
-    setSubmittingEgg(true);
-    try {
-      const targetDate = eggDate || todayStr || new Date().toISOString().split("T")[0];
-      if (editingEggId) {
-        await api.eggs.update(editingEggId, {
-          goodEggs: Number(goodEggs),
-          brokenEggs: Number(brokenEggs),
-          abnormalEggs: Number(abnormalEggs),
-          notes: eggNotes || undefined,
-        });
-        toast.success("Collecte mise à jour avec succès !");
-      } else {
-        await api.eggs.create({
-          flockId: selectedFlockId,
-          date: targetDate,
-          session: eggSession,
-          goodEggs: Number(goodEggs),
-          brokenEggs: Number(brokenEggs),
-          abnormalEggs: Number(abnormalEggs),
-          notes: eggNotes || undefined,
-          allowUpdate: true,
-        });
-        toast.success("Collecte d'œufs enregistrée avec succès !");
-      }
-      setEggModalOpen(false);
-      setEditingEggId(null);
-      setGoodEggs(0);
-      setBrokenEggs(0);
-      setAbnormalEggs(0);
-      setEggNotes("");
-      await loadDashboardData();
-    } catch (err: any) {
-      const msg = err?.message || "Erreur lors de l'enregistrement de la collecte";
-      setEggError(msg);
-      toast.error(msg);
-    } finally {
-      setSubmittingEgg(false);
-    }
-  }
-
-  // Handle Movement Submission
-  async function handleMoveSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMoveError(null);
-    if (!moveFlockId) {
-      const msg = "Veuillez sélectionner une bande.";
-      setMoveError(msg);
-      toast.warning(msg);
-      return;
-    }
-    setSubmittingMove(true);
-    try {
-      await api.flocks.addMovement(moveFlockId, {
-        type: moveType,
-        quantity: Number(moveQuantity),
-        date: new Date().toISOString().split("T")[0],
-        reason: moveReason || undefined,
-      });
-      toast.success(
-        moveType === "MORTALITY"
-          ? "Perte / mortalité enregistrée avec succès."
-          : "Mouvement de bande enregistré avec succès."
-      );
-      setMovementModalOpen(false);
-      setMoveQuantity(1);
-      setMoveReason("");
-      await loadDashboardData();
-    } catch (err: any) {
-      const msg = err?.message || "Erreur lors de l'enregistrement du mouvement";
-      setMoveError(msg);
-      toast.error(msg);
-    } finally {
-      setSubmittingMove(false);
-    }
-  }
-
-  // Handle Finance Submission
-  async function handleFinanceSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFinanceError(null);
-    if (!activeFarm?.id) return;
-    setSubmittingTx(true);
-    try {
-      await api.finance.createTransaction({
-        farmId: activeFarm.id,
-        type: txType,
-        amountFcfa: Number(txAmount),
-        category: txCategory,
-        customCategory: (txCategory === "Autre Recette" || txCategory === "Autre Depense") ? txCustomCategory.trim() : undefined,
-        paymentMethod: txPaymentMethod,
-        date: new Date().toISOString().split("T")[0],
-        notes: txNotes || undefined,
-      });
-      toast.success(
-        txType === "INCOME"
-          ? "Recette enregistrée avec succès !"
-          : "Dépense enregistrée avec succès !"
-      );
-      setFinanceModalOpen(false);
-      setTxAmount(0);
-      setTxCustomCategory("");
-      setTxNotes("");
-      await loadDashboardData();
-    } catch (err: any) {
-      const msg = err?.message || "Erreur lors de la transaction financière";
-      setFinanceError(msg);
-      toast.error(msg);
-    } finally {
-      setSubmittingTx(false);
-    }
-  }
-
-  function openFeedingModal() {
-    setFeedingError(null);
-    setFeedDate(new Date().toISOString().split("T")[0]);
-    if (flocks.length > 0 && !feedFlockId) {
-      setFeedFlockId(flocks[0].id);
-    }
-    const feedList = inventoryItems.filter(
-      (i) =>
-        i.category === "FEED" ||
-        i.unit.startsWith("BAG") ||
-        i.name.toLowerCase().includes("provende") ||
-        i.name.toLowerCase().includes("aliment") ||
-        i.name.toLowerCase().includes("farine")
-    );
-    if (feedList.length > 0 && !feedItemId) {
-      setFeedItemId(feedList[0].id);
-    }
-    setFeedWeightKg(25);
-    setFeedNotes("");
-    setWaterMode("CLEAR");
-    setWaterVolumeLiters(50);
-    setWaterProducts([]);
-    setFeedingModalOpen(true);
-  }
-
-  function addWaterProduct() {
-    const healthList = inventoryItems.filter(
-      (i) =>
-        i.category === "MEDICINE" ||
-        i.category === "VACCINE" ||
-        i.category === "OTHER" ||
-        ["ML", "LITER", "G", "SACHET", "DOSE", "VIAL"].includes(i.unit)
-    );
-    const defaultItem = healthList[0] || inventoryItems[0];
-    const defaultUnit = defaultItem?.unit === "LITER" ? "ML" : defaultItem?.unit === "KG" ? "G" : defaultItem?.unit || "ML";
-    setWaterProducts((prev) => [
-      ...prev,
-      {
-        id: `wp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        itemId: defaultItem?.id || "",
-        quantity: defaultUnit === "ML" ? 15 : defaultUnit === "G" ? 15 : 1,
-        unit: defaultUnit,
-      },
-    ]);
-  }
-
-  function removeWaterProduct(id: string) {
-    setWaterProducts((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function updateWaterProduct(
-    id: string,
-    updates: Partial<{ itemId: string; quantity: number | string; unit: string; notes?: string }>
-  ) {
-    setWaterProducts((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        const updated = { ...p, ...updates };
-        if (updates.itemId && updates.itemId !== p.itemId) {
-          const item = inventoryItems.find((i) => i.id === updates.itemId);
-          if (item) {
-            updated.unit = item.unit === "LITER" ? "ML" : item.unit === "KG" ? "G" : item.unit;
-          }
-        }
-        return updated;
-      })
-    );
-  }
-
-  async function handleFeedingSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFeedingError(null);
-    if (!activeFarm?.id) return;
-    if (!feedFlockId) {
-      const msg = "Veuillez sélectionner une bande.";
-      setFeedingError(msg);
-      toast.warning(msg);
-      return;
-    }
-
-    const sessionLabel = feedSession === "MORNING" ? "Matin" : feedSession === "NOON" ? "Midi" : "Soir";
-    const targetFlock = flocks.find((f) => f.id === feedFlockId);
-    setSubmittingFeeding(true);
-
-    try {
-      // 1. Décompte de la provende si renseignée
-      if (feedItemId && Number(feedWeightKg) > 0) {
-        await api.inventory.addMovement(feedItemId, {
-          type: "FEEDING",
-          quantity: Number(feedWeightKg),
-          unit: "KG",
-          movementDate: feedDate || new Date().toISOString().split("T")[0],
-          flockId: feedFlockId,
-          reason: `Ration ${sessionLabel} (${feedWeightKg} kg) - ${targetFlock?.name || "Bande"}`,
-        });
-      }
-
-      // 2. Décompte des produits dans l'eau
-      if (waterMode === "TREATED" && waterProducts.length > 0) {
-        for (const wp of waterProducts) {
-          if (wp.itemId && Number(wp.quantity) > 0) {
-            const productItem = inventoryItems.find((i) => i.id === wp.itemId);
-            await api.inventory.addMovement(wp.itemId, {
-              type: "FEEDING",
-              quantity: Number(wp.quantity),
-              unit: wp.unit,
-              movementDate: feedDate || new Date().toISOString().split("T")[0],
-              flockId: feedFlockId,
-              reason: `Abreuvement ${sessionLabel} (${wp.quantity} ${getUnitShortLabel(wp.unit)}) - ${targetFlock?.name || "Bande"}`,
-            });
-
-            // Traçabilité santé
-            await api.health
-              .create(activeFarm.id, {
-                flockId: feedFlockId,
-                title: productItem?.name || "Traitement eau de boisson",
-                type: productItem?.category === "VACCINE" ? "VACCINATION" : "TREATMENT",
-                administrationMethod: "DRINKING_WATER",
-                scheduledDate: feedDate || new Date().toISOString().split("T")[0],
-                inventoryItemId: wp.itemId,
-                quantityUsed: `${wp.quantity} ${getUnitShortLabel(wp.unit)}`,
-                notes: `Tournée ${sessionLabel}${waterVolumeLiters ? ` dans ${waterVolumeLiters} L d'eau` : ""}${wp.notes ? ` - ${wp.notes}` : ""}`,
-              })
-              .catch(() => {});
-          }
-        }
-      }
-
-      setFeedingModalOpen(false);
-      toast.success("Tournée d'alimentation et abreuvement enregistrée avec succès !");
-      await loadDashboardData();
-    } catch (err: any) {
-      const msg = err?.message || "Erreur lors de l'enregistrement de la distribution.";
-      setFeedingError(msg);
-      toast.error(msg);
-    } finally {
-      setSubmittingFeeding(false);
-    }
-  }
-
-  const trayCalc = calcEggTrays(Number(goodEggs));
 
   // Calculs directs et résilients pour garantir l'affichage immédiat des statistiques
   const computedLiveBirds =
@@ -516,22 +182,7 @@ export default function DashboardPage() {
       ? kpi.financialSummary.netCashflowFcfa
       : fallbackIncome - fallbackExpense;
 
-  const availableFeeds = inventoryItems.filter(
-    (i) =>
-      i.category === "FEED" ||
-      i.unit.startsWith("BAG") ||
-      i.name.toLowerCase().includes("provende") ||
-      i.name.toLowerCase().includes("aliment") ||
-      i.name.toLowerCase().includes("farine")
-  );
 
-  const availableHealthProducts = inventoryItems.filter(
-    (i) =>
-      i.category === "MEDICINE" ||
-      i.category === "VACCINE" ||
-      i.category === "OTHER" ||
-      ["ML", "LITER", "G", "SACHET", "DOSE", "VIAL"].includes(i.unit)
-  );
 
   const dashboardFlockColumns: ColumnDef<Flock>[] = [
     {
@@ -617,6 +268,27 @@ export default function DashboardPage() {
         </span>
       ),
     },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      cell: (f) => (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedFlockId(f.id);
+              setFeedingModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-600/10 border border-amber-600/20 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-600 hover:text-white transition-colors"
+          >
+            <Utensils className="h-3 w-3" />
+            <span>Nourrir</span>
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -671,32 +343,17 @@ export default function DashboardPage() {
 
               <button
                 type="button"
-                onClick={openFeedingModal}
+                onClick={() => setFeedingModalOpen(true)}
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors whitespace-nowrap"
               >
                 <Utensils className="h-3.5 w-3.5 shrink-0" />
-                <span>Nourrir & Distribuer</span>
+                <span>Nourrir</span>
               </button>
-            {/*
-              {hasPermission("egg:create") && (
-                <button
-                  type="button"
-                  onClick={openCreateEggModal}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-accent px-3.5 text-xs font-bold text-white shadow-xs hover:bg-accent-hover transition-colors whitespace-nowrap"
-                >
-                  <Egg className="h-4 w-4 shrink-0" />
-                  <span>Saisir Ponte</span>
-                </button>
-              )}
-                */}
 
               {hasPermission("flock:update") && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setMoveError(null);
-                    setMovementModalOpen(true);
-                  }}
+                  onClick={() => setMovementModalOpen(true)}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-danger px-3.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition-opacity whitespace-nowrap"
                 >
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -707,10 +364,7 @@ export default function DashboardPage() {
               {hasPermission("finance:create") && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setFinanceError(null);
-                    setFinanceModalOpen(true);
-                  }}
+                  onClick={() => setFinanceModalOpen(true)}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors whitespace-nowrap"
                 >
                   <Wallet className="h-4 w-4 shrink-0" />
@@ -811,7 +465,7 @@ export default function DashboardPage() {
               columns={dashboardFlockColumns}
               searchable={true}
               searchPlaceholder="Rechercher un groupe..."
-              searchAccessor={(f) => `${f.name} ${f.code || ""} ${f.breed || ""}`}
+              searchAccessor={(f: Flock) => `${f.name} ${f.code || ""} ${f.breed || ""}`}
               pageSize={10}
               actions={
                 <Link
@@ -1313,849 +967,44 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* MODAL 1: Saisie Ponte */}
-      <Modal
+      {/* MODALES DASHBOARD EXTRAITES */}
+      <RecordEggModal
         isOpen={eggModalOpen}
         onClose={() => {
           setEggModalOpen(false);
-          setEditingEggId(null);
+          setEditingEgg(null);
         }}
-        title={editingEggId ? "Modifier le ramassage d'œufs" : "Enregistrer une collecte de ponte"}
-        description={
-          editingEggId
-            ? "Mise à jour des quantités récoltées pour ce créneau de ponte."
-            : "Saisie des œufs récoltés avec calcul instantané en plateaux de 30 alvéoles."
-        }
-      >
-        <form onSubmit={handleEggSubmit} className="space-y-4">
-          {!editingEggId && recentEggs.some(
-            (e) => e.flockId === selectedFlockId && e.date === (eggDate || todayStr) && e.session === eggSession
-          ) && (
-              <div className="rounded-xl border border-warning/30 bg-warning-soft/30 p-3 text-xs text-warning flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>
-                  Une collecte existe déjà pour ce créneau. La validation mettra à jour directement ces chiffres.
-                </span>
-              </div>
-            )}
+        onSuccess={loadDashboardData}
+        flocks={flocks}
+        recentEggs={recentEggs}
+        editingEgg={editingEgg}
+        defaultFlockId={selectedFlockId}
+      />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Bande pondeuse
-              </label>
-              <select
-                value={selectedFlockId}
-                onChange={(e) => setSelectedFlockId(e.target.value)}
-                disabled={!!editingEggId}
-                required
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground disabled:opacity-60"
-              >
-                {flocks.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.breed} — {formatNumber(f.currentQuantity)} poules)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Date de collecte
-              </label>
-              <input
-                type="date"
-                value={eggDate || todayStr}
-                onChange={(e) => setEggDate(e.target.value)}
-                disabled={!!editingEggId}
-                required
-                className="w-full rounded-xl border border-border bg-surface-muted p-2 text-xs font-semibold text-foreground disabled:opacity-60 focus:border-accent focus:outline-hidden"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Session de ramassage
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["MORNING", "NOON", "EVENING"] as EggSession[]).map((session) => (
-                <button
-                  key={session}
-                  type="button"
-                  onClick={() => setEggSession(session)}
-                  className={`rounded-xl border py-2 text-xs font-bold transition-colors ${eggSession === session
-                      ? "border-accent bg-accent text-white shadow-xs"
-                      : "border-border bg-surface text-muted hover:bg-surface-hover"
-                    }`}
-                >
-                  {session === "MORNING"
-                    ? "Matin"
-                    : session === "NOON"
-                      ? "Midi"
-                      : "Soir"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-success mb-1">
-                Bons œufs (vendables)
-              </label>
-              <input
-                type="number"
-                min="0"
-                required
-                value={goodEggs}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setGoodEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
-                }}
-                placeholder="0"
-                className="w-full rounded-xl border border-success/30 bg-surface p-2.5 text-sm font-bold font-mono text-foreground focus:border-success focus:outline-hidden"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-danger mb-1">
-                Cassés / Fêlés
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={brokenEggs}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setBrokenEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
-                }}
-                placeholder="0"
-                className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-danger focus:outline-hidden"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-warning mb-1">
-                Anormaux / Petits
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={abnormalEggs}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setAbnormalEggs(val === "" ? "" : Math.max(0, parseInt(val) || 0));
-                }}
-                placeholder="0"
-                className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-mono text-foreground focus:border-warning focus:outline-hidden"
-              />
-            </div>
-          </div>
-
-          {/* Zootechnical Calculation Preview */}
-          <div className="rounded-xl bg-accent-soft p-3 text-xs text-accent border border-accent/20">
-            <div className="flex items-center justify-between font-bold">
-              <span>Conversion en plateaux de 30 :</span>
-              <span className="text-sm font-mono">{trayCalc.text}</span>
-            </div>
-            <div className="mt-1 text-[11px] opacity-80">
-              Total ramassé : {Number(goodEggs || 0) + Number(brokenEggs || 0) + Number(abnormalEggs || 0)} œufs
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Observations / Notes
-            </label>
-            <input
-              type="text"
-              value={eggNotes}
-              onChange={(e) => setEggNotes(e.target.value)}
-              placeholder="ex. Légère baisse due à la chaleur"
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
-            />
-          </div>
-
-          {eggError && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{eggError}</div>
-            </div>
-          )}
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEggModalOpen(false);
-                setEditingEggId(null);
-                setEggError(null);
-              }}
-              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submittingEgg}
-              className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-accent-hover"
-            >
-              {submittingEgg
-                ? "Enregistrement..."
-                : editingEggId
-                  ? "Mettre à jour le ramassage"
-                  : "Valider la collecte"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* MODAL 2: Mouvement / Mortalité */}
-      <Modal
+      <RecordMovementModal
         isOpen={movementModalOpen}
         onClose={() => setMovementModalOpen(false)}
-        title="Déclarer un mouvement ou une mortalité"
-        description="Mise à jour automatique de l'effectif vif de la bande."
-      >
-        <form onSubmit={handleMoveSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Bande concernée
-            </label>
-            <select
-              value={moveFlockId}
-              onChange={(e) => setMoveFlockId(e.target.value)}
-              required
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground"
-            >
-              {flocks.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} (Actuel: {formatNumber(f.currentQuantity)} sujets)
-                </option>
-              ))}
-            </select>
-          </div>
+        onSuccess={loadDashboardData}
+        flocks={flocks}
+        defaultFlockId={selectedFlockId}
+      />
 
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Type d'opération
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setMoveType("MORTALITY")}
-                className={`rounded-xl border py-2 text-xs font-bold ${moveType === "MORTALITY"
-                    ? "border-danger bg-danger text-white"
-                    : "border-border bg-surface text-muted"
-                  }`}
-              >
-                Mortalité
-              </button>
-              <button
-                type="button"
-                onClick={() => setMoveType("SALE")}
-                className={`rounded-xl border py-2 text-xs font-bold ${moveType === "SALE"
-                    ? "border-success bg-success text-white"
-                    : "border-border bg-surface text-muted"
-                  }`}
-              >
-                Vente Vif
-              </button>
-              <button
-                type="button"
-                onClick={() => setMoveType("CULL")}
-                className={`rounded-xl border py-2 text-xs font-bold ${moveType === "CULL"
-                    ? "border-warning bg-warning text-white"
-                    : "border-border bg-surface text-muted"
-                  }`}
-              >
-                Réforme
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Quantité (têtes / sujets)
-            </label>
-            <input
-              type="number"
-              min="1"
-              required
-              value={moveQuantity}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMoveQuantity(val === "" ? "" : Math.max(1, parseInt(val) || 1));
-              }}
-              className="w-full rounded-xl border border-border bg-surface p-2.5 text-sm font-bold font-mono text-foreground"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Cause / Motif
-            </label>
-            <input
-              type="text"
-              value={moveReason}
-              onChange={(e) => setMoveReason(e.target.value)}
-              placeholder="ex. Piquage, étouffement, autopsie suspecte..."
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground"
-            />
-          </div>
-
-          {moveError && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{moveError}</div>
-            </div>
-          )}
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMovementModalOpen(false);
-                setMoveError(null);
-              }}
-              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submittingMove}
-              className="rounded-xl bg-danger px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90"
-            >
-              {submittingMove ? "Enregistrement..." : "Confirmer le mouvement"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* MODAL NOURRIR & DISTRIBUER (ALIMENTATION & ABREUVEMENT) */}
-      <Modal
+      <RecordFeedingModal
         isOpen={feedingModalOpen}
         onClose={() => setFeedingModalOpen(false)}
-        title="Tournée d'alimentation & abreuvement"
-        description="Ration quotidienne de provende pesée et préparation de l'eau de boisson (avec cocktail de soins éventuel)."
-      >
-        <form onSubmit={handleFeedingSubmit} className="space-y-4">
-          {/* Section 1 : Bande & Moment */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Bande / Bâtiment à servir *
-              </label>
-              <select
-                value={feedFlockId}
-                onChange={(e) => setFeedFlockId(e.target.value)}
-                required
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
-              >
-                {flocks.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.breed} — {formatNumber(f.currentQuantity)} sujets)
-                  </option>
-                ))}
-              </select>
-            </div>
+        onSuccess={loadDashboardData}
+        flocks={flocks}
+        inventoryItems={inventoryItems}
+        activeFarmId={activeFarm?.id}
+        defaultFlockId={selectedFlockId}
+      />
 
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Date de distribution
-              </label>
-              <input
-                type="date"
-                required
-                value={feedDate}
-                onChange={(e) => setFeedDate(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
-              />
-            </div>
-          </div>
-
-          {/* Créneau : Matin, Midi, Soir */}
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Créneau du repas
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { key: "MORNING", label: "Matin" },
-                  { key: "NOON", label: "Midi" },
-                  { key: "EVENING", label: "Soir" },
-                ] as const
-              ).map((s) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => setFeedSession(s.key)}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-colors ${
-                    feedSession === s.key
-                      ? "bg-amber-600 text-white shadow-xs"
-                      : "bg-surface-muted border border-border text-muted hover:text-foreground hover:bg-surface-hover"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* VOLET 1 : Provende (Alimentation solide mesurée au kg) */}
-          <div className="rounded-xl border border-border bg-surface-muted/40 p-3 space-y-3">
-            <div className="flex items-center gap-2 border-b border-border/50 pb-2">
-              <Utensils className="h-4 w-4 text-amber-600" />
-              <span className="text-xs font-bold text-foreground">
-                1. Ration de provende (pesée sur balance)
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Aliment en stock *
-                </label>
-                <select
-                  value={feedItemId}
-                  onChange={(e) => setFeedItemId(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-border bg-surface p-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
-                >
-                  {availableFeeds.length === 0 ? (
-                    <option value="">Aucun aliment en stock</option>
-                  ) : (
-                    availableFeeds.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} (Stock: {formatInventoryUnit(item.currentStock, item.unit)})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Poids mesuré sur balance (kg) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    required
-                    value={feedWeightKg}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => setFeedWeightKg(e.target.value)}
-                    placeholder="ex. 25 ou 50"
-                    className="w-full rounded-xl border border-border bg-surface p-2 text-sm font-bold font-mono text-foreground focus:border-primary focus:outline-hidden"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-muted pointer-events-none">
-                    kg
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Indication sobre et pratique pour la provende */}
-            {(() => {
-              const selFeed = availableFeeds.find((i) => i.id === feedItemId);
-              const selFlock = flocks.find((f) => f.id === feedFlockId);
-              const weight = Number(feedWeightKg) || 0;
-              const bagWeight = selFeed?.packageWeightKg || 50;
-              const bagsEquivalent = weight > 0 ? (weight / bagWeight).toFixed(2) : "0";
-              const gramsPerBird =
-                selFlock && selFlock.currentQuantity > 0 && weight > 0
-                  ? Math.round((weight * 1000) / selFlock.currentQuantity)
-                  : 0;
-
-              return weight > 0 ? (
-                <div className="text-[11px] text-muted flex items-center justify-between pt-1 border-t border-border/40">
-                  <span>
-                    Équivalent : <strong className="text-foreground">{bagsEquivalent} sac(s)</strong> (base {bagWeight} kg/sac)
-                  </span>
-                  {gramsPerBird > 0 && (
-                    <span>
-                      Ration moyenne : <strong className="text-primary font-mono font-bold">{gramsPerBird} g / sujet</strong>
-                    </span>
-                  )}
-                </div>
-              ) : null;
-            })()}
-          </div>
-
-          {/* VOLET 2 : Eau de boisson & Traitements */}
-          <div className="rounded-xl border border-border bg-surface-muted/40 p-3 space-y-3">
-            <div className="flex items-center justify-between border-b border-border/50 pb-2">
-              <div className="flex items-center gap-2">
-                <Droplet className="h-4 w-4 text-sky-600" />
-                <span className="text-xs font-bold text-foreground">
-                  2. Abreuvement & Traitements dans l'eau
-                </span>
-              </div>
-              <div className="flex items-center gap-1 bg-surface rounded-lg p-0.5 border border-border">
-                <button
-                  type="button"
-                  onClick={() => setWaterMode("CLEAR")}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors ${
-                    waterMode === "CLEAR"
-                      ? "bg-primary text-white"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Eau claire
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWaterMode("TREATED");
-                    if (waterProducts.length === 0) {
-                      addWaterProduct();
-                    }
-                  }}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors ${
-                    waterMode === "TREATED"
-                      ? "bg-primary text-white"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Eau avec traitement
-                </button>
-              </div>
-            </div>
-
-            {waterMode === "CLEAR" ? (
-              <p className="text-[11px] text-muted italic">
-                Abreuvoirs approvisionnés en eau pure (aucun additif ni médicament ce créneau).
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {/* Volume d'eau préparé */}
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Volume d'eau préparé dans les abreuvoirs (Litres)
-                  </label>
-                  <div className="relative w-48">
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={waterVolumeLiters}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => setWaterVolumeLiters(e.target.value)}
-                      placeholder="ex. 50"
-                      className="w-full rounded-xl border border-border bg-surface p-2 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-muted pointer-events-none">
-                      Litres
-                    </span>
-                  </div>
-                </div>
-
-                {/* Liste des produits ajoutés dans l'eau */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-foreground">
-                    Médicaments / Vitamines ajoutés à cette eau :
-                  </label>
-
-                  {waterProducts.map((wp, index) => {
-                    const selItem = inventoryItems.find((i) => i.id === wp.itemId);
-                    const hint = getPracticalMeasurementHint(wp.quantity, wp.unit, {
-                      itemUnit: selItem?.unit,
-                    });
-
-                    return (
-                      <div
-                        key={wp.id}
-                        className="rounded-xl border border-border bg-surface p-2.5 space-y-1.5 shadow-2xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold text-muted">
-                            Produit #{index + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeWaterProduct(wp.id)}
-                            title="Supprimer ce produit"
-                            className="text-muted hover:text-danger p-1 rounded-md hover:bg-surface-muted transition-colors"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                          {/* Sélection du médicament/vitamine */}
-                          <div className="sm:col-span-7">
-                            <select
-                              value={wp.itemId}
-                              onChange={(e) => updateWaterProduct(wp.id, { itemId: e.target.value })}
-                              required
-                              className="w-full rounded-lg border border-border bg-surface-muted p-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
-                            >
-                              <option value="">-- Choisir un produit --</option>
-                              {availableHealthProducts.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name} ({formatInventoryUnit(item.currentStock, item.unit)})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Dose */}
-                          <div className="sm:col-span-3">
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0.1"
-                              required
-                              value={wp.quantity}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => updateWaterProduct(wp.id, { quantity: e.target.value })}
-                              placeholder="Dose"
-                              className="w-full rounded-lg border border-border bg-surface p-2 text-xs font-mono font-bold text-foreground focus:border-primary focus:outline-hidden"
-                            />
-                          </div>
-
-                          {/* Unité */}
-                          <div className="sm:col-span-2">
-                            <select
-                              value={wp.unit}
-                              onChange={(e) => updateWaterProduct(wp.id, { unit: e.target.value })}
-                              className="w-full rounded-lg border border-border bg-surface-muted p-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden"
-                            >
-                              <option value="ML">mL</option>
-                              <option value="G">g</option>
-                              <option value="LITER">L</option>
-                              <option value="KG">kg</option>
-                              <option value="SACHET">sachet</option>
-                              <option value="DOSE">dose</option>
-                              <option value="VIAL">flacon</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Équivalence pratique (cuillère à soupe, etc.) */}
-                        {hint && (
-                          <div className="text-[11px] text-muted flex items-center gap-1.5 pt-0.5">
-                            <span className="text-primary font-bold">•</span>
-                            <span>{hint}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    onClick={addWaterProduct}
-                    className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-hover hover:underline transition-colors pt-1"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>+ Ajouter un autre médicament / vitamine dans l'eau</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {feedingError && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{feedingError}</div>
-            </div>
-          )}
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setFeedingModalOpen(false);
-                setFeedingError(null);
-              }}
-              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submittingFeeding}
-              className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors"
-            >
-              {submittingFeeding ? "Enregistrement de la tournée..." : "Valider la distribution"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* MODAL 3: Recette / Dépense */}
-      <Modal
+      <RecordTransactionModal
         isOpen={financeModalOpen}
         onClose={() => setFinanceModalOpen(false)}
-        title="Enregistrer une transaction financière"
-        description="Encaissement ou décaissement en FCFA avec mode de paiement local."
-      >
-        <form onSubmit={handleFinanceSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setTxType("INCOME");
-                setTxCategory("Vente Oeufs");
-              }}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${txType === "INCOME"
-                  ? "border-primary bg-primary text-white"
-                  : "border-border bg-surface text-muted"
-                }`}
-            >
-              + Recette / Vente
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTxType("EXPENSE");
-                setTxCategory("Alimentation");
-              }}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${txType === "EXPENSE"
-                  ? "border-danger bg-danger text-white"
-                  : "border-border bg-surface text-muted"
-                }`}
-            >
-              - Dépense / Achat
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Montant en FCFA
-            </label>
-            <input
-              type="number"
-              min="1"
-              required
-              value={txAmount}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => {
-                const val = e.target.value;
-                setTxAmount(val === "" ? "" : Math.max(0, parseInt(val) || 0));
-              }}
-              placeholder="ex. 45000"
-              className="w-full rounded-xl border border-border bg-surface p-2.5 text-base font-bold font-mono text-foreground"
-            />
-            <div className="mt-1 text-[11px] text-muted font-mono">
-              Aperçu : {formatFcfa(Number(txAmount) || 0)}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Catégorie
-              </label>
-              <select
-                value={txCategory}
-                onChange={(e) => setTxCategory(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground"
-              >
-                {txType === "INCOME" ? (
-                  <>
-                    <option value="Vente Oeufs">Vente Œufs</option>
-                    <option value="Vente Poulets Vifs">Vente Poulets Vifs</option>
-                    <option value="Vente Fiente / Engrais">Vente Fiente</option>
-                    <option value="Autre Recette">Autre Recette</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="Alimentation">Alimentation</option>
-                    <option value="Vaccins & Soins">Vaccins & Soins</option>
-                    <option value="Poussins / Achat Sujets">Achat Poussins</option>
-                    <option value="Main d'oeuvre">Main d'œuvre</option>
-                    <option value="Carburant & Electricite">Énergie / Eau</option>
-                    <option value="Autre Depense">Autre Dépense</option>
-                  </>
-                )}
-              </select>
-
-              {(txCategory === "Autre Recette" || txCategory === "Autre Depense") && (
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    required
-                    value={txCustomCategory}
-                    onChange={(e) => setTxCustomCategory(e.target.value)}
-                    placeholder="Précisez la catégorie (ex. Subvention, Vente sacs...)"
-                    className="w-full rounded-xl border border-border bg-surface p-2 text-xs text-foreground focus:border-primary focus:outline-hidden"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Moyen de paiement
-              </label>
-              <select
-                value={txPaymentMethod}
-                onChange={(e) => setTxPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground"
-              >
-                <option value="MTN_MOMO">MTN Mobile Money</option>
-                <option value="MOOV_MONEY">Moov Money</option>
-                <option value="CELTIIS_CASH">Celtiis Cash</option>
-                <option value="CASH">Espèces</option>
-                <option value="BANK_TRANSFER">Virement Bancaire</option>
-                <option value="CHECK">Chèque</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
-              Référence / Client / Fournisseur
-            </label>
-            <input
-              type="text"
-              value={txNotes}
-              onChange={(e) => setTxNotes(e.target.value)}
-              placeholder="ex. Vente à la restauratrice Mme Dossou"
-              className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground"
-            />
-          </div>
-
-          {financeError && (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger flex items-start gap-2.5 animate-in fade-in duration-200">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{financeError}</div>
-            </div>
-          )}
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setFinanceModalOpen(false);
-                setFinanceError(null);
-              }}
-              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted hover:bg-surface-hover"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submittingTx}
-              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover"
-            >
-              {submittingTx ? "Enregistrement..." : "Valider l'opération"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        onSuccess={loadDashboardData}
+        activeFarmId={activeFarm?.id}
+      />
 
       {/* MODAL CRÉATION DE FERME */}
       <CreateFarmModal

@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --color-background: var(--bg-main);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-muted: var(--bg-surface-muted);
+  --color-surface-elevated: var(--bg-surface-elevated);
+
+  --color-foreground: var(--text-primary);
+  --color-muted: var(--text-muted);
+
+  --color-border: var(--border-color);
+
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-primary-soft: var(--brand-primary-soft);
+  --color-primary-foreground: #ffffff;
+
+  --color-accent: var(--brand-accent);
+  --color-accent-hover: var(--brand-accent-hover);
+  --color-accent-soft: var(--brand-accent-soft);
+  --color-accent-foreground: #ffffff;
+
+  --color-success: var(--status-success);
+  --color-success-soft: var(--status-success-soft);
+  --color-warning: var(--status-warning);
+  --color-warning-soft: var(--status-warning-soft);
+  --color-danger: var(--status-danger);
+  --color-danger-soft: var(--status-danger-soft);
+  --color-info: var(--status-info);
+  --color-info-soft: var(--status-info-soft);
+}
+
+@layer base {
+  :root {
+    --bg-main: #f6f8f6;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f1f4f1;
+    --bg-surface-muted: #eef2ee;
+    --bg-surface-elevated: #ffffff;
+
+    --text-primary: #202923;
+    --text-muted: #657168;
+
+    --border-color: #dfe6e0;
+
+    --brand-primary: #245c43;
+    --brand-primary-hover: #194832;
+    --brand-primary-soft: #e8f2ec;
+
+    --brand-accent: #dda64b;
+    --brand-accent-hover: #c48e37;
+    --brand-accent-soft: #fbf4e8;
+
+    --status-success: #237a4b;
+    --status-success-soft: #eaf5ee;
+    --status-warning: #946200;
+    --status-warning-soft: #fbf5e6;
+    --status-danger: #b4232c;
+    --status-danger-soft: #fdebed;
+    --status-info: #2463a6;
+    --status-info-soft: #ebf3fa;
+  }
+
+  * {
+    border-color: var(--border-color);
+  }
+
+  html {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+  }
+}
+
+/* Éléments de présentation professionnelle épurée */
+.subtle-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem; /* 12px max according to DESIGN_SYSTEM.md */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.subtle-card-muted {
+  background-color: var(--bg-surface-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+}

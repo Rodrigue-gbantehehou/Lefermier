@@ -105,8 +105,8 @@ Représente l'entité juridique, l'entreprise ou l'éleveur indépendant abonné
 | `id` | `ulid` | PK | Identifiant unique universel |
 | `name` | `VARCHAR(150)` | NOT NULL | Nom de l'organisation ou de l'éleveur |
 | `slug` | `VARCHAR(160)` | NOT NULL, UNIQUE | Identifiant textuel normalisé |
-| `subscription_plan` | `VARCHAR(50)` | NOT NULL, DEFAULT 'STANDARD' | Formule d'abonnement |
-| `status` | `VARCHAR(30)` | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `SUSPENDED`, `TRIAL` |
+| `subscription_plan` | `VARCHAR(50)` | NOT NULL, DEFAULT 'STANDARD' | Formule d'abonnement (`FREE`, `STANDARD`, `PRO`, `ENTERPRISE` — Enum `SubscriptionPlan`, quotas & tarifs déclarés dans `config/packages/subscriptions.yaml`) |
+| `status` | `VARCHAR(30)` | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `SUSPENDED`, `TRIAL` (Enum `OrganizationStatus`) |
 | `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de création |
 | `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Dernière mise à jour |
 
@@ -122,11 +122,50 @@ Représente un compte utilisateur authentifiable sur la plateforme.
 | `last_name` | `VARCHAR(100)` | NOT NULL | Nom de famille |
 | `phone` | `VARCHAR(30)` | NULL | Téléphone de contact (format international) |
 | `roles` | `JSON` | NOT NULL | Rôles système globaux (`ROLE_USER`, `ROLE_ADMIN`) |
+| `admin_role_id` | `ulid` | FK (admin_roles.id), NULL, ON DELETE SET NULL | Rôle d'administration plateforme (Scope Admin RBAC) |
 | `is_active` | `BOOLEAN` | NOT NULL, DEFAULT TRUE | Compte activé ou verrouillé |
 | `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de création |
 | `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Dernière mise à jour |
 
-### 2.3. Farm (`farms`)
+### 2.3. AdminRole (`admin_roles`)
+Représente un rôle d'administration de la plateforme Lefermier (Scope Admin / Modèle Microsoft RBAC dynamique).
+
+| Champ | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | `ulid` | PK | Identifiant unique (binaire 16 octets) |
+| `name` | `VARCHAR(100)` | NOT NULL | Libellé affiché du rôle (ex: "Support Client & Fermes") |
+| `code` | `VARCHAR(60)` | NOT NULL, UNIQUE | Code technique préfixé par `ROLE_` (ex: `SUPER_ADMIN`, `ADMIN_SUPPORT`) |
+| `description` | `LONGTEXT` | NULL | Description du périmètre d'action du rôle |
+| `permissions` | `JSON` | NOT NULL | Tableau JSON des permissions granulaires (`admin:*` ou `*`) |
+| `is_system` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | `true` pour les rôles modèles protégés contre la suppression |
+| `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de création |
+| `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de mise à jour |
+
+### 2.4. SubscriptionPlan (`subscription_plans`)
+Représente une formule commerciale et ses quotas d'exploitation (Modèle Microsoft 365 Licensing & Azure Subscriptions dynamique, administrable depuis le back-office `admin/`).
+
+| Champ | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | `ulid` | PK | Identifiant unique (binaire 16 octets) |
+| `sku` | `VARCHAR(50)` | NOT NULL, UNIQUE | Code technique de l'offre (ex: `FREE`, `STANDARD`, `PRO`, `ENTERPRISE`, ou SKU personnalisé) |
+| `name` | `VARCHAR(120)` | NOT NULL | Libellé commercial de la formule |
+| `tier` | `VARCHAR(80)` | NOT NULL | Niveau de gamme (ex: Découverte, Professionnel, Multi-Sites, Grand Compte) |
+| `badge` | `VARCHAR(50)` | NULL | Badge visuel (ex: "Populaire", "Recommandé", "Sur-Mesure") |
+| `description` | `LONGTEXT` | NULL | Description du positionnement de l'offre |
+| `price_monthly` | `INT` | NOT NULL, DEFAULT 0 | Tarif mensuel en FCFA (`XOF`) |
+| `price_annually` | `INT` | NOT NULL, DEFAULT 0 | Tarif annuel en FCFA (`XOF`) (-15% d'engagement) |
+| `currency` | `VARCHAR(10)` | NOT NULL, DEFAULT 'XOF' | Devise de facturation |
+| `quotas` | `JSON` | NOT NULL | Quotas plafonds : `max_farms`, `max_flocks`, `max_members`, `retention_months` |
+| `features` | `JSON` | NOT NULL | Tableau des fonctionnalités et services inclus |
+| `flags` | `JSON` | NOT NULL | Capacités techniques : `accounting_exports`, `health_alerts`, `iot_sensors`, `api_access`, `priority_support` |
+| `is_popular` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Indicateur d'offre populaire |
+| `is_recommended` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Indicateur d'offre recommandée |
+| `is_active` | `BOOLEAN` | NOT NULL, DEFAULT TRUE | Formule ouverte à la souscription |
+| `is_system` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | `true` pour les 4 offres modèles protégées contre la suppression |
+| `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de création |
+| `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de dernière modification |
+
+### 2.5. Farm (`farms`)
 Représente une exploitation avicole physique gérée par une organisation.
 
 | Champ | Type | Contraintes | Description |
@@ -142,7 +181,7 @@ Représente une exploitation avicole physique gérée par une organisation.
 | `created_at` | `DATETIME_IMMUTABLE` | NOT NULL | Date de création |
 | `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Dernière mise à jour |
 
-### 2.4. FarmMembership (`farm_memberships`)
+### 2.5. FarmMembership (`farm_memberships`)
 Associe un utilisateur à une exploitation avec un rôle spécifique au sein de cette exploitation.
 
 | Champ | Type | Contraintes | Description |
@@ -165,7 +204,7 @@ Associe un utilisateur à une exploitation avec un rôle spécifique au sein de 
 - `STOCK_KEEPER` : Magasinier (gestion des stocks, réceptions, sorties d'aliments).
 - `ACCOUNTANT` : Comptable (achats, ventes, rapports financiers).
 
-### 2.5. Building (`buildings`)
+### 2.6. Building (`buildings`)
 Bâtiment d'élevage, poulailler ou espace dédié au sein de l'exploitation.
 
 | Champ | Type | Contraintes | Description |

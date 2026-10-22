@@ -178,9 +178,7 @@ export default function InventoryPage() {
           >
             {item.name}
           </Link>
-          <div className="text-[10px] font-normal text-muted font-mono">
-            {item.sku}
-          </div>
+         
         </div>
       ),
     },
@@ -214,17 +212,7 @@ export default function InventoryPage() {
         </span>
       ),
     },
-    {
-      key: "minThreshold",
-      header: "Seuil Alerte",
-      sortable: true,
-      align: "right",
-      cell: (item) => (
-        <span className="font-mono text-muted text-xs">
-          {formatInventoryUnit(item.minThreshold, item.unit, { short: true })}
-        </span>
-      ),
-    },
+   
     {
       key: "currentStock",
       header: "Stock Actuel",
@@ -287,15 +275,7 @@ export default function InventoryPage() {
             <Eye className="h-3 w-3 text-muted" />
             <span>Détails</span>
           </Link>
-          {hasPermission("inventory:update") && (
-            <button
-              type="button"
-              onClick={() => openMovementModal(item)}
-              className="rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary hover:text-white transition-colors"
-            >
-              Mouvement
-            </button>
-          )}
+         
         </div>
       ),
     },
@@ -480,15 +460,7 @@ export default function InventoryPage() {
                       <Eye className="h-3 w-3 text-muted" />
                       <span>Détails</span>
                     </Link>
-                    {hasPermission("inventory:update") && (
-                      <button
-                        type="button"
-                        onClick={() => openMovementModal(item)}
-                        className="rounded-lg bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary hover:text-white transition-colors"
-                      >
-                        Mouvement
-                      </button>
-                    )}
+                    
                   </div>
                 </div>
               </div>
