@@ -286,18 +286,13 @@ export default function AuditLogPage() {
                           <p className="text-xs font-semibold text-foreground">{log.actor.fullName}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] text-muted">{log.actor.email}</span>
-                            <Badge variant="secondary" className="text-[9px] px-1 py-0 font-normal">
-                              {log.actor.role}
-                            </Badge>
                           </div>
+
                         </TableCell>
 
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            {getActionIcon(log.action)}
-                            <Badge variant={getActionBadgeVariant(log.action)} className="text-[10px] font-semibold">
                               {log.label || log.action}
-                            </Badge>
                           </div>
                         </TableCell>
 
@@ -305,7 +300,6 @@ export default function AuditLogPage() {
                           <p className="text-xs font-semibold text-foreground">{log.targetName}</p>
                           <div className="flex items-center gap-1 mt-0.5">
                             <span className="text-[10px] text-muted font-mono">{log.targetType}</span>
-                            <span className="text-[10px] text-muted font-mono">#{log.targetId.slice(0, 8)}</span>
                           </div>
                         </TableCell>
 

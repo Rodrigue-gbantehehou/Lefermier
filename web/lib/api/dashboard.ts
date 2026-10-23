@@ -52,12 +52,17 @@ export const dashboardApi = {
           looseEggs: loose,
           layingRatePercent: layingRate,
         },
+        hasEggAccess: raw?.eggProduction?.hasAccess ?? true,
         inventoryAlertsCount: lowStock,
+        hasInventoryAccess: raw?.inventory?.hasAccess ?? true,
         financialSummary: {
           revenueFcfa: rev,
           expenseFcfa: exp,
           netCashflowFcfa: net,
         },
+        hasFinanceAccess: raw?.finances?.hasAccess ?? true,
+        subscription: raw?.subscription ?? undefined,
+        health: raw?.health ?? undefined,
       };
     } catch (err) {
       console.warn("Erreur chargement KPIs dashboard:", err);

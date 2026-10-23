@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
   Users,
   X,
   Settings,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
@@ -26,73 +27,80 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, hasModule, activePlan } = useAuth();
 
   const navigation = [
     {
       name: "Tableau de bord",
       href: "/",
       icon: LayoutDashboard,
+      module: undefined,
       show: true,
     },
     {
       name: "Poules & Bandes",
       href: "/flocks",
       icon: Bird,
+      module: "flocks",
       show: hasPermission("flock:read"),
     },
     {
       name: "Production d'œufs",
       href: "/eggs",
       icon: Egg,
+      module: "eggs",
       show: hasPermission("egg:read"),
     },
     {
       name: "Santé & Vaccins",
       href: "/health",
       icon: HeartPulse,
-      show: true,
+      module: "health",
+      show: hasPermission("health:view") || true,
     },
     {
       name: "Stocks & Aliments",
       href: "/inventory",
       icon: Package,
+      module: "inventory",
       show: hasPermission("inventory:read"),
     },
     {
       name: "Trésorerie & Ventes",
       href: "/finances",
       icon: Wallet,
+      module: "finance",
       show: hasPermission("finance:read"),
     },
     {
       name: "Contacts & Tiers",
       href: "/contacts",
       icon: ContactRound,
+      module: "contacts",
       show: hasPermission("contact:read") || hasPermission("contact:view"),
     },
-    
     {
       name: "Utilisateurs & Employés",
       href: "/settings/members",
       icon: Users,
+      module: "team",
       show: true,
     },
     {
       name: "Rôles & Permissions",
       href: "/settings/roles",
       icon: ShieldCheck,
+      module: "team",
       show: hasPermission("role:read") || user?.roles.includes("ROLE_ADMIN"),
     },
     {
       name: "Paramètres de la ferme",
       href: "/settings/farm",
       icon: Settings,
+      module: undefined,
       show: true,
     },
   ];
-
-  const filteredNav = navigation.filter((item) => item.show);
 
   return (
     <>
@@ -145,7 +153,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider uppercase text-muted">
             Exploitation
           </div>
-          {filteredNav.map((item) => {
+          {navigation.map((item) => {
+            const isModuleAllowed = item.module ? hasModule(item.module) : true;
+
+            // Ne pas afficher les modules non concernés par l'offre ou non autorisés par le rôle
+            if (!isModuleAllowed || !item.show) {
+              return null;
+            }
+
             const isActive =
               item.href === "/"
                 ? pathname === "/"
@@ -175,6 +190,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Footer avec formule active */}
+        <div className="border-t border-border p-4">
+          <div className="rounded-xl bg-surface-hover/80 border border-border p-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              Formule de la ferme
+            </div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground truncate">
+                {activePlan?.planName || "Formule Starter"}
+              </span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                {activePlan?.badge || activePlan?.plan || "Gratuit"}
+              </span>
+            </div>
+          </div>
+        </div>
       </aside>
     </>
   );

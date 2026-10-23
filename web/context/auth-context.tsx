@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import { Farm, FarmRole, User } from "@/lib/types";
+import { Farm, FarmRole, FarmSubscription, User } from "@/lib/types";
 
 interface AuthContextType {
   user: User | null;
   activeFarm: Farm | null;
+  activePlan: FarmSubscription | null;
   farms: Farm[];
   role: FarmRole | null;
   permissions: string[];
@@ -23,6 +24,7 @@ interface AuthContextType {
   logout: () => void;
   switchFarm: (farmId: string) => Promise<void>;
   hasPermission: (permissionKey: string) => boolean;
+  hasModule: (moduleKey: string) => boolean;
   refreshMe: () => Promise<void>;
 }
 
@@ -82,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userRole: f.role,
         roleName: f.roleName,
         permissions: f.permissions || [],
+        subscription: f.subscription || null,
       }));
       setFarms(mappedFarms);
 
@@ -113,12 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "api_key:manage",
       ];
 
-      // If user has ROLE_ADMIN or is Owner/Director, default to all permissions
-      if (
-        mappedUser.roles.includes("ROLE_ADMIN") ||
-        currentFarm?.userRole === "OWNER" ||
-        currentFarm?.userRole === "DIRECTOR"
-      ) {
+      // Les permissions retournées par l'API intègrent déjà la formule souscrite
+      if (mappedUser.roles.includes("ROLE_ADMIN") || mappedUser.roles.includes("ROLE_SUPER_ADMIN")) {
         setPermissions(allPermissions);
       } else if (Array.isArray(currentFarm?.permissions)) {
         const rawPerms: string[] = currentFarm.permissions;
@@ -139,6 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           setPermissions(Array.from(permsSet));
         }
+      } else {
+        setPermissions([]);
       }
     } catch {
       // Invalid or expired token
@@ -199,10 +200,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadCurrentUser();
   }
 
+  function hasModule(moduleKey: string): boolean {
+    if (!user) return false;
+    if (user.roles?.includes("ROLE_ADMIN") || user.roles?.includes("ROLE_SUPER_ADMIN")) return true;
+    const modules = activeFarm?.subscription?.modules;
+    if (!Array.isArray(modules) || modules.length === 0) return true;
+    return modules.includes(moduleKey);
+  }
+
   function hasPermission(permissionKey: string): boolean {
     if (!user) return false;
-    if (user.roles?.includes("ROLE_ADMIN")) return true;
-    if (activeFarm?.userRole === "OWNER" || activeFarm?.userRole === "DIRECTOR") return true;
+    if (user.roles?.includes("ROLE_ADMIN") || user.roles?.includes("ROLE_SUPER_ADMIN")) return true;
+
     if (permissions.includes("*")) return true;
     if (permissions.includes(permissionKey)) return true;
 
@@ -222,6 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         activeFarm,
+        activePlan: activeFarm?.subscription || null,
         farms,
         role,
         permissions,
@@ -232,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         switchFarm,
         hasPermission,
+        hasModule,
         refreshMe,
       }}
     >

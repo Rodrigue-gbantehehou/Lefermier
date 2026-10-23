@@ -31,6 +31,15 @@ class Organization
     #[ORM\Column(type: Types::STRING, length: 50)]
     private string $subscriptionPlan = 'STANDARD';
 
+    #[ORM\Column(type: Types::STRING, length: 20)]
+    private string $subscriptionBillingCycle = 'MONTHLY'; // 'MONTHLY', 'ANNUALLY'
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $subscriptionRenewalDate = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $subscriptionTrialEndsAt = null;
+
     #[ORM\Column(type: Types::STRING, length: 30, enumType: OrganizationStatus::class)]
     private OrganizationStatus $status = OrganizationStatus::ACTIVE;
 
@@ -91,6 +100,42 @@ class Organization
     public function setSubscriptionPlan(string $subscriptionPlan): self
     {
         $this->subscriptionPlan = strtoupper(trim($subscriptionPlan));
+        return $this;
+    }
+
+    public function getSubscriptionBillingCycle(): string
+    {
+        return $this->subscriptionBillingCycle;
+    }
+
+    public function setSubscriptionBillingCycle(string $billingCycle): self
+    {
+        $upper = strtoupper(trim($billingCycle));
+        if (in_array($upper, ['MONTHLY', 'ANNUALLY'], true)) {
+            $this->subscriptionBillingCycle = $upper;
+        }
+        return $this;
+    }
+
+    public function getSubscriptionRenewalDate(): ?\DateTimeImmutable
+    {
+        return $this->subscriptionRenewalDate;
+    }
+
+    public function setSubscriptionRenewalDate(?\DateTimeImmutable $date): self
+    {
+        $this->subscriptionRenewalDate = $date;
+        return $this;
+    }
+
+    public function getSubscriptionTrialEndsAt(): ?\DateTimeImmutable
+    {
+        return $this->subscriptionTrialEndsAt;
+    }
+
+    public function setSubscriptionTrialEndsAt(?\DateTimeImmutable $date): self
+    {
+        $this->subscriptionTrialEndsAt = $date;
         return $this;
     }
 

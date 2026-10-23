@@ -50,6 +50,107 @@ class SubscriptionController extends AbstractController
     }
 
     /**
+     * Référentiel des modules fonctionnels réels du backend groupés par catégorie.
+     *
+     * GET /api/admin/subscriptions/modules
+     */
+    #[Route('/modules', name: 'modules', methods: ['GET'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_VIEW)]
+    public function modules(): JsonResponse
+    {
+        return $this->json([
+            'status' => 'success',
+            'data' => \App\Service\Admin\PlatformModuleRegistry::getGroupedByCategory(),
+        ]);
+    }
+
+    /**
+     * Duplique une offre existante en mode brouillon pour faciliter la création de variantes.
+     *
+     * POST /api/admin/subscriptions/plans/{id}/duplicate
+     */
+    #[Route('/plans/{id}/duplicate', name: 'duplicate_plan', methods: ['POST'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
+    public function duplicatePlan(string $id): JsonResponse
+    {
+        $plan = $this->planService->findPlanEntity($id);
+
+        if ($plan === null) {
+            return $this->json([
+                'status' => 'error',
+                'code' => Response::HTTP_NOT_FOUND,
+                'message' => 'Formule commerciale introuvable.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $duplicated = $this->planService->duplicatePlan($plan);
+
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_PLAN_CHANGE',
+            label: 'Duplication formule commerciale',
+            targetType: 'SUBSCRIPTION_PLAN',
+            targetId: $duplicated->getSku(),
+            targetName: $duplicated->getName(),
+            details: sprintf('Duplication de l\'offre "%s" vers la nouvelle formule brouillon "%s" (%s).', $plan->getName(), $duplicated->getName(), $duplicated->getSku()),
+        );
+
+        return $this->json([
+            'status' => 'success',
+            'message' => sprintf('Offre dupliquée en brouillon avec succès : "%s".', $duplicated->getName()),
+            'data' => $duplicated->toArray(0),
+        ], Response::HTTP_CREATED);
+    }
+
+    /**
+     * Modification rapide du statut de publication d'une offre (DRAFT, PUBLISHED, ARCHIVED).
+     *
+     * PATCH /api/admin/subscriptions/plans/{id}/status
+     */
+    #[Route('/plans/{id}/status', name: 'update_plan_status', methods: ['PATCH'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
+    public function updatePlanStatus(string $id, Request $request): JsonResponse
+    {
+        $plan = $this->planService->findPlanEntity($id);
+
+        if ($plan === null) {
+            return $this->json([
+                'status' => 'error',
+                'code' => Response::HTTP_NOT_FOUND,
+                'message' => 'Formule commerciale introuvable.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $payload = $request->toArray();
+        $newStatus = strtoupper(trim((string) ($payload['status'] ?? '')));
+
+        if (!in_array($newStatus, ['DRAFT', 'PUBLISHED', 'ARCHIVED'], true)) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Statut invalide. Valeurs autorisées : DRAFT, PUBLISHED, ARCHIVED.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $oldStatus = $plan->getStatus();
+        $plan->setStatus($newStatus);
+        $this->entityManager->flush();
+
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_PLAN_CHANGE',
+            label: 'Changement statut publication offre',
+            targetType: 'SUBSCRIPTION_PLAN',
+            targetId: $plan->getSku(),
+            targetName: $plan->getName(),
+            details: sprintf('Statut de publication de l\'offre "%s" modifié : %s -> %s.', $plan->getName(), $oldStatus, $newStatus),
+        );
+
+        return $this->json([
+            'status' => 'success',
+            'message' => sprintf('Statut de l\'offre "%s" mis à jour (%s).', $plan->getName(), $newStatus),
+            'data' => $plan->toArray(),
+        ]);
+    }
+
+    /**
      * Crée une nouvelle formule commerciale dans le catalogue plateforme.
      *
      * POST /api/admin/subscriptions/plans
@@ -212,8 +313,10 @@ class SubscriptionController extends AbstractController
         }
 
         if ($search !== null && $search !== '') {
-            $qb->andWhere('o.name LIKE :search OR o.slug LIKE :search')
-               ->setParameter('search', '%' . $search . '%');
+            $qb->leftJoin('o.farms', 'f')
+               ->andWhere('o.name LIKE :search OR o.slug LIKE :search OR f.name LIKE :search')
+               ->setParameter('search', '%' . $search . '%')
+               ->distinct();
         }
 
         $organizations = $qb->getQuery()->getResult();

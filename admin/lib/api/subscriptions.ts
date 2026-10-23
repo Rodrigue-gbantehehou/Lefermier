@@ -1,8 +1,12 @@
 import { apiRequest } from "./client";
 import {
   CommercialPlan,
+  CreatePlanPayload,
   FinancialMetrics,
+  OfferStatus,
+  PlatformModuleGroup,
   SubscriptionItem,
+  UpdatePlanPayload,
 } from "../types";
 
 export const subscriptionsApi = {
@@ -12,6 +16,16 @@ export const subscriptionsApi = {
   async getPlans(): Promise<CommercialPlan[]> {
     const res = await apiRequest<{ status: string; data: CommercialPlan[] }>(
       "/api/admin/subscriptions/plans"
+    );
+    return res.data;
+  },
+
+  /**
+   * Récupère la liste des modules applicatifs réels du backend groupés par catégorie.
+   */
+  async getModules(): Promise<PlatformModuleGroup[]> {
+    const res = await apiRequest<{ status: string; data: PlatformModuleGroup[] }>(
+      "/api/admin/subscriptions/modules"
     );
     return res.data;
   },
@@ -66,7 +80,7 @@ export const subscriptionsApi = {
   /**
    * Crée une nouvelle formule commerciale dans le catalogue plateforme.
    */
-  async createPlan(payload: any): Promise<CommercialPlan> {
+  async createPlan(payload: CreatePlanPayload): Promise<CommercialPlan> {
     const res = await apiRequest<{ status: string; data: CommercialPlan }>(
       "/api/admin/subscriptions/plans",
       {
@@ -80,7 +94,7 @@ export const subscriptionsApi = {
   /**
    * Met à jour une formule commerciale existante.
    */
-  async updatePlan(idOrSku: string, payload: any): Promise<CommercialPlan> {
+  async updatePlan(idOrSku: string, payload: UpdatePlanPayload): Promise<CommercialPlan> {
     const res = await apiRequest<{ status: string; data: CommercialPlan }>(
       `/api/admin/subscriptions/plans/${idOrSku}`,
       {
@@ -92,7 +106,34 @@ export const subscriptionsApi = {
   },
 
   /**
-   * Supprime une formule commerciale personnalisée.
+   * Duplique une offre existante en mode brouillon pour en faire une variante.
+   */
+  async duplicatePlan(idOrSku: string): Promise<CommercialPlan> {
+    const res = await apiRequest<{ status: string; data: CommercialPlan }>(
+      `/api/admin/subscriptions/plans/${idOrSku}/duplicate`,
+      {
+        method: "POST",
+      }
+    );
+    return res.data;
+  },
+
+  /**
+   * Modifie rapidement le statut de publication d'une offre (DRAFT, PUBLISHED, ARCHIVED).
+   */
+  async updatePlanStatus(idOrSku: string, status: OfferStatus): Promise<CommercialPlan> {
+    const res = await apiRequest<{ status: string; data: CommercialPlan }>(
+      `/api/admin/subscriptions/plans/${idOrSku}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }
+    );
+    return res.data;
+  },
+
+  /**
+   * Supprime une formule commerciale personnalisée (uniquement si 0 abonné).
    */
   async deletePlan(idOrSku: string): Promise<void> {
     await apiRequest<{ status: string; message: string }>(

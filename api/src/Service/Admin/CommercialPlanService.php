@@ -43,11 +43,28 @@ class CommercialPlanService
         if (empty($entities)) {
             $this->seedDefaultPlans();
             $entities = $this->planRepository->findBy([], ['priceMonthly' => 'ASC']);
+        } else {
+            // S'assurer que les formules existantes ont leurs modules configurés
+            $this->ensureModulesSeeded($entities);
+        }
+
+        // Compter les abonnés par SKU pour chaque formule
+        $subscriberCounts = [];
+        $orgCounts = $this->organizationRepository->createQueryBuilder('o')
+            ->select('UPPER(o.subscriptionPlan) as sku, COUNT(o.id) as total')
+            ->groupBy('o.subscriptionPlan')
+            ->getQuery()
+            ->getResult();
+
+        foreach ($orgCounts as $row) {
+            $subscriberCounts[(string) $row['sku']] = (int) $row['total'];
         }
 
         $plans = [];
         foreach ($entities as $entity) {
-            $plans[$entity->getSku()] = $entity->toArray();
+            $sku = $entity->getSku();
+            $subscribers = $subscriberCounts[$sku] ?? 0;
+            $plans[$sku] = $entity->toArray($subscribers);
         }
 
         return $plans;
@@ -75,7 +92,37 @@ class CommercialPlanService
     }
 
     /**
-     * Crée une nouvelle formule commerciale personnalisée dans la table subscription_plans.
+     * Vérifie si un module applicatif est inclus dans la formule de l'exploitation.
+     */
+    public function isModuleAllowedForFarm(Farm $farm, string $moduleKey): bool
+    {
+        $org = $farm->getOrganization();
+        $planSku = strtoupper($org->getSubscriptionPlan());
+        $plan = $this->getPlan($planSku) ?? $this->getPlan('STANDARD');
+        if ($plan === null) {
+            return true;
+        }
+
+        $modules = $plan['modules'] ?? [];
+        return in_array($moduleKey, $modules, true);
+    }
+
+    /**
+     * Vérifie si une permission spécifique est couverte par la formule de l'exploitation.
+     */
+    public function isPermissionAllowedForFarm(Farm $farm, string $permission): bool
+    {
+        $module = PlatformModuleRegistry::getModuleForPermission($permission);
+        if ($module === null) {
+            // Permission socle non restreinte par une offre
+            return true;
+        }
+
+        return $this->isModuleAllowedForFarm($farm, $module);
+    }
+
+    /**
+     * Crée une nouvelle formule commerciale dans la table subscription_plans.
      *
      * @param array<string, mixed> $data
      */
@@ -95,7 +142,7 @@ class CommercialPlanService
             throw new \InvalidArgumentException('Le nom de la formule est obligatoire.');
         }
 
-        $tier = trim((string) ($data['tier'] ?? 'Personnalisé'));
+        $tier = trim((string) ($data['tier'] ?? 'Standard'));
         $priceMonthly = (int) ($data['priceMonthly'] ?? $data['price_monthly'] ?? 0);
         $priceAnnually = (int) ($data['priceAnnually'] ?? $data['price_annually'] ?? 0);
         $currency = strtoupper((string) ($data['currency'] ?? 'XOF'));
@@ -103,11 +150,19 @@ class CommercialPlanService
         $quotas = (array) ($data['quotas'] ?? []);
         $features = (array) ($data['features'] ?? []);
         $flags = (array) ($data['flags'] ?? []);
+        $modules = (array) ($data['modules'] ?? []);
 
         $badge = isset($data['badge']) && trim((string) $data['badge']) !== '' ? trim((string) $data['badge']) : null;
         $description = isset($data['description']) && trim((string) $data['description']) !== '' ? trim((string) $data['description']) : null;
         $isPopular = (bool) ($data['isPopular'] ?? $data['is_popular'] ?? false);
         $isRecommended = (bool) ($data['isRecommended'] ?? $data['is_recommended'] ?? false);
+
+        $status = (string) ($data['status'] ?? 'PUBLISHED');
+        $availableFrom = isset($data['availableFrom']) && !empty($data['availableFrom']) ? new \DateTimeImmutable((string) $data['availableFrom']) : null;
+        $availableTo = isset($data['availableTo']) && !empty($data['availableTo']) ? new \DateTimeImmutable((string) $data['availableTo']) : null;
+        $isVisibilityPublic = (bool) ($data['isVisibilityPublic'] ?? true);
+        $trialDays = (int) ($data['trialDays'] ?? 0);
+        $allowedBillingCycles = (array) ($data['allowedBillingCycles'] ?? ['MONTHLY', 'ANNUALLY']);
 
         $plan = new SubscriptionPlan(
             sku: $sku,
@@ -124,6 +179,14 @@ class CommercialPlanService
             isRecommended: $isRecommended,
             isSystem: false,
             currency: $currency,
+            status: $status,
+            availableFrom: $availableFrom,
+            availableTo: $availableTo,
+            isVisibilityPublic: $isVisibilityPublic,
+            trialDays: $trialDays,
+            allowedBillingCycles: $allowedBillingCycles,
+            modules: $modules,
+            version: 1,
         );
 
         $this->entityManager->persist($plan);
@@ -133,7 +196,7 @@ class CommercialPlanService
     }
 
     /**
-     * Modifie une formule commerciale existante.
+     * Modifie une formule commerciale existante sans casser les abonnements en cours.
      *
      * @param array<string, mixed> $data
      */
@@ -182,6 +245,34 @@ class CommercialPlanService
             $plan->setFlags(array_merge($plan->getFlags(), $data['flags']));
         }
 
+        if (isset($data['modules']) && is_array($data['modules'])) {
+            $plan->setModules($data['modules']);
+        }
+
+        if (isset($data['status'])) {
+            $plan->setStatus((string) $data['status']);
+        }
+
+        if (array_key_exists('availableFrom', $data)) {
+            $plan->setAvailableFrom(!empty($data['availableFrom']) ? new \DateTimeImmutable((string) $data['availableFrom']) : null);
+        }
+
+        if (array_key_exists('availableTo', $data)) {
+            $plan->setAvailableTo(!empty($data['availableTo']) ? new \DateTimeImmutable((string) $data['availableTo']) : null);
+        }
+
+        if (isset($data['isVisibilityPublic'])) {
+            $plan->setIsVisibilityPublic((bool) $data['isVisibilityPublic']);
+        }
+
+        if (isset($data['trialDays'])) {
+            $plan->setTrialDays((int) $data['trialDays']);
+        }
+
+        if (isset($data['allowedBillingCycles']) && is_array($data['allowedBillingCycles'])) {
+            $plan->setAllowedBillingCycles($data['allowedBillingCycles']);
+        }
+
         if (isset($data['isPopular'])) {
             $plan->setIsPopular((bool) $data['isPopular']);
         }
@@ -194,23 +285,74 @@ class CommercialPlanService
             $plan->setIsActive((bool) $data['isActive']);
         }
 
+        // Incrémenter le numéro de version de l'offre
+        $plan->incrementVersion();
+
         $this->entityManager->flush();
 
         return $plan;
     }
 
     /**
-     * Supprime une formule commerciale (uniquement si non système et non utilisée par des organisations actives).
+     * Duplique une offre existante en brouillon pour créer facilement une variante promotionnelle.
+     */
+    public function duplicatePlan(SubscriptionPlan $source): SubscriptionPlan
+    {
+        $baseSku = $source->getSku();
+        $newSku = $baseSku . '_COPY';
+        $i = 1;
+        while ($this->planRepository->findBySku($newSku) !== null) {
+            $i++;
+            $newSku = $baseSku . '_V' . $i;
+        }
+
+        $duplicate = new SubscriptionPlan(
+            sku: $newSku,
+            name: $source->getName() . ' (Copie)',
+            tier: $source->getTier(),
+            priceMonthly: $source->getPriceMonthly(),
+            priceAnnually: $source->getPriceAnnually(),
+            quotas: $source->getQuotas(),
+            features: $source->getFeatures(),
+            flags: $source->getFlags(),
+            badge: $source->getBadge() ? $source->getBadge() . ' (Copie)' : 'Nouveau',
+            description: $source->getDescription(),
+            isPopular: false,
+            isRecommended: false,
+            isSystem: false,
+            currency: $source->getCurrency(),
+            status: 'DRAFT', // Une duplication commence toujours en brouillon
+            availableFrom: null,
+            availableTo: null,
+            isVisibilityPublic: $source->isVisibilityPublic(),
+            trialDays: $source->getTrialDays(),
+            allowedBillingCycles: $source->getAllowedBillingCycles(),
+            modules: $source->getModules(),
+            version: 1,
+        );
+
+        $this->entityManager->persist($duplicate);
+        $this->entityManager->flush();
+
+        return $duplicate;
+    }
+
+    /**
+     * Supprime une formule commerciale (uniquement si non système et sans aucun abonné actif).
      */
     public function deletePlan(SubscriptionPlan $plan): void
     {
         if ($plan->isSystem()) {
-            throw new \LogicException('Les formules de base du système (FREE, STANDARD, PRO, ENTERPRISE) ne peuvent pas être supprimées.');
+            throw new \LogicException('Les formules système de référence (FREE, STANDARD, PRO, ENTERPRISE) ne peuvent pas être supprimées.');
         }
 
         $count = $this->organizationRepository->count(['subscriptionPlan' => $plan->getSku()]);
         if ($count > 0) {
-            throw new \LogicException(sprintf('Impossible de supprimer la formule "%s" car elle est actuellement souscrite par %d organisation(s). Veuillez d\'abord modifier ces abonnements.', $plan->getName(), $count));
+            throw new \LogicException(sprintf(
+                'Impossible de supprimer définitivement la formule "%s" car %d organisation(s) y sont actuellement abonnées. Pour protéger ces clients sans interrompre leur service, archivez l\'offre plutôt que de la supprimer.',
+                $plan->getName(),
+                $count
+            ));
         }
 
         $this->entityManager->remove($plan);
@@ -279,6 +421,14 @@ class CommercialPlanService
             'name' => $org->getName(),
             'slug' => $org->getSlug(),
             'status' => $status,
+            'farms' => array_map(
+                fn (Farm $f) => [
+                    'id' => $f->getId()?->toBase32(),
+                    'name' => $f->getName(),
+                    'code' => $f->getCode(),
+                ],
+                $farms->toArray()
+            ),
             'plan' => [
                 'sku' => $plan['sku'],
                 'name' => $plan['name'],
@@ -400,7 +550,7 @@ class CommercialPlanService
                 'description' => 'Pour les éleveurs individuels qui démarrent leur première exploitation avicole.',
                 'priceMonthly' => 0,
                 'priceAnnually' => 0,
-                'quotas' => ['max_farms' => 1, 'max_flocks' => 2, 'max_members' => 2, 'retention_months' => 3],
+                'quotas' => ['max_farms' => 1, 'max_flocks' => 2, 'max_members' => 2, 'max_buildings' => 2, 'retention_months' => 3],
                 'features' => [
                     '1 exploitation avicole',
                     'Jusqu\'à 2 bandes simultanées',
@@ -418,6 +568,10 @@ class CommercialPlanService
                 ],
                 'isPopular' => false,
                 'isRecommended' => false,
+                'trialDays' => 0,
+                'allowedBillingCycles' => ['MONTHLY'],
+                'modules' => ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings'],
+                'isVisibilityPublic' => true,
             ],
             [
                 'sku' => 'STANDARD',
@@ -427,7 +581,7 @@ class CommercialPlanService
                 'description' => 'Pour les fermes structurées nécessitant un pilotage rigoureux des stocks et de la ponte.',
                 'priceMonthly' => 15000,
                 'priceAnnually' => 153000,
-                'quotas' => ['max_farms' => 3, 'max_flocks' => 10, 'max_members' => 5, 'retention_months' => 12],
+                'quotas' => ['max_farms' => 3, 'max_flocks' => 10, 'max_members' => 5, 'max_buildings' => 6, 'retention_months' => 12],
                 'features' => [
                     'Jusqu\'à 3 exploitations avicoles',
                     'Jusqu\'à 10 bandes actives',
@@ -447,6 +601,10 @@ class CommercialPlanService
                 ],
                 'isPopular' => true,
                 'isRecommended' => false,
+                'trialDays' => 14,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+                'isVisibilityPublic' => true,
             ],
             [
                 'sku' => 'PRO',
@@ -456,7 +614,7 @@ class CommercialPlanService
                 'description' => 'Pour les coopératives, exploitations multi-sites et groupements d\'éleveurs.',
                 'priceMonthly' => 35000,
                 'priceAnnually' => 357000,
-                'quotas' => ['max_farms' => 10, 'max_flocks' => 50, 'max_members' => 20, 'retention_months' => 36],
+                'quotas' => ['max_farms' => 10, 'max_flocks' => 50, 'max_members' => 20, 'max_buildings' => 25, 'retention_months' => 36],
                 'features' => [
                     'Jusqu\'à 10 exploitations avicoles',
                     'Jusqu\'à 50 bandes simultanées',
@@ -475,6 +633,10 @@ class CommercialPlanService
                 ],
                 'isPopular' => false,
                 'isRecommended' => true,
+                'trialDays' => 14,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+                'isVisibilityPublic' => true,
             ],
             [
                 'sku' => 'ENTERPRISE',
@@ -484,7 +646,7 @@ class CommercialPlanService
                 'description' => 'Pour les intégrateurs avicoles industriels, accouveurs et fabricants d\'aliments.',
                 'priceMonthly' => 85000,
                 'priceAnnually' => 867000,
-                'quotas' => ['max_farms' => 9999, 'max_flocks' => 9999, 'max_members' => 9999, 'retention_months' => 120],
+                'quotas' => ['max_farms' => 9999, 'max_flocks' => 9999, 'max_members' => 9999, 'max_buildings' => 9999, 'retention_months' => 120],
                 'features' => [
                     'Nombre d\'exploitations illimité',
                     'Nombre de bandes et de bâtiments illimité',
@@ -503,6 +665,10 @@ class CommercialPlanService
                 ],
                 'isPopular' => false,
                 'isRecommended' => false,
+                'trialDays' => 30,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced', 'api_iot'],
+                'isVisibilityPublic' => false,
             ],
         ];
 
@@ -523,11 +689,61 @@ class CommercialPlanService
                     isPopular: $def['isPopular'],
                     isRecommended: $def['isRecommended'],
                     isSystem: true,
+                    currency: 'XOF',
+                    status: 'PUBLISHED',
+                    availableFrom: null,
+                    availableTo: null,
+                    isVisibilityPublic: $def['isVisibilityPublic'] ?? true,
+                    trialDays: $def['trialDays'] ?? 0,
+                    allowedBillingCycles: $def['allowedBillingCycles'] ?? ['MONTHLY', 'ANNUALLY'],
+                    modules: $def['modules'] ?? [],
+                    version: 1,
                 );
                 $this->entityManager->persist($plan);
             }
         }
 
         $this->entityManager->flush();
+    }
+
+    /**
+     * Rétro-compatibilité : assure que les formules déjà en base reçoivent leurs modules par défaut.
+     *
+     * @param array<SubscriptionPlan> $entities
+     */
+    public function ensureModulesSeeded(array $entities): void
+    {
+        $needsFlush = false;
+
+        $moduleMap = [
+            'FREE' => ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings'],
+            'STANDARD' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+            'PRO' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+            'ENTERPRISE' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced', 'api_iot'],
+        ];
+
+        foreach ($entities as $plan) {
+            $sku = $plan->getSku();
+            if (empty($plan->getModules())) {
+                $mods = $moduleMap[$sku] ?? ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings'];
+                $plan->setModules($mods);
+                if ($plan->getAllowedBillingCycles() === []) {
+                    $plan->setAllowedBillingCycles($sku === 'FREE' ? ['MONTHLY'] : ['MONTHLY', 'ANNUALLY']);
+                }
+                if ($plan->getTrialDays() === 0 && in_array($sku, ['STANDARD', 'PRO'], true)) {
+                    $plan->setTrialDays(14);
+                }
+                $needsFlush = true;
+            }
+
+            if ($plan->getStatus() === '' || $plan->getStatus() === null) {
+                $plan->setStatus('PUBLISHED');
+                $needsFlush = true;
+            }
+        }
+
+        if ($needsFlush) {
+            $this->entityManager->flush();
+        }
     }
 }

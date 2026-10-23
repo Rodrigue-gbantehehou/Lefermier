@@ -31,6 +31,23 @@ export interface Farm {
   userRole?: string | null;
   roleName?: string | null;
   permissions?: string[];
+  subscription?: FarmSubscription | null;
+}
+
+export interface FarmSubscription {
+  plan: string;
+  planName: string;
+  tier?: string | null;
+  badge?: string | null;
+  modules: string[];
+  quotas: {
+    maxFarms?: number;
+    maxFlocks?: number;
+    maxMembers?: number;
+    maxBuildings?: number;
+    retentionMonths?: number;
+  };
+  status?: string;
 }
 
 export interface Building {
@@ -257,6 +274,47 @@ export interface Transaction {
 }
 
 /**
+ * Quotas & Dashboard Subscription
+ */
+export interface QuotaMetric {
+  current: number;
+  max: number;
+  percent: number;
+  isExceeded: boolean;
+  isUnlimited: boolean;
+}
+
+export interface DashboardSubscription {
+  plan: string;
+  planName: string;
+  tier: string;
+  badge?: string | null;
+  status: string;
+  modules: string[];
+  quotas: {
+    flocks: QuotaMetric;
+    buildings: QuotaMetric;
+    farms: QuotaMetric;
+    members: QuotaMetric;
+  };
+  isOverQuota: boolean;
+}
+
+export interface DashboardHealthOverview {
+  hasAccess: boolean;
+  pendingCount: number;
+  overdueCount: number;
+  upcomingTreatments: Array<{
+    id: string;
+    title: string;
+    flockName: string;
+    type: string;
+    scheduledDate: string;
+    status: string;
+  }>;
+}
+
+/**
  * Dashboard KPI
  */
 export interface DashboardKPI {
@@ -269,12 +327,17 @@ export interface DashboardKPI {
     looseEggs: number;
     layingRatePercent: number;
   };
+  hasEggAccess?: boolean;
   inventoryAlertsCount: number;
+  hasInventoryAccess?: boolean;
   financialSummary: {
     revenueFcfa: number;
     expenseFcfa: number;
     netCashflowFcfa: number;
   };
+  hasFinanceAccess?: boolean;
+  subscription?: DashboardSubscription;
+  health?: DashboardHealthOverview;
 }
 
 /**

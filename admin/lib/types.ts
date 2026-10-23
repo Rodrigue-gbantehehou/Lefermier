@@ -147,10 +147,30 @@ export interface UpdateAdminRolePayload {
   description?: string;
 }
 
+export type OfferStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type BillingCycle = "MONTHLY" | "ANNUALLY";
+
+export interface PlatformModuleMeta {
+  key: string;
+  category: string;
+  categoryKey: string;
+  label: string;
+  description: string;
+  icon: string;
+  permissions: string[];
+}
+
+export interface PlatformModuleGroup {
+  key: string;
+  category: string;
+  modules: PlatformModuleMeta[];
+}
+
 export interface PlanQuotas {
   maxFarms: number;
   maxFlocks: number;
   maxMembers: number;
+  maxBuildings: number;
   retentionMonths: number;
 }
 
@@ -172,6 +192,14 @@ export interface CommercialPlan {
   priceMonthly: number;
   priceAnnually: number;
   currency: string;
+  status: OfferStatus;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+  isAvailable?: boolean;
+  isVisibilityPublic: boolean;
+  trialDays: number;
+  allowedBillingCycles: BillingCycle[];
+  modules: string[];
   quotas: PlanQuotas;
   features: string[];
   flags: PlanFlags;
@@ -179,6 +207,8 @@ export interface CommercialPlan {
   isRecommended: boolean;
   isActive?: boolean;
   isSystem?: boolean;
+  version?: number;
+  subscribersCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -192,9 +222,16 @@ export interface CreatePlanPayload {
   priceMonthly: number;
   priceAnnually: number;
   currency?: string;
+  status?: OfferStatus;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+  isVisibilityPublic?: boolean;
+  trialDays?: number;
+  allowedBillingCycles?: BillingCycle[];
+  modules?: string[];
   quotas: PlanQuotas;
   features: string[];
-  flags: PlanFlags;
+  flags?: PlanFlags;
   isPopular?: boolean;
   isRecommended?: boolean;
 }
@@ -207,6 +244,13 @@ export interface UpdatePlanPayload {
   priceMonthly?: number;
   priceAnnually?: number;
   currency?: string;
+  status?: OfferStatus;
+  availableFrom?: string | null;
+  availableTo?: string | null;
+  isVisibilityPublic?: boolean;
+  trialDays?: number;
+  allowedBillingCycles?: BillingCycle[];
+  modules?: string[];
   quotas?: Partial<PlanQuotas>;
   features?: string[];
   flags?: Partial<PlanFlags>;
@@ -227,6 +271,11 @@ export interface SubscriptionItem {
   name: string;
   slug: string;
   status: OrganizationStatus;
+  farms?: Array<{
+    id: string;
+    name: string;
+    code?: string | null;
+  }>;
   plan: {
     sku: string;
     name: string;

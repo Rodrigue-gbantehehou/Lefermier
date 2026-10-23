@@ -14,6 +14,8 @@ use App\Exception\EmailAlreadyExistsException;
 use App\Repository\OrganizationRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminAuditService;
+use App\Service\Admin\CommercialPlanService;
+use App\Service\Admin\PlatformModuleRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -29,6 +31,7 @@ class AuthService
         private readonly JWTTokenManagerInterface $jwtManager,
         private readonly SluggerInterface $slugger,
         private readonly AdminAuditService $adminAuditService,
+        private readonly CommercialPlanService $commercialPlanService,
     ) {
     }
 
@@ -102,6 +105,25 @@ class AuthService
         foreach ($user->getFarmMemberships() as $membership) {
             if ($membership->isActive()) {
                 $farm = $membership->getFarm();
+                $org = $farm->getOrganization();
+                $planSku = strtoupper($org->getSubscriptionPlan());
+                $plan = $this->commercialPlanService->getPlan($planSku) ?? $this->commercialPlanService->getPlan('STANDARD');
+                $planModules = $plan['modules'] ?? [];
+                $planPermissions = PlatformModuleRegistry::getPermissionsForModules($planModules);
+
+                $rawPermissions = $membership->getPermissions();
+                if (in_array('*', $rawPermissions, true)) {
+                    $effectivePermissions = $planPermissions;
+                } else {
+                    $effectivePermissions = array_values(array_filter(
+                        $rawPermissions,
+                        function (string $p) use ($planModules) {
+                            $mod = PlatformModuleRegistry::getModuleForPermission($p);
+                            return $mod === null || in_array($mod, $planModules, true);
+                        }
+                    ));
+                }
+
                 $farms[] = [
                     'id' => $farm->getId()?->toBase32(),
                     'name' => $farm->getName(),
@@ -118,7 +140,22 @@ class AuthService
                     'description' => $farm->getDescription(),
                     'role' => $membership->getRole()->value,
                     'roleName' => $membership->getRoleDefinition()?->getName() ?? $membership->getRole()->value,
-                    'permissions' => $membership->getPermissions(),
+                    'permissions' => $effectivePermissions,
+                    'subscription' => [
+                        'plan' => $planSku,
+                        'planName' => $plan['name'] ?? $planSku,
+                        'tier' => $plan['tier'] ?? null,
+                        'badge' => $plan['badge'] ?? null,
+                        'modules' => $planModules,
+                        'quotas' => $plan['quotas'] ?? [
+                            'maxFarms' => 1,
+                            'maxFlocks' => 2,
+                            'maxMembers' => 2,
+                            'maxBuildings' => 2,
+                            'retentionMonths' => 3,
+                        ],
+                        'status' => $plan['status'] ?? 'ACTIVE',
+                    ],
                 ];
             }
         }
