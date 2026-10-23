@@ -13,6 +13,7 @@ use App\Enum\FarmRole;
 use App\Exception\EmailAlreadyExistsException;
 use App\Repository\OrganizationRepository;
 use App\Repository\UserRepository;
+use App\Service\Admin\AdminAuditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -27,6 +28,7 @@ class AuthService
         private readonly EntityManagerInterface $entityManager,
         private readonly JWTTokenManagerInterface $jwtManager,
         private readonly SluggerInterface $slugger,
+        private readonly AdminAuditService $adminAuditService,
     ) {
     }
 
@@ -198,5 +200,55 @@ class AuthService
         $user->setPasswordResetExpiresAt(null);
 
         $this->entityManager->flush();
+
+        $this->adminAuditService->log(
+            action: 'PASSWORD_RESET',
+            label: 'Réinitialisation de mot de passe',
+            targetType: 'User',
+            targetId: (string) $user->getId()?->toBase32(),
+            targetName: $user->getFullName(),
+            details: sprintf('Mot de passe réinitialisé via code de vérification pour %s', $user->getEmail()),
+            status: 'SUCCESS',
+            actor: $user,
+        );
+    }
+
+    /**
+     * Modification du mot de passe par un utilisateur authentifié.
+     */
+    public function changePassword(User $user, string $currentPassword, string $newPassword): void
+    {
+        if (!$this->passwordHasher->isPasswordValid($user, $currentPassword)) {
+            $this->adminAuditService->log(
+                action: 'PASSWORD_CHANGE',
+                label: 'Échec de changement de mot de passe',
+                targetType: 'User',
+                targetId: (string) $user->getId()?->toBase32(),
+                targetName: $user->getFullName(),
+                details: sprintf('Tentative échouée : ancien mot de passe erroné pour %s', $user->getEmail()),
+                status: 'FAILED',
+                actor: $user,
+            );
+            throw new \InvalidArgumentException('Le mot de passe actuel saisi est incorrect.');
+        }
+
+        if (strlen($newPassword) < 8) {
+            throw new \InvalidArgumentException('Le nouveau mot de passe doit comporter au moins 8 caractères.');
+        }
+
+        $hashed = $this->passwordHasher->hashPassword($user, $newPassword);
+        $user->setPassword($hashed);
+        $this->entityManager->flush();
+
+        $this->adminAuditService->log(
+            action: 'PASSWORD_CHANGE',
+            label: 'Changement de mot de passe',
+            targetType: 'User',
+            targetId: (string) $user->getId()?->toBase32(),
+            targetName: $user->getFullName(),
+            details: sprintf('Mot de passe mis à jour avec succès par l\'utilisateur %s', $user->getEmail()),
+            status: 'SUCCESS',
+            actor: $user,
+        );
     }
 }

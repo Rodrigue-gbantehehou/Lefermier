@@ -16,6 +16,7 @@ import {
   CreditCard,
   KeyRound,
   AlertOctagon,
+  LogIn,
 } from "lucide-react";
 import { adminApi, AuditLogItem } from "@/lib/api-client";
 import { AdminHeader } from "@/components/admin-header";
@@ -38,6 +39,10 @@ import { formatDate } from "@/lib/utils";
 
 const ACTION_OPTIONS = [
   { value: "", label: "Toutes les actions" },
+  { value: "AUTH_LOGIN_SUCCESS", label: "Connexion : réussie" },
+  { value: "AUTH_LOGIN_FAILED", label: "Connexion : échec" },
+  { value: "PASSWORD_CHANGE", label: "Mot de passe : modification" },
+  { value: "PASSWORD_RESET", label: "Mot de passe : réinitialisation" },
   { value: "ORGANIZATION_STATUS_UPDATE", label: "Organisation : statut" },
   { value: "SUBSCRIPTION_PLAN_CHANGE", label: "Organisation : formule" },
   { value: "SUBSCRIPTION_PLAN_CREATE", label: "Formule : création" },
@@ -101,8 +106,9 @@ export default function AuditLogPage() {
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const getActionBadgeVariant = (action: string) => {
-    if (action.includes("DELETE") || action.includes("SUSPEND")) return "destructive";
-    if (action.includes("CREATE")) return "success";
+    if (action.includes("FAILED") || action.includes("DELETE") || action.includes("SUSPEND")) return "destructive";
+    if (action.includes("SUCCESS") || action.includes("CREATE")) return "success";
+    if (action.includes("PASSWORD")) return "warning";
     if (action.includes("ROLE")) return "secondary";
     return "outline";
   };
@@ -111,6 +117,8 @@ export default function AuditLogPage() {
     if (action.startsWith("ORGANIZATION")) return <Building2 className="h-3.5 w-3.5 text-sky-500" />;
     if (action.startsWith("SUBSCRIPTION")) return <CreditCard className="h-3.5 w-3.5 text-emerald-500" />;
     if (action.startsWith("ADMIN_ROLE")) return <KeyRound className="h-3.5 w-3.5 text-purple-500" />;
+    if (action.startsWith("AUTH_LOGIN")) return <LogIn className="h-3.5 w-3.5 text-blue-500" />;
+    if (action.startsWith("PASSWORD")) return <Lock className="h-3.5 w-3.5 text-amber-500" />;
     return <UserCheck className="h-3.5 w-3.5 text-amber-500" />;
   };
 

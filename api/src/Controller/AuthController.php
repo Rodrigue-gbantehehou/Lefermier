@@ -129,4 +129,43 @@ class AuthController extends AbstractController
             ],
         ]);
     }
+
+    #[Route('/change-password', name: 'change_password', methods: ['POST'])]
+    public function changePassword(
+        #[CurrentUser] ?User $user,
+        Request $request,
+    ): JsonResponse {
+        if ($user === null) {
+            return $this->json([
+                'title' => 'Non authentifié',
+                'detail' => 'Vous devez être authentifié pour modifier votre mot de passe.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $currentPassword = (string) ($payload['currentPassword'] ?? $payload['oldPassword'] ?? '');
+        $newPassword = (string) ($payload['newPassword'] ?? $payload['password'] ?? '');
+
+        if (empty($currentPassword) || empty($newPassword)) {
+            return $this->json([
+                'title' => 'Champs obligatoires manquants',
+                'detail' => 'Le mot de passe actuel et le nouveau mot de passe sont obligatoires.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $this->authService->changePassword($user, $currentPassword, $newPassword);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json([
+                'title' => 'Échec de modification',
+                'detail' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json([
+            'data' => [
+                'message' => 'Votre mot de passe a été modifié avec succès.',
+            ],
+        ]);
+    }
 }

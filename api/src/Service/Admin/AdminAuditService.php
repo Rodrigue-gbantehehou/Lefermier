@@ -33,6 +33,7 @@ class AdminAuditService
         string $details,
         string $status = 'SUCCESS',
         ?User $actor = null,
+        ?string $fallbackActorEmail = null,
     ): AdminAuditLog {
         if ($actor === null) {
             $user = $this->security->getUser();
@@ -45,10 +46,12 @@ class AdminAuditService
         $clientIp = $request?->getClientIp() ?? '127.0.0.1';
 
         $actorId = $actor?->getId()?->toBase32();
-        $actorEmail = $actor?->getEmail() ?? 'system@lefermier.bj';
-        $actorName = $actor?->getFullName() ?? 'Système';
+        $actorEmail = $actor?->getEmail() ?? $fallbackActorEmail ?? 'system@lefermier.bj';
+        $actorName = $actor?->getFullName() ?? $fallbackActorEmail ?? 'Système';
         $actorRole = $actor?->getAdminRole()?->getName()
-            ?? (in_array('ROLE_SUPER_ADMIN', $actor?->getRoles() ?? [], true) ? 'Super-Administrateur' : 'Administrateur');
+            ?? ($actor !== null
+                ? (in_array('ROLE_SUPER_ADMIN', $actor->getRoles(), true) ? 'Super-Administrateur' : 'Utilisateur')
+                : ($fallbackActorEmail ? 'Visiteur' : 'Système'));
 
         $log = new AdminAuditLog(
             actorEmail: $actorEmail,

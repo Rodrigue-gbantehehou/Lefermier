@@ -26,6 +26,7 @@ class PromoteSuperAdminCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly \App\Service\Admin\AdminRoleService $adminRoleService,
+        private readonly \App\Service\Admin\AdminAuditService $adminAuditService,
     ) {
         parent::__construct();
     }
@@ -65,6 +66,16 @@ class PromoteSuperAdminCommand extends Command
         if ($newPassword) {
             $hashed = $this->passwordHasher->hashPassword($user, (string) $newPassword);
             $user->setPassword($hashed);
+            $this->adminAuditService->log(
+                action: 'PASSWORD_CHANGE',
+                label: 'Changement de mot de passe (CLI)',
+                targetType: 'User',
+                targetId: (string) $user->getId()?->toBase32(),
+                targetName: $user->getFullName(),
+                details: sprintf('Mot de passe défini via console CLI pour le compte %s', $email),
+                status: 'SUCCESS',
+                actor: $user,
+            );
             $io->note('Mot de passe mis à jour.');
         }
 
