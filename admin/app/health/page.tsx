@@ -58,24 +58,21 @@ export default function SystemHealthPage() {
   return (
     <div className="flex-1 flex flex-col">
       <AdminHeader
-        title="Supervision Technique & État des Services"
-        description="Surveillance en temps réel de la disponibilité de l'API Symfony et de la base de données MySQL."
+        title="État système"
+        description="Disponibilité de l'API et des services."
       />
 
       <main className="p-6 md:p-8 space-y-6 max-w-7xl">
-        {/* En-tête Statut Réel */}
+        {/* En-tête Statut */}
         {apiError ? (
-          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-warning">Serveur API Symfony non détecté</p>
-              <p className="text-muted">
-                {apiError} Les métriques réelles (PHP, MySQL, mémoire) ne sont pas accessibles tant que l'API est hors-ligne.
-              </p>
-              <p className="text-muted font-mono text-[11px] bg-surface/70 px-2 py-1 rounded inline-block">
-                cd api && symfony serve --port=8000
-              </p>
+          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+              <span>API hors ligne : impossible de joindre le serveur.</span>
             </div>
+            <Button variant="outline" size="sm" onClick={checkHealth} className="text-xs h-7">
+              Réessayer
+            </Button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-success-soft/60 border border-success/30">
@@ -85,12 +82,12 @@ export default function SystemHealthPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-success">
-                  API Symfony et Base de Données connectées
+                  Tous les services fonctionnent normalement
                 </p>
                 <p className="text-xs text-muted" suppressHydrationWarning>
                   {lastCheck
-                    ? `Dernière vérification à ${lastCheck.toLocaleTimeString("fr-FR")}`
-                    : "Connexion établie"}
+                    ? `Dernière vérification à ${lastCheck.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+                    : "Connexion active"}
                 </p>
               </div>
             </div>
@@ -103,7 +100,7 @@ export default function SystemHealthPage() {
               className="gap-2 bg-surface text-xs"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>Tester à nouveau</span>
+              <span>Actualiser</span>
             </Button>
           </div>
         )}
@@ -115,10 +112,10 @@ export default function SystemHealthPage() {
             className="gap-1.5 bg-surface text-xs py-1"
           >
             <span
-              className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-warning"} animate-pulse`}
+              className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-warning"}`}
             />
             <span>
-              {isConnected ? "Services Opérationnels (Données Réelles)" : "API Déconnectée"}
+              {isConnected ? "En ligne" : "Hors ligne"}
             </span>
           </Badge>
 

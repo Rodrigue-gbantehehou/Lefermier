@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Security\AdminPermission;
 use App\Service\Admin\AdminStatsService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -15,10 +16,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 /**
  * Tableau de bord d'administration globale de la plateforme Lefermier.
  *
- * Accessible aux administrateurs et collaborateurs de la plateforme (ROLE_ADMIN, ROLE_SUPER_ADMIN).
+ * Protégé par les permissions granulaires du modèle Microsoft RBAC.
  */
 #[Route('/api/admin', name: 'api_admin_')]
-#[IsGranted('ROLE_ADMIN')]
 class DashboardController extends AbstractController
 {
     public function __construct(
@@ -32,6 +32,7 @@ class DashboardController extends AbstractController
      * GET /api/admin/stats
      */
     #[Route('/stats', name: 'stats', methods: ['GET'])]
+    #[IsGranted(AdminPermission::DASHBOARD_VIEW)]
     public function stats(): JsonResponse
     {
         return $this->json([
@@ -46,6 +47,7 @@ class DashboardController extends AbstractController
      * GET /api/admin/health
      */
     #[Route('/health', name: 'health', methods: ['GET'])]
+    #[IsGranted(AdminPermission::HEALTH_VIEW)]
     public function health(Connection $connection): JsonResponse
     {
         $dbConnected = false;

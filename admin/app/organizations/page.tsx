@@ -27,8 +27,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/utils";
+import { useAdminAuth } from "@/context/admin-auth-context";
 
 export default function AdminOrganizationsPage() {
+  const { hasPermission } = useAdminAuth();
+  const canSuspend = hasPermission("admin:organizations:suspend");
+
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -85,23 +89,20 @@ export default function AdminOrganizationsPage() {
   return (
     <div className="flex-1 flex flex-col">
       <AdminHeader
-        title="Gestion des Organisations & Fermes"
-        description="Supervisez les organisations inscrites, leurs exploitations affiliées et appliquez les suspensions d'accès."
+        title="Organisations"
+        description="Liste des entreprises clientes et fermes."
       />
 
       <main className="p-6 md:p-8 space-y-6 max-w-7xl">
         {apiError && (
-          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-start gap-3">
-            <AlertOctagon className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-warning">Serveur API Symfony non détecté</p>
-              <p className="text-muted mt-0.5">
-                {apiError} Les organisations réelles s'afficheront dès que le serveur backend sera démarré.
-              </p>
-              <p className="text-muted mt-1 font-mono text-[11px] bg-surface/70 px-2 py-1 rounded inline-block">
-                cd api && symfony serve --port=8000
-              </p>
+          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertOctagon className="h-4 w-4 text-warning shrink-0" />
+              <span>API hors ligne : impossible de charger les organisations.</span>
             </div>
+            <Button variant="outline" size="sm" onClick={fetchOrganizations} className="text-xs h-7">
+              Réessayer
+            </Button>
           </div>
         )}
 
@@ -110,11 +111,8 @@ export default function AdminOrganizationsPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <CardTitle>
-                  Organisations clientes {apiError ? "(Déconnecté)" : `(${organizations.length})`}
+                  Organisations {organizations.length > 0 && `(${organizations.length})`}
                 </CardTitle>
-                <CardDescription>
-                  Chaque organisation regroupe une ou plusieurs fermes avicoles indépendantes.
-                </CardDescription>
               </div>
 
               {/* Filtres & Recherche */}
@@ -122,7 +120,7 @@ export default function AdminOrganizationsPage() {
                 <div className="relative w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
                   <Input
-                    placeholder="Rechercher par nom..."
+                    placeholder="Rechercher..."
                     className="pl-8 text-xs h-9"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -146,10 +144,10 @@ export default function AdminOrganizationsPage() {
                   size="sm"
                   onClick={fetchOrganizations}
                   isLoading={isLoading}
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Filtrer</span>
+                  <span>Actualiser</span>
                 </Button>
               </div>
             </div>
@@ -159,12 +157,8 @@ export default function AdminOrganizationsPage() {
             {organizations.length === 0 && !isLoading ? (
               <EmptyState
                 icon={<Building2 />}
-                title={apiError ? "Connexion API indisponible" : "Aucune organisation trouvée"}
-                description={
-                  apiError
-                    ? "Impossible de joindre le serveur API Symfony. Aucune donnée fictive n'est affichée."
-                    : "Aucun résultat ne correspond aux filtres sélectionnés."
-                }
+                title="Aucune organisation trouvée"
+                description="Aucun résultat ne correspond aux filtres appliqués."
                 className="m-6"
               />
             ) : (
@@ -174,8 +168,8 @@ export default function AdminOrganizationsPage() {
                     <TableHead>Organisation</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Formule</TableHead>
-                    <TableHead>Fermes affiliées</TableHead>
-                    <TableHead>Création</TableHead>
+                    <TableHead>Fermes</TableHead>
+                    <TableHead>Créée le</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -251,25 +245,27 @@ export default function AdminOrganizationsPage() {
                               </Button>
                             </Link>
 
-                            <Button
-                              variant={isSuspended ? "success" : "destructive"}
-                              size="sm"
-                              isLoading={actionLoadingId === org.id}
-                              onClick={() => handleToggleStatus(org)}
-                              className="text-xs gap-1.5"
-                            >
-                              {isSuspended ? (
-                                <>
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  <span>Réactiver</span>
-                                </>
-                              ) : (
-                                <>
-                                  <AlertOctagon className="h-3.5 w-3.5" />
-                                  <span>Suspendre</span>
-                                </>
-                              )}
-                            </Button>
+                            {canSuspend && (
+                              <Button
+                                variant={isSuspended ? "success" : "destructive"}
+                                size="sm"
+                                isLoading={actionLoadingId === org.id}
+                                onClick={() => handleToggleStatus(org)}
+                                className="text-xs gap-1.5"
+                              >
+                                {isSuspended ? (
+                                  <>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <span>Réactiver</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertOctagon className="h-3.5 w-3.5" />
+                                    <span>Suspendre</span>
+                                  </>
+                                )}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

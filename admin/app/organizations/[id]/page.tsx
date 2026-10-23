@@ -31,14 +31,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { useAdminAuth } from "@/context/admin-auth-context";
 
 export default function OrganizationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const orgId = params?.id;
 
+  const { hasPermission } = useAdminAuth();
+  const canSuspend = hasPermission("admin:organizations:suspend");
+  const canManageSubscriptions = hasPermission("admin:subscriptions:manage");
+
   const [org, setOrg] = useState<OrganizationItem | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
@@ -50,9 +56,13 @@ export default function OrganizationDetailPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const data = await adminApi.getOrganization(orgId);
-      setOrg(data);
-      setSelectedPlan(data.subscriptionPlan);
+      const [orgData, plansData] = await Promise.all([
+        adminApi.getOrganization(orgId),
+        adminApi.subscriptions.getPlans().catch(() => []),
+      ]);
+      setOrg(orgData);
+      setAvailablePlans(plansData);
+      setSelectedPlan(orgData.subscriptionPlan);
     } catch (err: unknown) {
       setApiError(
         (err as Error).message ||
@@ -94,7 +104,7 @@ export default function OrganizationDetailPage() {
 
     setIsUpdatingPlan(true);
     try {
-      await adminApi.updateSubscription(org.id, selectedPlan);
+      await adminApi.subscriptions.update(org.id, { plan: selectedPlan });
       setOrg((prev: OrganizationItem | null) => (prev ? { ...prev, subscriptionPlan: selectedPlan } : prev));
       alert(`Plan d'abonnement mis à jour avec succès : ${selectedPlan}`);
     } catch (err: unknown) {
@@ -107,8 +117,8 @@ export default function OrganizationDetailPage() {
   return (
     <div className="flex-1 flex flex-col">
       <AdminHeader
-        title={org ? `Organisation : ${org.name}` : "Détail de l'organisation"}
-        description="Fiche administrative complète de l'organisation et de ses exploitations avicoles rattachées."
+        title={org ? org.name : "Organisation"}
+        description="Fiche organisation et gestion des accès."
       />
 
       <main className="p-6 md:p-8 space-y-6 max-w-7xl">
@@ -116,10 +126,10 @@ export default function OrganizationDetailPage() {
         <div className="flex items-center justify-between gap-4">
           <Link
             href="/organizations"
-            className="inline-flex items-center gap-2 text-xs font-medium text-muted hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Retour à la liste des organisations</span>
+            <span>Retour</span>
           </Link>
 
           <Button
@@ -138,16 +148,12 @@ export default function OrganizationDetailPage() {
         {!org && !isLoading && (
           <EmptyState
             icon={<Building2 />}
-            title={apiError ? "Connexion API indisponible" : "Organisation introuvable"}
-            description={
-              apiError
-                ? `${apiError} Aucune donnée de secours n'est affichée. Veuillez démarrer l'API Symfony.`
-                : "Cette organisation n'existe pas dans la base de données de production."
-            }
+            title="Organisation introuvable"
+            description="Cette organisation n'existe pas ou le serveur est inaccessible."
             action={
               <Link href="/organizations">
                 <Button variant="outline" size="sm">
-                  Retour à la liste des organisations
+                  Retour
                 </Button>
               </Link>
             }
@@ -167,68 +173,67 @@ export default function OrganizationDetailPage() {
                     <h2 className="text-xl font-bold text-foreground tracking-tight">{org.name}</h2>
                     {org.status === "ACTIVE" && <Badge variant="success" dot>Active</Badge>}
                     {org.status === "SUSPENDED" && <Badge variant="destructive" dot>Suspendue</Badge>}
-                    {org.status === "TRIAL" && <Badge variant="warning" dot>Essai gratuit</Badge>}
+                    {org.status === "TRIAL" && <Badge variant="warning" dot>Essai</Badge>}
                     <Badge variant="outline" className="font-semibold text-xs">{org.subscriptionPlan}</Badge>
                   </div>
-                  <p className="text-xs text-muted font-mono mt-1">Identifiant ULID : {org.id}</p>
-                  <p className="text-xs text-muted font-mono">Slug système : {org.slug}</p>
+                  <p className="text-xs text-muted font-mono mt-1">ID : {org.id}</p>
+                  <p className="text-xs text-muted font-mono">Code : {org.slug}</p>
                 </div>
               </div>
 
-              {/* Bouton Action Sensible de Suspension */}
-              <Button
-                variant={org.status === "SUSPENDED" ? "success" : "destructive"}
-                size="default"
-                isLoading={isUpdatingStatus}
-                onClick={handleToggleStatus}
-                className="gap-2 text-xs font-semibold"
-              >
-                {org.status === "SUSPENDED" ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Réactiver l'organisation</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertOctagon className="h-4 w-4" />
-                    <span>Suspendre l'organisation</span>
-                  </>
-                )}
-              </Button>
+              {/* Bouton Suspension */}
+              {canSuspend && (
+                <Button
+                  variant={org.status === "SUSPENDED" ? "success" : "destructive"}
+                  size="default"
+                  isLoading={isUpdatingStatus}
+                  onClick={handleToggleStatus}
+                  className="gap-2 text-xs font-semibold"
+                >
+                  {org.status === "SUSPENDED" ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Réactiver</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertOctagon className="h-4 w-4" />
+                      <span>Suspendre</span>
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
 
             {/* KPIs Clés de l'organisation */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60 text-xs">
               <div className="p-3.5 rounded-xl bg-surface-muted/50 border border-border">
-                <span className="text-muted block text-[11px] mb-1">Exploitations rattachées</span>
+                <span className="text-muted block text-[11px] mb-1">Fermes</span>
                 <span className="text-lg font-bold text-foreground font-mono">{org.farmsCount}</span>
               </div>
               <div className="p-3.5 rounded-xl bg-surface-muted/50 border border-border">
-                <span className="text-muted block text-[11px] mb-1">Formule active</span>
+                <span className="text-muted block text-[11px] mb-1">Abonnement</span>
                 <span className="text-lg font-bold text-foreground">{org.subscriptionPlan}</span>
               </div>
               <div className="p-3.5 rounded-xl bg-surface-muted/50 border border-border">
-                <span className="text-muted block text-[11px] mb-1">Date d'inscription</span>
+                <span className="text-muted block text-[11px] mb-1">Créée le</span>
                 <span className="font-medium text-foreground">{formatDate(org.createdAt)}</span>
               </div>
               <div className="p-3.5 rounded-xl bg-surface-muted/50 border border-border">
-                <span className="text-muted block text-[11px] mb-1">Dernière mise à jour</span>
+                <span className="text-muted block text-[11px] mb-1">Modifiée le</span>
                 <span className="font-medium text-foreground">{formatDate(org.updatedAt)}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Section 1 : Exploitations Avicoles */}
+        {/* Section 1 : Fermes */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Warehouse className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle>Exploitations Avicoles Affiliées ({org?.farms?.length ?? 0})</CardTitle>
-                <CardDescription>
-                  Fermes avicoles indépendantes enregistrées sous cette organisation.
-                </CardDescription>
+                <CardTitle>Fermes ({org?.farms?.length ?? 0})</CardTitle>
               </div>
             </div>
           </CardHeader>
@@ -288,16 +293,13 @@ export default function OrganizationDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Section 2 : Membres & Collaborateurs */}
+        {/* Section 2 : Membres */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle>Collaborateurs & Éleveurs ({org?.members?.length ?? 0})</CardTitle>
-                <CardDescription>
-                  Utilisateurs habilités sur les exploitations de cette organisation.
-                </CardDescription>
+                <CardTitle>Membres ({org?.members?.length ?? 0})</CardTitle>
               </div>
             </div>
           </CardHeader>
@@ -305,18 +307,18 @@ export default function OrganizationDetailPage() {
             {(!org?.members || org.members.length === 0) ? (
               <EmptyState
                 icon={<Users />}
-                title="Aucun membre listé"
-                description="Aucun utilisateur n'est actuellement rattaché aux exploitations de cette organisation."
+                title="Aucun membre"
+                description="Aucun utilisateur n'est rattaché à cette organisation."
                 className="m-6"
               />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Collaborateur</TableHead>
-                    <TableHead>Email & Contact</TableHead>
-                    <TableHead>Rôles par Exploitation</TableHead>
-                    <TableHead>Statut du compte</TableHead>
+                    <TableHead>Membre</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Fermes & Rôles</TableHead>
+                    <TableHead>Statut</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -363,15 +365,15 @@ export default function OrganizationDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Section 3 : Gestion de la Formule d'Abonnement */}
+        {/* Section 3 : Formule d'Abonnement */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle>Abonnement & Facturation Plateforme</CardTitle>
+                <CardTitle>Abonnement</CardTitle>
                 <CardDescription>
-                  Ajustez la formule commerciale de l'organisation.
+                  Changer la formule de l'organisation.
                 </CardDescription>
               </div>
             </div>
@@ -380,24 +382,35 @@ export default function OrganizationDetailPage() {
             <div className="flex flex-wrap items-center gap-4">
               <select
                 value={selectedPlan}
+                disabled={!canManageSubscriptions}
                 onChange={(e) => setSelectedPlan(e.target.value)}
-                className="h-10 px-3 rounded-lg border border-border bg-surface text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+                className="h-10 px-3 rounded-lg border border-border bg-surface text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer min-w-64 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <option value="FREE">Formule GRATUITE (FREE)</option>
-                <option value="STANDARD">Formule STANDARD</option>
-                <option value="PRO">Formule PROFESSIONNELLE (PRO)</option>
-                <option value="ENTERPRISE">Formule ENTREPRISE (ENTERPRISE)</option>
+                {selectedPlan && !availablePlans.some((p) => p.sku === selectedPlan) && (
+                  <option value={selectedPlan}>{selectedPlan} (Actuel)</option>
+                )}
+                {availablePlans.length > 0 ? (
+                  availablePlans.map((p) => (
+                    <option key={p.sku || p.id} value={p.sku}>
+                      {p.name} ({p.sku}) {p.priceMonthly > 0 ? `— ${formatNumber(p.priceMonthly)} FCFA/mois` : "— Gratuit"}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Aucune formule disponible</option>
+                )}
               </select>
 
-              <Button
-                size="default"
-                onClick={handleUpdatePlan}
-                isLoading={isUpdatingPlan}
-                disabled={selectedPlan === org?.subscriptionPlan}
-                className="text-xs font-semibold"
-              >
-                Enregistrer la nouvelle formule
-              </Button>
+              {canManageSubscriptions && (
+                <Button
+                  size="default"
+                  onClick={handleUpdatePlan}
+                  isLoading={isUpdatingPlan}
+                  disabled={selectedPlan === org?.subscriptionPlan}
+                  className="text-xs font-semibold"
+                >
+                  Enregistrer
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -44,14 +44,4 @@ export const organizationsApi = {
       body: JSON.stringify({ status }),
     });
   },
-
-  /**
-   * Mettre à jour le plan d'abonnement d'une organisation
-   */
-  updateSubscription: async (id: string, plan: string): Promise<any> => {
-    return apiRequest(`/api/admin/organizations/${id}/subscription`, {
-      method: "PUT",
-      body: JSON.stringify({ plan }),
-    });
-  },
 };

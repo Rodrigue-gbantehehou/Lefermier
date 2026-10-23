@@ -85,20 +85,40 @@ class AdminUserService
     }
 
     /**
-     * Accorde ou retire le rôle ROLE_SUPER_ADMIN à un utilisateur.
+     * Vérifie si un utilisateur est considéré comme Super-Administrateur.
      */
-    public function setUserSuperAdmin(User $user, bool $isSuperAdmin): User
+    public function isSuperAdmin(User $user): bool
     {
-        $roles = array_filter($user->getRoles(), fn (string $r) => $r !== 'ROLE_SUPER_ADMIN' && $r !== 'ROLE_USER');
-
-        if ($isSuperAdmin) {
-            $roles[] = 'ROLE_SUPER_ADMIN';
+        if (in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)) {
+            return true;
         }
 
-        $user->setRoles(array_values($roles));
-        $this->entityManager->flush();
+        return $user->getAdminRole() !== null && $user->getAdminRole()->hasPermission('*');
+    }
 
-        return $user;
+    /**
+     * Compte le nombre de super-administrateurs actuellement actifs sur la plateforme.
+     */
+    public function countActiveSuperAdmins(): int
+    {
+        $qb = $this->userRepository->createQueryBuilder('u')
+            ->leftJoin('u.adminRole', 'r')
+            ->select('COUNT(DISTINCT u.id)')
+            ->where('u.isActive = true')
+            ->andWhere('(u.roles LIKE :superAdminRole OR r.permissions LIKE :wildcard OR r.code = :superAdminCode)')
+            ->setParameter('superAdminRole', '%ROLE_SUPER_ADMIN%')
+            ->setParameter('wildcard', '%"*"%')
+            ->setParameter('superAdminCode', 'SUPER_ADMIN');
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Sauvegarde les modifications d'une entité utilisateur.
+     */
+    public function saveUser(User $user): void
+    {
+        $this->entityManager->flush();
     }
 
     /**

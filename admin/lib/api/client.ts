@@ -37,9 +37,7 @@ export async function apiRequest<T = any>(
 
   // Injection du jeton JWT Super-Admin côté client
   if (typeof window !== "undefined") {
-    const token =
-      localStorage.getItem("lefermier_admin_jwt") ||
-      localStorage.getItem("lefermier_token");
+    const token = localStorage.getItem("lefermier_admin_jwt");
     if (token && !headers["Authorization"]) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -65,6 +63,10 @@ export async function apiRequest<T = any>(
   if (!response.ok) {
     if (response.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("lefermier_admin_jwt");
+      window.dispatchEvent(new CustomEvent("admin:unauthorized"));
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
     }
     const errorMsg =
       body?.message ||

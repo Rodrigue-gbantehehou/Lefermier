@@ -45,8 +45,12 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatNumber, formatDate } from "@/lib/utils";
+import { useAdminAuth } from "@/context/admin-auth-context";
 
 export default function SubscriptionsPage() {
+  const { hasPermission } = useAdminAuth();
+  const canManageSubscriptions = hasPermission("admin:subscriptions:manage");
+
   const [activeTab, setActiveTab] = useState<"subscriptions" | "plans" | "analytics">("subscriptions");
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [plans, setPlans] = useState<CommercialPlan[]>([]);
@@ -274,18 +278,21 @@ export default function SubscriptionsPage() {
     }
   };
 
-  // SKU styling helper (Microsoft Cloud branding)
+  // SKU styling helper
   const getSkuBadge = (sku: string) => {
+    const matchedPlan = plans.find((p) => p.sku === sku);
+    const label = matchedPlan?.name || sku;
     switch (sku) {
       case "ENTERPRISE":
-        return <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 text-xs">Entreprise</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 text-xs">{label}</Badge>;
       case "PRO":
-        return <Badge className="bg-primary/10 text-primary border border-primary/30 text-xs">Professionnel</Badge>;
+        return <Badge className="bg-primary/10 text-primary border border-primary/30 text-xs">{label}</Badge>;
       case "STANDARD":
-        return <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/30 text-xs">Standard</Badge>;
+        return <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/30 text-xs">{label}</Badge>;
       case "FREE":
+        return <Badge className="bg-surface-muted text-muted border border-border text-xs">{label}</Badge>;
       default:
-        return <Badge className="bg-surface-muted text-muted border border-border text-xs">Starter</Badge>;
+        return <Badge variant="outline" className="text-xs font-semibold">{label}</Badge>;
     }
   };
 
@@ -304,16 +311,16 @@ export default function SubscriptionsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-background">
       <AdminHeader
-        title="Abonnements, Licences & Quotas"
-        description="Gouvernance centrale des souscriptions clientes, suivi de la consommation des ressources et revenus récurrents (MRR)."
+        title="Abonnements"
+        description="Formules, abonnements actifs et quotas."
       />
 
       <div className="p-6 md:p-8 space-y-6 max-w-7xl">
-        {/* Microsoft 365 Billing KPI Tiles */}
+        {/* KPI Tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-4 bg-surface border-border flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Revenu Mensuel (MRR)</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Revenu mensuel</span>
               <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                 <Coins className="h-4 w-4" />
               </div>
@@ -323,14 +330,14 @@ export default function SubscriptionsPage() {
                 {metrics ? metrics.mrr.formatted : "—"}
               </div>
               <p className="text-[11px] text-muted mt-0.5">
-                ARR annualisé : {metrics ? metrics.arr.formatted : "—"}
+                Annuel : {metrics ? metrics.arr.formatted : "—"}
               </p>
             </div>
           </Card>
 
           <Card className="p-4 bg-surface border-border flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Licences Payantes</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Abonnements payants</span>
               <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                 <CreditCard className="h-4 w-4" />
               </div>
@@ -341,14 +348,14 @@ export default function SubscriptionsPage() {
               </div>
               <p className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
                 <TrendingUp className="h-3 w-3" />
-                {metrics ? `${metrics.conversionRate}% taux de conversion` : "—"}
+                {metrics ? `${metrics.conversionRate}% conversion` : "—"}
               </p>
             </div>
           </Card>
 
           <Card className="p-4 bg-surface border-border flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Comptes en Essai</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">En essai</span>
               <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
                 <Clock className="h-4 w-4" />
               </div>
@@ -358,14 +365,14 @@ export default function SubscriptionsPage() {
                 {metrics ? metrics.trialSubscriptions : "—"}
               </div>
               <p className="text-[11px] text-muted mt-0.5">
-                Organisations en période d&apos;évaluation
+                Organisations en test
               </p>
             </div>
           </Card>
 
           <Card className="p-4 bg-surface border-border flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Santé des Quotas</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Quotas</span>
               <div className="h-8 w-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
                 <ShieldCheck className="h-4 w-4" />
               </div>
@@ -375,7 +382,7 @@ export default function SubscriptionsPage() {
                 {subscriptions.filter((s) => s.isOverQuota).length > 0 ? (
                   <span className="text-danger flex items-center gap-1">
                     <AlertTriangle className="h-5 w-5" />
-                    {subscriptions.filter((s) => s.isOverQuota).length} dépassement(s)
+                    {subscriptions.filter((s) => s.isOverQuota).length} dépassé(s)
                   </span>
                 ) : (
                   <span className="text-emerald-600 flex items-center gap-1">
@@ -385,13 +392,13 @@ export default function SubscriptionsPage() {
                 )}
               </div>
               <p className="text-[11px] text-muted mt-0.5">
-                Capacité d&apos;accueil des fermes respectée
+                Capacité fermes respectée
               </p>
             </div>
           </Card>
         </div>
 
-        {/* Microsoft Style Navigation Tabs */}
+        {/* Navigation Tabs */}
         <div className="border-b border-border flex items-center justify-between">
           <nav className="flex space-x-6">
             <button
@@ -403,7 +410,7 @@ export default function SubscriptionsPage() {
               }`}
             >
               <CreditCard className="h-4 w-4" />
-              <span>Souscriptions & Licences Clients</span>
+              <span>Abonnements</span>
               <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-muted text-foreground">
                 {subscriptions.length}
               </span>
@@ -418,7 +425,7 @@ export default function SubscriptionsPage() {
               }`}
             >
               <Layers className="h-4 w-4" />
-              <span>Catalogue des Formules & Quotas</span>
+              <span>Formules & Tarifs</span>
               <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-muted text-foreground">
                 {plans.length}
               </span>
@@ -433,7 +440,7 @@ export default function SubscriptionsPage() {
               }`}
             >
               <TrendingUp className="h-4 w-4" />
-              <span>Répartition MRR & Analyse</span>
+              <span>Statistiques</span>
             </button>
           </nav>
 
@@ -492,10 +499,11 @@ export default function SubscriptionsPage() {
                   className="h-9 px-3 rounded-lg border border-border bg-surface text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
                 >
                   <option value="">Toutes les formules</option>
-                  <option value="FREE">Starter (FREE)</option>
-                  <option value="STANDARD">Standard (STANDARD)</option>
-                  <option value="PRO">Professionnel (PRO)</option>
-                  <option value="ENTERPRISE">Entreprise (ENTERPRISE)</option>
+                  {plans.map((p) => (
+                    <option key={p.sku || p.id} value={p.sku}>
+                      {p.name} ({p.sku})
+                    </option>
+                  ))}
                 </select>
 
                 <Button type="submit" variant="default" size="sm" className="text-xs">
@@ -628,15 +636,17 @@ export default function SubscriptionsPage() {
                               </td>
 
                               <td className="py-3 px-4 text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openManageModal(sub)}
-                                  className="text-xs gap-1.5"
-                                >
-                                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                                  <span>Mettre à niveau</span>
-                                </Button>
+                                {canManageSubscriptions && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openManageModal(sub)}
+                                    className="text-xs gap-1.5"
+                                  >
+                                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                                    <span>Mettre à niveau</span>
+                                  </Button>
+                                )}
                               </td>
                             </tr>
                           );
@@ -663,15 +673,17 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={openCreatePlanModal}
-                className="gap-2 shrink-0 text-xs shadow-xs"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Nouvelle Formule Commerciale</span>
-              </Button>
+              {canManageSubscriptions && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={openCreatePlanModal}
+                  className="gap-2 shrink-0 text-xs shadow-xs"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Nouvelle Formule Commerciale</span>
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -772,28 +784,30 @@ export default function SubscriptionsPage() {
                       </div>
 
                       {/* Actions Formule */}
-                      <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditPlanModal(p)}
-                          className="gap-1.5 text-xs flex-1 h-8"
-                        >
-                          <Edit3 className="h-3.5 w-3.5 text-primary" />
-                          <span>Modifier</span>
-                        </Button>
-                        {!p.isSystem && (
+                      {canManageSubscriptions && (
+                        <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-2">
                           <Button
-                            variant="destructive"
+                            variant="outline"
                             size="sm"
-                            onClick={() => handleDeletePlan(p)}
-                            className="h-8 px-2.5 text-xs"
-                            title="Supprimer cette formule personnalisée"
+                            onClick={() => openEditPlanModal(p)}
+                            className="gap-1.5 text-xs flex-1 h-8"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Edit3 className="h-3.5 w-3.5 text-primary" />
+                            <span>Modifier</span>
                           </Button>
-                        )}
-                      </div>
+                          {!p.isSystem && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeletePlan(p)}
+                              className="h-8 px-2.5 text-xs"
+                              title="Supprimer cette formule personnalisée"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

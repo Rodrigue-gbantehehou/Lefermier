@@ -211,8 +211,8 @@ export default function AdminRolesPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-background">
       <AdminHeader
-        title="Rôles & Habilitations Plateforme"
-        description="Contrôle d'accès basé sur les rôles (RBAC) pour l'équipe centrale — aucun rôle codé en dur."
+        title="Rôles & Permissions"
+        description="Gestion des accès et des permissions."
       />
 
       <div className="p-6 space-y-6">
@@ -220,7 +220,7 @@ export default function AdminRolesPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="p-4 bg-surface border-border flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted">Rôles Définis</p>
+              <p className="text-xs font-medium text-muted">Total rôles</p>
               <p className="text-2xl font-bold text-foreground mt-1">{roles.length}</p>
             </div>
             <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -230,7 +230,7 @@ export default function AdminRolesPage() {
 
           <Card className="p-4 bg-surface border-border flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted">Rôles Modèles Système</p>
+              <p className="text-xs font-medium text-muted">Rôles système</p>
               <p className="text-2xl font-bold text-foreground mt-1">
                 {roles.filter((r) => r.isSystem).length}
               </p>
@@ -242,7 +242,7 @@ export default function AdminRolesPage() {
 
           <Card className="p-4 bg-surface border-border flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted">Rôles Personnalisés</p>
+              <p className="text-xs font-medium text-muted">Rôles personnalisés</p>
               <p className="text-2xl font-bold text-foreground mt-1">
                 {roles.filter((r) => !r.isSystem).length}
               </p>
@@ -254,7 +254,7 @@ export default function AdminRolesPage() {
 
           <Card className="p-4 bg-surface border-border flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted">Permissions au Catalogue</p>
+              <p className="text-xs font-medium text-muted">Permissions</p>
               <p className="text-2xl font-bold text-foreground mt-1">
                 {Object.keys(permissions).length}
               </p>
@@ -267,13 +267,8 @@ export default function AdminRolesPage() {
 
         {/* Action bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs px-2.5 py-1 bg-surface-muted/30">
-              Modèle Microsoft Entra RBAC
-            </Badge>
-            <span className="text-xs text-muted">
-              Isolation stricte : les éleveurs (ROLE_USER) n&apos;ont aucun rôle admin.
-            </span>
+          <div className="text-xs text-muted">
+            Sélectionnez un rôle pour voir ou modifier ses autorisations.
           </div>
 
           <div className="flex items-center gap-2">
@@ -295,7 +290,7 @@ export default function AdminRolesPage() {
                 className="gap-2 text-xs shadow-xs"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Nouveau Rôle Collaborateur
+                Nouveau rôle
               </Button>
             )}
           </div>

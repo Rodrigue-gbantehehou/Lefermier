@@ -22,12 +22,12 @@ use Symfony\Component\Uid\Ulid;
  * Modèle inspiré de Microsoft RBAC (Scope Platform).
  */
 #[Route('/api/admin/roles', name: 'api_admin_roles_')]
-#[IsGranted('ROLE_ADMIN')]
 class RoleController extends AbstractController
 {
     public function __construct(
         private readonly AdminRoleService $roleService,
         private readonly AdminRoleRepository $roleRepository,
+        private readonly \App\Service\Admin\AdminAuditService $auditService,
     ) {
     }
 
@@ -37,6 +37,7 @@ class RoleController extends AbstractController
      * GET /api/admin/roles/permissions
      */
     #[Route('/permissions', name: 'permissions', methods: ['GET'])]
+    #[IsGranted(AdminPermission::ROLES_VIEW)]
     public function permissions(): JsonResponse
     {
         return $this->json([
@@ -54,6 +55,7 @@ class RoleController extends AbstractController
      * GET /api/admin/roles
      */
     #[Route('', name: 'list', methods: ['GET'])]
+    #[IsGranted(AdminPermission::ROLES_VIEW)]
     public function list(): JsonResponse
     {
         $roles = $this->roleService->getRoles();
@@ -71,7 +73,7 @@ class RoleController extends AbstractController
      * POST /api/admin/roles
      */
     #[Route('', name: 'create', methods: ['POST'])]
-    #[IsGranted('admin:roles:manage')]
+    #[IsGranted(AdminPermission::ROLES_MANAGE)]
     public function create(Request $request): JsonResponse
     {
         $body = $request->toArray();
@@ -89,6 +91,15 @@ class RoleController extends AbstractController
 
         $role = $this->roleService->createRole($name, $code, $permissions, $description);
 
+        $this->auditService->log(
+            action: 'ADMIN_ROLE_MUTATION',
+            label: 'Création rôle d\'administration',
+            targetType: 'ADMIN_ROLE',
+            targetId: $role->getId()->toBase32(),
+            targetName: $role->getName(),
+            details: sprintf('Nouveau rôle créé : "%s" (ROLE_%s) avec %d permissions.', $role->getName(), $role->getCode(), count($role->getPermissions())),
+        );
+
         return $this->json([
             'status' => 'success',
             'message' => sprintf('Rôle "%s" créé avec succès.', $role->getName()),
@@ -102,7 +113,7 @@ class RoleController extends AbstractController
      * PUT /api/admin/roles/{id}
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[IsGranted('admin:roles:manage')]
+    #[IsGranted(AdminPermission::ROLES_MANAGE)]
     public function update(string $id, Request $request): JsonResponse
     {
         $role = $this->findRoleOrFail($id);
@@ -117,6 +128,15 @@ class RoleController extends AbstractController
 
         $updated = $this->roleService->updateRole($role, $name, $permissions, $description);
 
+        $this->auditService->log(
+            action: 'ADMIN_ROLE_MUTATION',
+            label: 'Modification rôle d\'administration',
+            targetType: 'ADMIN_ROLE',
+            targetId: $updated->getId()->toBase32(),
+            targetName: $updated->getName(),
+            details: sprintf('Mise à jour du rôle "%s" (ROLE_%s).', $updated->getName(), $updated->getCode()),
+        );
+
         return $this->json([
             'status' => 'success',
             'message' => sprintf('Rôle "%s" mis à jour.', $updated->getName()),
@@ -130,7 +150,7 @@ class RoleController extends AbstractController
      * DELETE /api/admin/roles/{id}
      */
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[IsGranted('admin:roles:manage')]
+    #[IsGranted(AdminPermission::ROLES_MANAGE)]
     public function delete(string $id): JsonResponse
     {
         $role = $this->findRoleOrFail($id);
@@ -138,7 +158,20 @@ class RoleController extends AbstractController
             return $role;
         }
 
+        $roleName = $role->getName();
+        $roleCode = $role->getCode();
+        $roleId = $role->getId()->toBase32();
+
         $this->roleService->deleteRole($role);
+
+        $this->auditService->log(
+            action: 'ADMIN_ROLE_MUTATION',
+            label: 'Suppression rôle d\'administration',
+            targetType: 'ADMIN_ROLE',
+            targetId: $roleId,
+            targetName: $roleName,
+            details: sprintf('Suppression du rôle personnalisé "%s" (ROLE_%s).', $roleName, $roleCode),
+        );
 
         return $this->json([
             'status' => 'success',

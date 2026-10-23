@@ -25,7 +25,7 @@ export interface PlatformStats {
 
 export type OrganizationStatus = "ACTIVE" | "SUSPENDED" | "TRIAL";
 
-export type SubscriptionPlan = "FREE" | "STANDARD" | "PRO" | "ENTERPRISE";
+export type SubscriptionPlan = string;
 
 export interface FarmSummary {
   id: string;
@@ -266,5 +266,27 @@ export interface FinancialMetrics {
   };
   bySku: Record<string, { count: number; mrr: number }>;
 }
+
+export interface AuditActor {
+  id?: string | null;
+  fullName: string;
+  email: string;
+  role: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  actor: AuditActor;
+  action: string;
+  label: string;
+  targetType: string;
+  targetId: string;
+  targetName: string;
+  clientIp: string;
+  status: string;
+  details: string;
+}
+
 
 

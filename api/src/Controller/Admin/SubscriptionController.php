@@ -7,6 +7,7 @@ namespace App\Controller\Admin;
 use App\Entity\Organization;
 use App\Enum\OrganizationStatus;
 use App\Repository\OrganizationRepository;
+use App\Security\AdminPermission;
 use App\Service\Admin\CommercialPlanService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,13 +24,13 @@ use Symfony\Component\Uid\Ulid;
  * Modèle inspiré de Microsoft 365 Licensing & Azure Subscriptions.
  */
 #[Route('/api/admin/subscriptions', name: 'api_admin_subscriptions_')]
-#[IsGranted('ROLE_ADMIN')]
 class SubscriptionController extends AbstractController
 {
     public function __construct(
         private readonly CommercialPlanService $planService,
         private readonly OrganizationRepository $organizationRepository,
         private readonly EntityManagerInterface $entityManager,
+        private readonly \App\Service\Admin\AdminAuditService $auditService,
     ) {
     }
 
@@ -39,6 +40,7 @@ class SubscriptionController extends AbstractController
      * GET /api/admin/subscriptions/plans
      */
     #[Route('/plans', name: 'plans', methods: ['GET'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_VIEW)]
     public function plans(): JsonResponse
     {
         return $this->json([
@@ -53,12 +55,22 @@ class SubscriptionController extends AbstractController
      * POST /api/admin/subscriptions/plans
      */
     #[Route('/plans', name: 'create_plan', methods: ['POST'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
     public function createPlan(Request $request): JsonResponse
     {
         $payload = $request->toArray();
 
         try {
             $plan = $this->planService->createPlan($payload);
+
+            $this->auditService->log(
+                action: 'SUBSCRIPTION_PLAN_CHANGE',
+                label: 'Création formule commerciale',
+                targetType: 'SUBSCRIPTION_PLAN',
+                targetId: $plan->getSku(),
+                targetName: $plan->getName(),
+                details: sprintf('Création de la formule "%s" (%s) au tarif mensuel de %d FCFA.', $plan->getName(), $plan->getSku(), $plan->getPriceMonthly()),
+            );
 
             return $this->json([
                 'status' => 'success',
@@ -80,6 +92,7 @@ class SubscriptionController extends AbstractController
      * PUT /api/admin/subscriptions/plans/{id}
      */
     #[Route('/plans/{id}', name: 'update_plan', methods: ['PUT'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
     public function updatePlan(string $id, Request $request): JsonResponse
     {
         $plan = $this->planService->findPlanEntity($id);
@@ -95,6 +108,15 @@ class SubscriptionController extends AbstractController
         $payload = $request->toArray();
         $updated = $this->planService->updatePlan($plan, $payload);
 
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_PLAN_CHANGE',
+            label: 'Modification formule commerciale',
+            targetType: 'SUBSCRIPTION_PLAN',
+            targetId: $updated->getSku(),
+            targetName: $updated->getName(),
+            details: sprintf('Mise à jour des paramètres et quotas de la formule "%s" (%s).', $updated->getName(), $updated->getSku()),
+        );
+
         return $this->json([
             'status' => 'success',
             'message' => sprintf('Formule "%s" mise à jour avec succès.', $updated->getName()),
@@ -108,6 +130,7 @@ class SubscriptionController extends AbstractController
      * DELETE /api/admin/subscriptions/plans/{id}
      */
     #[Route('/plans/{id}', name: 'delete_plan', methods: ['DELETE'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
     public function deletePlan(string $id): JsonResponse
     {
         $plan = $this->planService->findPlanEntity($id);
@@ -121,11 +144,22 @@ class SubscriptionController extends AbstractController
         }
 
         try {
+            $planName = $plan->getName();
+            $planSku = $plan->getSku();
             $this->planService->deletePlan($plan);
+
+            $this->auditService->log(
+                action: 'SUBSCRIPTION_PLAN_CHANGE',
+                label: 'Suppression formule commerciale',
+                targetType: 'SUBSCRIPTION_PLAN',
+                targetId: $planSku,
+                targetName: $planName,
+                details: sprintf('Suppression définitive de la formule commerciale personnalisée "%s" (%s).', $planName, $planSku),
+            );
 
             return $this->json([
                 'status' => 'success',
-                'message' => sprintf('Formule commerciale "%s" supprimée avec succès.', $plan->getName()),
+                'message' => sprintf('Formule commerciale "%s" supprimée avec succès.', $planName),
             ]);
         } catch (\LogicException $e) {
             return $this->json([
@@ -142,6 +176,7 @@ class SubscriptionController extends AbstractController
      * GET /api/admin/subscriptions/metrics
      */
     #[Route('/metrics', name: 'metrics', methods: ['GET'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_VIEW)]
     public function metrics(): JsonResponse
     {
         return $this->json([
@@ -156,6 +191,7 @@ class SubscriptionController extends AbstractController
      * GET /api/admin/subscriptions?status=ACTIVE&plan=PRO&search=allada
      */
     #[Route('', name: 'list', methods: ['GET'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_VIEW)]
     public function list(Request $request): JsonResponse
     {
         $status = $request->query->get('status');
@@ -200,7 +236,7 @@ class SubscriptionController extends AbstractController
      * Body: { "plan": "PRO", "status": "ACTIVE" }
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[IsGranted('admin:subscriptions:manage')]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
     public function update(string $id, Request $request): JsonResponse
     {
         try {
@@ -246,6 +282,20 @@ class SubscriptionController extends AbstractController
         }
 
         $this->entityManager->flush();
+
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_PLAN_CHANGE',
+            label: 'Changement d\'offre client',
+            targetType: 'ORGANIZATION',
+            targetId: $organization->getId()?->toBase32() ?? $id,
+            targetName: $organization->getName(),
+            details: sprintf(
+                'Mise à jour de la souscription de l\'organisation "%s" : Formule %s, Statut %s.',
+                $organization->getName(),
+                $organization->getSubscriptionPlan(),
+                $organization->getStatus()->value
+            ),
+        );
 
         return $this->json([
             'status' => 'success',

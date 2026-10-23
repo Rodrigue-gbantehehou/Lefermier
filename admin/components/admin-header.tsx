@@ -18,16 +18,14 @@ export function AdminHeader({ title, description }: { title: string; description
         <div className="relative w-64 hidden md:block">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
           <Input
-            placeholder="Rechercher une organisation, un compte..."
+            placeholder="Rechercher..."
             className="pl-8 text-xs h-9 bg-surface-muted/40"
           />
         </div>
 
-     
-
         <button
           className="relative p-2 rounded-lg text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
-          title="Notifications plateforme"
+          title="Notifications"
         >
           <Bell className="h-4 w-4" />
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />

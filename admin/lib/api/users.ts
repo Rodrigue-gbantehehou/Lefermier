@@ -41,14 +41,4 @@ export const usersApi = {
       body: JSON.stringify({ isActive }),
     });
   },
-
-  /**
-   * Accorder ou révoquer les privilèges super-administrateur
-   */
-  setSuperAdmin: async (id: string, isSuperAdmin: boolean): Promise<any> => {
-    return apiRequest(`/api/admin/users/${id}/super-admin`, {
-      method: "PUT",
-      body: JSON.stringify({ isSuperAdmin }),
-    });
-  },
 };

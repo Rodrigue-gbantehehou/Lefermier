@@ -6,6 +6,8 @@ namespace App\Controller\Admin;
 
 use App\Entity\Organization;
 use App\Enum\OrganizationStatus;
+use App\Security\AdminPermission;
+use App\Service\Admin\AdminAuditService;
 use App\Service\Admin\AdminOrganizationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,14 +19,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 /**
  * Gestion administrative des organisations et exploitations de la plateforme.
  *
- * Accessible aux collaborateurs habilités (ROLE_ADMIN_SUPPORT, ROLE_ADMIN, ROLE_SUPER_ADMIN).
+ * Protégé par les permissions granulaires du modèle Microsoft RBAC.
  */
 #[Route('/api/admin/organizations', name: 'api_admin_organizations_')]
-#[IsGranted('ROLE_ADMIN_SUPPORT')]
 class OrganizationController extends AbstractController
 {
     public function __construct(
         private readonly AdminOrganizationService $organizationService,
+        private readonly AdminAuditService $auditService,
     ) {
     }
 
@@ -34,6 +36,7 @@ class OrganizationController extends AbstractController
      * GET /api/admin/organizations?page=1&limit=25&status=ACTIVE&search=ferme
      */
     #[Route('', name: 'list', methods: ['GET'])]
+    #[IsGranted(AdminPermission::ORGANIZATIONS_VIEW)]
     public function list(Request $request): JsonResponse
     {
         $page = max(1, $request->query->getInt('page', 1));
@@ -60,6 +63,7 @@ class OrganizationController extends AbstractController
      * GET /api/admin/organizations/{id}
      */
     #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[IsGranted(AdminPermission::ORGANIZATIONS_VIEW)]
     public function show(string $id): JsonResponse
     {
         $organization = $this->findOrganizationOrFail($id);
@@ -80,7 +84,7 @@ class OrganizationController extends AbstractController
      * Body: { "status": "SUSPENDED" | "ACTIVE" | "TRIAL" }
      */
     #[Route('/{id}/status', name: 'status', methods: ['PUT'])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted(AdminPermission::ORGANIZATIONS_SUSPEND)]
     public function updateStatus(string $id, Request $request): JsonResponse
     {
         $organization = $this->findOrganizationOrFail($id);
@@ -99,46 +103,21 @@ class OrganizationController extends AbstractController
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $previousStatus = $organization->getStatus()->value;
         $updated = $this->organizationService->setOrganizationStatus($organization, OrganizationStatus::from($statusValue));
+
+        $this->auditService->log(
+            action: 'ORGANIZATION_STATUS_UPDATE',
+            label: $statusValue === 'SUSPENDED' ? 'Suspension d\'organisation' : 'Réactivation d\'organisation',
+            targetType: 'ORGANIZATION',
+            targetId: $updated->getId()?->toBase32() ?? $id,
+            targetName: $updated->getName(),
+            details: sprintf('Statut opérationnel modifié de %s vers %s.', $previousStatus, $statusValue),
+        );
 
         return $this->json([
             'status' => 'success',
             'message' => sprintf('Statut de l\'organisation "%s" mis à jour vers %s.', $updated->getName(), $statusValue),
-            'data' => $this->organizationService->serializeOrganization($updated),
-        ]);
-    }
-
-    /**
-     * Met à jour le plan d'abonnement d'une organisation.
-     *
-     * PUT /api/admin/organizations/{id}/subscription
-     * Body: { "plan": "FREE" | "STANDARD" | "PRO" }
-     */
-    #[Route('/{id}/subscription', name: 'subscription', methods: ['PUT'])]
-    #[IsGranted('ROLE_ADMIN_FINANCE')]
-    public function updateSubscription(string $id, Request $request): JsonResponse
-    {
-        $organization = $this->findOrganizationOrFail($id);
-        if ($organization instanceof JsonResponse) {
-            return $organization;
-        }
-
-        $body = $request->toArray();
-        $plan = trim((string) ($body['plan'] ?? ''));
-
-        if ($plan === '') {
-            return $this->json([
-                'status' => 'error',
-                'code' => Response::HTTP_UNPROCESSABLE_ENTITY,
-                'message' => 'Le champ "plan" est requis.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $updated = $this->organizationService->updateSubscriptionPlan($organization, strtoupper($plan));
-
-        return $this->json([
-            'status' => 'success',
-            'message' => sprintf('Plan d\'abonnement de "%s" mis à jour vers %s.', $updated->getName(), $updated->getSubscriptionPlan()),
             'data' => $this->organizationService->serializeOrganization($updated),
         ]);
     }

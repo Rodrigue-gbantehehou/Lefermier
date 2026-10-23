@@ -24,48 +24,59 @@ const navigationItems = [
     label: "Tableau de bord",
     href: "/",
     icon: LayoutDashboard,
+    permission: "admin:dashboard:view",
   },
   {
-    label: "Organisations & Fermes",
+    label: "Organisations",
     href: "/organizations",
     icon: Building2,
+    permission: "admin:organizations:view",
   },
   {
-    label: "Comptes & Utilisateurs",
+    label: "Utilisateurs",
     href: "/users",
     icon: Users,
+    permission: "admin:users:view",
   },
   {
-    label: "Rôles & Habilitations",
+    label: "Rôles",
     href: "/roles",
     icon: KeyRound,
+    permission: "admin:roles:view",
   },
   {
-    label: "Abonnements & Offres",
+    label: "Abonnements",
     href: "/subscriptions",
     icon: CreditCard,
+    permission: "admin:subscriptions:view",
   },
   {
-    label: "Journal d'Audit",
+    label: "Journal d'audit",
     href: "/audit",
     icon: ShieldCheck,
+    permission: "admin:audit:view",
   },
   {
-    label: "Supervision API",
+    label: "État système",
     href: "/health",
     icon: Activity,
+    permission: "admin:health:view",
   },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAdminAuth();
+  const { user, logout, hasPermission } = useAdminAuth();
 
   const initials = user
     ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "AD"
     : "AD";
 
   const roleLabel = user?.adminRole?.name || (user?.roles?.includes("ROLE_SUPER_ADMIN") ? "Super-Admin" : "Collaborateur");
+
+  const visibleNavItems = navigationItems.filter(
+    (item) => !item.permission || hasPermission(item.permission)
+  );
 
   return (
     <aside className="w-64 shrink-0 border-r border-border bg-surface flex flex-col justify-between h-screen sticky top-0">
@@ -83,7 +94,7 @@ export function AdminSidebar() {
                   Admin
                 </span>
               </div>
-              <p className="text-[11px] text-muted">Console centrale plateforme</p>
+              <p className="text-[11px] text-muted">Espace administration</p>
             </div>
           </div>
         </div>
@@ -91,10 +102,13 @@ export function AdminSidebar() {
         {/* Navigation list */}
         <div className="p-3 space-y-1">
           <p className="px-3 py-2 text-[11px] font-semibold text-muted uppercase tracking-wider">
-            Supervision Globale
+            Menu
           </p>
-          {navigationItems.map((item) => {
-            const isActive = pathname === item.href;
+          {visibleNavItems.map((item) => {
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
             return (
               <Link
@@ -114,33 +128,7 @@ export function AdminSidebar() {
           })}
         </div>
 
-        {/* Separator & App Switcher */}
-        <div className="px-3 pt-3">
-          <div className="p-3 rounded-xl bg-surface-muted/50 border border-border/80">
-            <p className="text-xs font-semibold text-foreground mb-1">Applications Clientes</p>
-            <p className="text-[11px] text-muted mb-2.5">Accès direct aux espaces métiers</p>
-            <div className="space-y-1.5">
-              <a
-                href="http://localhost:3000"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between text-xs text-primary hover:underline font-medium"
-              >
-                <span>App Éleveur (web/)</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href="http://127.0.0.1:8000/api/docs"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between text-xs text-muted hover:text-foreground font-medium"
-              >
-                <span>Swagger / Docs API</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        </div>
+     
       </div>
 
       {/* Footer Profile & Logout */}

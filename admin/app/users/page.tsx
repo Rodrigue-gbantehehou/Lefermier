@@ -29,8 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/utils";
+import { useAdminAuth } from "@/context/admin-auth-context";
 
 export default function AdminUsersPage() {
+  const { hasPermission } = useAdminAuth();
+  const canManageUsers = hasPermission("admin:users:manage");
+
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -88,23 +92,20 @@ export default function AdminUsersPage() {
   return (
     <div className="flex-1 flex flex-col">
       <AdminHeader
-        title="Gestion des Comptes & Super-Admins"
-        description="Gérez les utilisateurs inscrits sur la plateforme, leurs statuts de connexion et leurs privilèges d'administration."
+        title="Utilisateurs"
+        description="Comptes et droits d'accès."
       />
 
       <main className="p-6 md:p-8 space-y-6 max-w-7xl">
         {apiError && (
-          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-start gap-3">
-            <Ban className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-warning">Serveur API Symfony non détecté</p>
-              <p className="text-muted mt-0.5">
-                {apiError} Les comptes utilisateurs réels s'afficheront dès que le serveur backend sera démarré.
-              </p>
-              <p className="text-muted mt-1 font-mono text-[11px] bg-surface/70 px-2 py-1 rounded inline-block">
-                cd api && symfony serve --port=8000
-              </p>
+          <div className="p-4 rounded-xl border border-warning/30 bg-warning-soft/70 text-xs text-foreground flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-warning shrink-0" />
+              <span>API hors ligne : impossible de charger les utilisateurs.</span>
             </div>
+            <Button variant="outline" size="sm" onClick={fetchUsers} className="text-xs h-7">
+              Réessayer
+            </Button>
           </div>
         )}
 
@@ -113,11 +114,8 @@ export default function AdminUsersPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <CardTitle>
-                  Comptes utilisateurs {apiError ? "(Déconnecté)" : `(${users.length})`}
+                  Utilisateurs {users.length > 0 && `(${users.length})`}
                 </CardTitle>
-                <CardDescription>
-                  Éleveurs, gérants d&apos;exploitation et administrateurs système de la plateforme.
-                </CardDescription>
               </div>
 
               {/* Filtres & Recherche */}
@@ -125,7 +123,7 @@ export default function AdminUsersPage() {
                 <div className="relative w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
                   <Input
-                    placeholder="Nom, email ou téléphone..."
+                    placeholder="Rechercher..."
                     className="pl-8 text-xs h-9"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -138,9 +136,9 @@ export default function AdminUsersPage() {
                   onChange={(e) => setActiveFilter(e.target.value)}
                   className="h-9 px-3 rounded-lg border border-border bg-surface text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
                 >
-                  <option value="">Tous les états</option>
-                  <option value="true">Comptes actifs</option>
-                  <option value="false">Comptes désactivés</option>
+                  <option value="">Tous les comptes</option>
+                  <option value="true">Actifs</option>
+                  <option value="false">Désactivés</option>
                 </select>
 
                 <Button
@@ -148,7 +146,7 @@ export default function AdminUsersPage() {
                   size="sm"
                   onClick={fetchUsers}
                   isLoading={isLoading}
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>Actualiser</span>
@@ -161,12 +159,8 @@ export default function AdminUsersPage() {
             {users.length === 0 && !isLoading ? (
               <EmptyState
                 icon={<Users />}
-                title={apiError ? "Connexion API indisponible" : "Aucun utilisateur trouvé"}
-                description={
-                  apiError
-                    ? "Impossible de joindre le serveur API Symfony. Aucune donnée fictive n'est affichée."
-                    : "Aucun compte ne correspond aux critères recherchés."
-                }
+                title="Aucun utilisateur trouvé"
+                description="Aucun compte ne correspond aux filtres appliqués."
                 className="m-6"
               />
             ) : (
@@ -174,11 +168,9 @@ export default function AdminUsersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Utilisateur</TableHead>
-                    <TableHead>Coordonnées</TableHead>
-                    <TableHead>Rôle Plateforme</TableHead>
-                    <TableHead>Statut Compte</TableHead>
-                    <TableHead>Fermes associées</TableHead>
-                    <TableHead>Date d&apos;inscription</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Fermes</TableHead>
+                    <TableHead>Créé le</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -189,10 +181,7 @@ export default function AdminUsersPage() {
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-full bg-primary-soft text-primary font-bold text-xs flex items-center justify-center shrink-0">
-                              {user.firstName[0]}
-                              {user.lastName[0]}
-                            </div>
+                           
                             <div>
                               <Link
                                 href={`/users/${user.id}`}
@@ -200,55 +189,35 @@ export default function AdminUsersPage() {
                               >
                                 {user.fullName}
                               </Link>
-                              <p className="text-[11px] text-muted font-mono">{user.id}</p>
+                              <p className="text-[11px] text-muted font-mono">  {user.adminRole ? (
+                              <span>{user.adminRole.name}</span>
+                          ) : isSuperAdmin ? (
+
+                            <span>SUPER ADMIN</span>
+                          ) : (
+                            <span>Éleveur</span>
+                          )}</p>
+                               
                             </div>
+                            
                           </div>
                         </TableCell>
 
                         <TableCell>
                           <div className="space-y-1 text-xs">
                             <div className="flex items-center gap-1.5 text-foreground">
-                              <Mail className="h-3 w-3 text-muted" />
                               <span>{user.email}</span>
                             </div>
                             {user.phone && (
                               <div className="flex items-center gap-1.5 text-muted">
-                                <Phone className="h-3 w-3 text-muted" />
                                 <span>{user.phone}</span>
                               </div>
                             )}
                           </div>
                         </TableCell>
 
-                        <TableCell>
-                          {user.adminRole ? (
-                            <Badge variant="default" className="gap-1 text-xs bg-primary">
-                              <ShieldCheck className="h-3 w-3" />
-                              <span>{user.adminRole.name}</span>
-                            </Badge>
-                          ) : isSuperAdmin ? (
-                            <Badge variant="default" className="gap-1 text-xs bg-primary">
-                              <ShieldCheck className="h-3 w-3" />
-                              <span>SUPER ADMIN</span>
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              Éleveur
-                            </Badge>
-                          )}
-                        </TableCell>
+                       
 
-                        <TableCell>
-                          {user.isActive ? (
-                            <Badge variant="success" dot>
-                              Actif
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" dot>
-                              Désactivé
-                            </Badge>
-                          )}
-                        </TableCell>
 
                         <TableCell>
                           <span className="text-xs text-muted">
@@ -273,25 +242,27 @@ export default function AdminUsersPage() {
                               </Button>
                             </Link>
 
-                            <Button
-                              variant={user.isActive ? "destructive" : "success"}
-                              size="sm"
-                              isLoading={actionLoadingId === user.id}
-                              onClick={() => handleToggleActive(user)}
-                              className="text-xs gap-1.5"
-                            >
-                              {user.isActive ? (
-                                <>
-                                  <Ban className="h-3.5 w-3.5" />
-                                  <span>Désactiver</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  <span>Activer</span>
-                                </>
-                              )}
-                            </Button>
+                            {canManageUsers && (
+                              <Button
+                                variant={user.isActive ? "destructive" : "success"}
+                                size="sm"
+                                isLoading={actionLoadingId === user.id}
+                                onClick={() => handleToggleActive(user)}
+                                className="text-xs gap-1.5"
+                              >
+                                {user.isActive ? (
+                                  <>
+                                    <Ban className="h-3.5 w-3.5" />
+                                    <span>Désactiver</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <span>Activer</span>
+                                  </>
+                                )}
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
