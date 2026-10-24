@@ -22,6 +22,7 @@ import {
   User,
   Coins,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -40,9 +41,10 @@ import {
   InventoryItem,
 } from "@/lib/types";
 import { formatDate, formatNumber } from "@/lib/utils";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function HealthPage() {
-  const { activeFarm } = useAuth();
+  const { activeFarm, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [treatments, setTreatments] = useState<HealthTreatment[]>([]);
@@ -145,8 +147,10 @@ export default function HealthPage() {
   ];
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("health")) {
       loadData();
+    } else {
+      setIsLoading(false);
     }
   }, [activeFarm?.id, selectedFlockId, selectedStatus]);
 
@@ -344,6 +348,17 @@ export default function HealthPage() {
   const completedCount = treatments.filter((t) => t.status === "COMPLETED").length;
   const totalCost = treatments.reduce((acc, t) => acc + (t.costFcfa || 0), 0);
 
+  if (!hasModule("health")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Santé & Vaccins"
+          description="Le registre sanitaire, le calendrier vaccinal et la prophylaxie ne sont pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       <div className="space-y-6">
@@ -360,20 +375,32 @@ export default function HealthPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => {
-                if (flocks.length === 0) {
-                  toast.warning("Veuillez d'abord créer une bande de volailles.");
-                  return;
-                }
-                setProgramError(null);
-                setProgramModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2 text-sm font-semibold text-accent hover:bg-accent/20 transition-colors shadow-sm"
-            >
-              <Zap className="h-4 w-4" />
-              Programme Standard 1-Clic
-            </button>
+            {hasModule("prophylaxis_program") ? (
+              <button
+                onClick={() => {
+                  if (flocks.length === 0) {
+                    toast.warning("Veuillez d'abord créer une bande de volailles.");
+                    return;
+                  }
+                  setProgramError(null);
+                  setProgramModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2 text-sm font-semibold text-accent hover:bg-accent/20 transition-colors shadow-sm"
+              >
+                <Zap className="h-4 w-4" />
+                Programme Standard 1-Clic
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => toast.info("La génération automatique 1-clic des programmes prophylactiques selon la souche est disponible à partir de la formule Professionnel.")}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-muted/50 px-3.5 py-2 text-sm font-semibold text-muted hover:text-foreground transition-colors shadow-sm"
+                title="Disponible à partir de la formule Professionnel"
+              >
+                <Lock className="h-4 w-4 text-muted" />
+                Programme Standard 1-Clic
+              </button>
+            )}
 
             <button
               onClick={handleOpenCreateModal}

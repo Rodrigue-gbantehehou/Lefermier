@@ -234,7 +234,21 @@ class CommercialPlanService
         }
 
         if (isset($data['quotas']) && is_array($data['quotas'])) {
-            $plan->setQuotas(array_merge($plan->getQuotas(), $data['quotas']));
+            // Normaliser camelCase → snake_case et mettre à jour les quotas
+            $currentQuotas = $plan->getQuotas();
+            $qIn = $data['quotas'];
+            // Accepter les deux formats camelCase (frontend) et snake_case (legacy)
+            if (isset($qIn['maxFarms']))        $currentQuotas['max_farms']        = (int) $qIn['maxFarms'];
+            if (isset($qIn['max_farms']))       $currentQuotas['max_farms']        = (int) $qIn['max_farms'];
+            if (isset($qIn['maxFlocks']))       $currentQuotas['max_flocks']       = (int) $qIn['maxFlocks'];
+            if (isset($qIn['max_flocks']))      $currentQuotas['max_flocks']       = (int) $qIn['max_flocks'];
+            if (isset($qIn['maxMembers']))      $currentQuotas['max_members']      = (int) $qIn['maxMembers'];
+            if (isset($qIn['max_members']))     $currentQuotas['max_members']      = (int) $qIn['max_members'];
+            if (isset($qIn['maxBuildings']))    $currentQuotas['max_buildings']    = (int) $qIn['maxBuildings'];
+            if (isset($qIn['max_buildings']))   $currentQuotas['max_buildings']    = (int) $qIn['max_buildings'];
+            if (isset($qIn['retentionMonths'])) $currentQuotas['retention_months'] = (int) $qIn['retentionMonths'];
+            if (isset($qIn['retention_months'])) $currentQuotas['retention_months'] = (int) $qIn['retention_months'];
+            $plan->setQuotas($currentQuotas);
         }
 
         if (isset($data['features']) && is_array($data['features'])) {
@@ -603,7 +617,22 @@ class CommercialPlanService
                 'isRecommended' => false,
                 'trialDays' => 14,
                 'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
-                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'finance',
+                    'finance_margin',
+                    'sales_receipts',
+                    'contacts',
+                    'buildings',
+                    'team',
+                    'dashboard_advanced',
+                ],
                 'isVisibilityPublic' => true,
             ],
             [
@@ -635,7 +664,28 @@ class CommercialPlanService
                 'isRecommended' => true,
                 'trialDays' => 14,
                 'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
-                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'prophylaxis_program',
+                    'finance',
+                    'finance_margin',
+                    'credit_debt',
+                    'sales_receipts',
+                    'reports_accounting',
+                    'contacts',
+                    'buildings',
+                    'performance_benchmark',
+                    'team',
+                    'custom_roles',
+                    'dashboard_advanced',
+                    'priority_support',
+                ],
                 'isVisibilityPublic' => true,
             ],
             [
@@ -667,7 +717,29 @@ class CommercialPlanService
                 'isRecommended' => false,
                 'trialDays' => 30,
                 'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
-                'modules' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced', 'api_iot'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'prophylaxis_program',
+                    'finance',
+                    'finance_margin',
+                    'credit_debt',
+                    'sales_receipts',
+                    'reports_accounting',
+                    'contacts',
+                    'buildings',
+                    'performance_benchmark',
+                    'team',
+                    'custom_roles',
+                    'dashboard_advanced',
+                    'api_iot',
+                    'priority_support',
+                ],
                 'isVisibilityPublic' => false,
             ],
         ];
@@ -707,7 +779,7 @@ class CommercialPlanService
     }
 
     /**
-     * Rétro-compatibilité : assure que les formules déjà en base reçoivent leurs modules par défaut.
+     * Rétro-compatibilité : assure que les formules reçoivent les modules applicatifs officiels.
      *
      * @param array<SubscriptionPlan> $entities
      */
@@ -716,14 +788,83 @@ class CommercialPlanService
         $needsFlush = false;
 
         $moduleMap = [
-            'FREE' => ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings'],
-            'STANDARD' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
-            'PRO' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced'],
-            'ENTERPRISE' => ['flocks', 'eggs', 'inventory', 'inventory_valuation', 'health', 'finance', 'finance_margin', 'contacts', 'buildings', 'team', 'dashboard_advanced', 'api_iot'],
+            'FREE' => [
+                'flocks',
+                'eggs',
+                'inventory',
+                'health',
+                'finance',
+                'contacts',
+                'buildings',
+            ],
+            'STANDARD' => [
+                'flocks',
+                'eggs',
+                'inventory',
+                'inventory_valuation',
+                'feed_rationing',
+                'health',
+                'health_alerts',
+                'finance',
+                'finance_margin',
+                'sales_receipts',
+                'contacts',
+                'buildings',
+                'team',
+                'dashboard_advanced',
+            ],
+            'PRO' => [
+                'flocks',
+                'eggs',
+                'inventory',
+                'inventory_valuation',
+                'feed_rationing',
+                'health',
+                'health_alerts',
+                'prophylaxis_program',
+                'finance',
+                'finance_margin',
+                'credit_debt',
+                'sales_receipts',
+                'reports_accounting',
+                'contacts',
+                'buildings',
+                'performance_benchmark',
+                'team',
+                'custom_roles',
+                'dashboard_advanced',
+                'priority_support',
+            ],
+            'ENTERPRISE' => [
+                'flocks',
+                'eggs',
+                'inventory',
+                'inventory_valuation',
+                'feed_rationing',
+                'health',
+                'health_alerts',
+                'prophylaxis_program',
+                'finance',
+                'finance_margin',
+                'credit_debt',
+                'sales_receipts',
+                'reports_accounting',
+                'contacts',
+                'buildings',
+                'performance_benchmark',
+                'team',
+                'custom_roles',
+                'dashboard_advanced',
+                'api_iot',
+                'priority_support',
+            ],
         ];
 
         foreach ($entities as $plan) {
             $sku = $plan->getSku();
+
+            // Migration initiale : ne configurer les modules que si le plan n'en a aucun
+            // (ne JAMAIS écraser les modules configurés manuellement par l'admin)
             if (empty($plan->getModules())) {
                 $mods = $moduleMap[$sku] ?? ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings'];
                 $plan->setModules($mods);

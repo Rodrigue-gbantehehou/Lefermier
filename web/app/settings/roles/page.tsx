@@ -9,9 +9,10 @@ import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { FarmRole, Permission } from "@/lib/types";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function RolesMatrixPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [roles, setRoles] = useState<FarmRole[]>([]);
@@ -31,7 +32,11 @@ export default function RolesMatrixPage() {
   const [submittingCreate, setSubmittingCreate] = useState(false);
 
   useEffect(() => {
-    loadData();
+    if (activeFarm?.id && hasModule("custom_roles")) {
+      loadData();
+    } else {
+      setIsLoading(false);
+    }
   }, [activeFarm?.id]);
 
   async function loadData() {
@@ -126,6 +131,17 @@ export default function RolesMatrixPage() {
       }
       categories[cat].perms.push(p);
     });
+  }
+
+  if (!hasModule("custom_roles")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Rôles Sur-Mesure & Permissions Fines"
+          description="La création de rôles personnalisés et la personnalisation granulaire de la matrice des 22 permissions est disponible à partir de la formule Professionnel (Coopérative)."
+        />
+      </Shell>
+    );
   }
 
   return (

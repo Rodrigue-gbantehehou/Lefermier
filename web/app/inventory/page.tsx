@@ -14,6 +14,7 @@ import { api } from "@/lib/api-client";
 import { InventoryItem, InventoryCategory, StockMovementType } from "@/lib/types";
 import { formatFcfa, formatNumber } from "@/lib/utils";
 import { exportInventoryToCsv } from "@/lib/export";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 import {
   formatInventoryUnit,
   getUnitLabel,
@@ -25,7 +26,7 @@ import {
 } from "@/lib/units";
 
 export default function InventoryPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -70,8 +71,10 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("inventory")) {
       loadInventory();
+    } else {
+      setIsLoading(false);
     }
   }, [activeFarm?.id]);
 
@@ -280,6 +283,17 @@ export default function InventoryPage() {
       ),
     },
   ];
+
+  if (!hasModule("inventory")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Stocks & Aliments"
+          description="Le suivi des stocks d'aliments et produits de soins n'est pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell>

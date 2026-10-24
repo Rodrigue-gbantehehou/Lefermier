@@ -8,6 +8,7 @@ import { financeApi } from "./finance";
 import { contactsApi } from "./contacts";
 import { healthApi } from "./health";
 import { rolesApi, developerApi, membersApi } from "./settings";
+import { subscriptionsApi } from "./subscriptions";
 
 export * from "./client";
 export * from "./auth";
@@ -20,6 +21,7 @@ export * from "./finance";
 export * from "./contacts";
 export * from "./health";
 export * from "./settings";
+export * from "./subscriptions";
 
 export const api = {
   auth: authApi,
@@ -34,6 +36,7 @@ export const api = {
   developer: developerApi,
   members: membersApi,
   health: healthApi,
+  subscriptions: subscriptionsApi,
 };
 
 export default api;

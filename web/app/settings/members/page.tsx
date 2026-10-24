@@ -25,9 +25,10 @@ import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { FarmMember, FarmRole } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function MembersManagementPage() {
-  const { activeFarm, hasPermission, user: currentUser, isLoading: authLoading } = useAuth();
+  const { activeFarm, hasPermission, hasModule, user: currentUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [members, setMembers] = useState<FarmMember[]>([]);
@@ -57,7 +58,7 @@ export default function MembersManagementPage() {
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("team")) {
       loadData();
     } else if (!authLoading) {
       setIsLoading(false);
@@ -300,6 +301,17 @@ export default function MembersManagementPage() {
       },
     },
   ];
+
+  if (!hasModule("team")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Utilisateurs & Équipe"
+          description="La gestion multi-utilisateurs et des comptes employés n'est pas incluse dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell>

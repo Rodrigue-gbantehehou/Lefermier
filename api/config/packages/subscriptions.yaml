@@ -34,6 +34,14 @@ parameters:
                 iot_sensors: false
                 api_access: false
                 priority_support: false
+            modules:
+                - 'flocks'
+                - 'eggs'
+                - 'inventory'
+                - 'health'
+                - 'finance'
+                - 'contacts'
+                - 'buildings'
             is_popular: false
             is_recommended: false
 
@@ -66,6 +74,21 @@ parameters:
                 iot_sensors: false
                 api_access: false
                 priority_support: false
+            modules:
+                - 'flocks'
+                - 'eggs'
+                - 'inventory'
+                - 'inventory_valuation'
+                - 'feed_rationing'
+                - 'health'
+                - 'health_alerts'
+                - 'finance'
+                - 'finance_margin'
+                - 'sales_receipts'
+                - 'contacts'
+                - 'buildings'
+                - 'team'
+                - 'dashboard_advanced'
             is_popular: true
             is_recommended: false
 
@@ -97,6 +120,27 @@ parameters:
                 iot_sensors: false
                 api_access: false
                 priority_support: true
+            modules:
+                - 'flocks'
+                - 'eggs'
+                - 'inventory'
+                - 'inventory_valuation'
+                - 'feed_rationing'
+                - 'health'
+                - 'health_alerts'
+                - 'prophylaxis_program'
+                - 'finance'
+                - 'finance_margin'
+                - 'credit_debt'
+                - 'sales_receipts'
+                - 'reports_accounting'
+                - 'contacts'
+                - 'buildings'
+                - 'performance_benchmark'
+                - 'team'
+                - 'custom_roles'
+                - 'dashboard_advanced'
+                - 'priority_support'
             is_popular: false
             is_recommended: true
 
@@ -128,5 +172,27 @@ parameters:
                 iot_sensors: true
                 api_access: true
                 priority_support: true
+            modules:
+                - 'flocks'
+                - 'eggs'
+                - 'inventory'
+                - 'inventory_valuation'
+                - 'feed_rationing'
+                - 'health'
+                - 'health_alerts'
+                - 'prophylaxis_program'
+                - 'finance'
+                - 'finance_margin'
+                - 'credit_debt'
+                - 'sales_receipts'
+                - 'reports_accounting'
+                - 'contacts'
+                - 'buildings'
+                - 'performance_benchmark'
+                - 'team'
+                - 'custom_roles'
+                - 'dashboard_advanced'
+                - 'api_iot'
+                - 'priority_support'
             is_popular: false
             is_recommended: false

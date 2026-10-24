@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -33,9 +34,10 @@ import {
 import { formatFcfa, formatDate } from "@/lib/utils";
 import { exportTransactionsToCsv } from "@/lib/export";
 import { SalesReceiptModal } from "@/components/finances/sales-receipt-modal";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function FinancesPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -71,8 +73,10 @@ export default function FinancesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("finance")) {
       loadTransactions();
+    } else {
+      setIsLoading(false);
     }
   }, [activeFarm?.id]);
 
@@ -307,6 +311,22 @@ export default function FinancesPage() {
       align: "right",
       cell: (tx) => {
         if (tx.type !== "INCOME") return null;
+        if (!hasModule("sales_receipts")) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.info("L'édition et impression de reçus officiels avec IFU est disponible à partir de la formule Standard.");
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-surface-muted/50 px-2 py-1 text-[11px] font-semibold text-muted hover:text-foreground transition-colors"
+              title="Disponible à partir de la formule Standard"
+            >
+              <Lock className="h-3 w-3" />
+              <span>Reçu</span>
+            </button>
+          );
+        }
         return (
           <button
             type="button"
@@ -326,6 +346,17 @@ export default function FinancesPage() {
     },
   ];
 
+  if (!hasModule("finance")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Trésorerie & Ventes"
+          description="Le suivi de la trésorerie, des ventes et des dépenses n'est pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       {/* Header */}
@@ -340,14 +371,26 @@ export default function FinancesPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => exportTransactionsToCsv(transactions, activeFarm?.name || "ferme")}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
-          >
-            <Download className="h-4 w-4 text-muted" />
-            <span>Exporter CSV</span>
-          </button>
+          {hasModule("reports_accounting") ? (
+            <button
+              type="button"
+              onClick={() => exportTransactionsToCsv(transactions, activeFarm?.name || "ferme")}
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
+            >
+              <Download className="h-4 w-4 text-muted" />
+              <span>Exporter CSV</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => toast.info("L'export comptable complet SYSCOHADA (CSV/PDF) est disponible à partir de la formule Professionnel.")}
+              className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-surface-muted/50 px-3 py-2 text-xs font-semibold text-muted hover:text-foreground transition-colors"
+              title="Disponible à partir de la formule Professionnel"
+            >
+              <Lock className="h-3.5 w-3.5 text-muted" />
+              <span>Exporter CSV</span>
+            </button>
+          )}
 
           {hasPermission("finance:create") && (
             <button

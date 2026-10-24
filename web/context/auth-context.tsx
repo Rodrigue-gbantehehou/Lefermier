@@ -116,28 +116,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "api_key:manage",
       ];
 
-      // Les permissions retournées par l'API intègrent déjà la formule souscrite
-      if (mappedUser.roles.includes("ROLE_ADMIN") || mappedUser.roles.includes("ROLE_SUPER_ADMIN")) {
-        setPermissions(allPermissions);
-      } else if (Array.isArray(currentFarm?.permissions)) {
+      // Les permissions retournées par l'API intègrent déjà la formule souscrite pour la ferme active
+      if (Array.isArray(currentFarm?.permissions)) {
         const rawPerms: string[] = currentFarm.permissions;
-        if (rawPerms.includes("*")) {
-          setPermissions(allPermissions);
-        } else {
-          const permsSet = new Set<string>(rawPerms);
-          rawPerms.forEach((p) => {
-            if (p.endsWith(":view")) permsSet.add(p.replace(":view", ":read"));
-            if (p.endsWith(":read")) permsSet.add(p.replace(":read", ":view"));
-            if (p.endsWith(":manage")) {
-              const prefix = p.replace(":manage", "");
-              permsSet.add(`${prefix}:create`);
-              permsSet.add(`${prefix}:update`);
-              permsSet.add(`${prefix}:read`);
-              permsSet.add(`${prefix}:view`);
-            }
-          });
-          setPermissions(Array.from(permsSet));
-        }
+        const permsSet = new Set<string>(rawPerms);
+        rawPerms.forEach((p) => {
+          if (p.endsWith(":view")) permsSet.add(p.replace(":view", ":read"));
+          if (p.endsWith(":read")) permsSet.add(p.replace(":read", ":view"));
+          if (p.endsWith(":manage")) {
+            const prefix = p.replace(":manage", "");
+            permsSet.add(`${prefix}:create`);
+            permsSet.add(`${prefix}:update`);
+            permsSet.add(`${prefix}:read`);
+            permsSet.add(`${prefix}:view`);
+          }
+        });
+        setPermissions(Array.from(permsSet));
       } else {
         setPermissions([]);
       }
@@ -201,16 +195,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function hasModule(moduleKey: string): boolean {
-    if (!user) return false;
-    if (user.roles?.includes("ROLE_ADMIN") || user.roles?.includes("ROLE_SUPER_ADMIN")) return true;
-    const modules = activeFarm?.subscription?.modules;
-    if (!Array.isArray(modules) || modules.length === 0) return true;
+    if (!activeFarm) return false;
+    const modules = activeFarm.subscription?.modules;
+    if (!Array.isArray(modules)) return false;
     return modules.includes(moduleKey);
   }
 
   function hasPermission(permissionKey: string): boolean {
-    if (!user) return false;
-    if (user.roles?.includes("ROLE_ADMIN") || user.roles?.includes("ROLE_SUPER_ADMIN")) return true;
+    if (!activeFarm) return false;
 
     if (permissions.includes("*")) return true;
     if (permissions.includes(permissionKey)) return true;

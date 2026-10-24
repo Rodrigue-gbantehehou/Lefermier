@@ -13,16 +13,54 @@ interface PlanDetailsModalProps {
   activeModules?: string[];
 }
 
-const ALL_MODULES = [
-  { key: "flocks", name: "Lots & Volailles", desc: "Suivi des effectifs et mortalité" },
-  { key: "eggs", name: "Ramassage des œufs", desc: "Collecte journalière et calibrage" },
-  { key: "inventory", name: "Stocks & Aliments", desc: "Sacs d'aliments et alertes stock bas" },
-  { key: "health", name: "Soins & Vaccins", desc: "Vaccinations et rappels vétérinaires" },
-  { key: "finance", name: "Caisse & Ventes", desc: "Recettes des ventes et dépenses" },
-  { key: "contacts", name: "Clients & Fournisseurs", desc: "Carnet d'adresses et revendeuses" },
-  { key: "buildings", name: "Bâtiments d'élevage", desc: "Poulaillers et capacités" },
-  { key: "team", name: "Équipe & Accès", desc: "Comptes employés et rôles" },
-  { key: "api_iot", name: "API & Capteurs", desc: "Intégrations IoT et clés d'accès" },
+interface ModuleItem {
+  key: string;
+  category: string;
+  name: string;
+  desc: string;
+}
+
+const ALL_MODULES: ModuleItem[] = [
+  // Production
+  { key: "flocks", category: "Volailles & Lots", name: "Lots & Volailles", desc: "Suivi des effectifs, mortalité, réformes et pesées" },
+  { key: "eggs", category: "Volailles & Lots", name: "Ramassage des œufs", desc: "Collecte journalière, calibrage et calcul des alvéoles de 30" },
+
+  // Santé
+  { key: "health", category: "Santé & Soins", name: "Soins & Vaccins", desc: "Vaccinations, ordonnances et registre des soins vétérinaires" },
+  { key: "prophylaxis_program", category: "Santé & Soins", name: "Programmes Vaccinaux 1-Clic", desc: "Génération automatique du calendrier vaccinal selon la souche" },
+  { key: "health_alerts", category: "Santé & Soins", name: "Alertes de Mortalité", desc: "Notification temps réel si la mortalité dépasse le seuil critique" },
+
+  // Stocks
+  { key: "inventory", category: "Stocks & Aliments", name: "Stocks & Aliments", desc: "Sacs d'aliments, produits vétérinaires et alertes stock bas" },
+  { key: "inventory_valuation", category: "Stocks & Aliments", name: "Valeur du stock", desc: "Estimation financière de la valeur du magasin en FCFA" },
+  { key: "feed_rationing", category: "Stocks & Aliments", name: "Rationnement & Indice FCR", desc: "Consommation journalière et indice de conversion alimentaire" },
+
+  // Finances
+  { key: "finance", category: "Finances & Caisse", name: "Caisse & Ventes", desc: "Ventes, dépenses et caisse en FCFA (MoMo MTN, Moov, Celtiis, Espèces)" },
+  { key: "finance_margin", category: "Finances & Caisse", name: "Marges & Bénéfices", desc: "Coût de revient et bénéfice net dégagé par lot" },
+  { key: "credit_debt", category: "Finances & Caisse", name: "Créances & Dettes", desc: "Suivi des impayés revendeuses du marché et dettes provenderies" },
+  { key: "sales_receipts", category: "Finances & Caisse", name: "Reçus & Factures Imprimables", desc: "Reçus officiels prêts à imprimer avec IFU et en-tête" },
+  { key: "reports_accounting", category: "Finances & Caisse", name: "Exports Comptables SYSCOHADA", desc: "Grand livre et journaux d'achats/ventes en CSV et PDF" },
+
+  // Clients & Tiers
+  { key: "contacts", category: "Clients & Fournisseurs", name: "Clients & Fournisseurs", desc: "Carnet d'adresses acheteurs, revendeuses et provenderies" },
+
+  // Bâtiments
+  { key: "buildings", category: "Bâtiments & Fermes", name: "Bâtiments d'élevage", desc: "Poulaillers, poussinières, capacités et vides sanitaires" },
+  { key: "performance_benchmark", category: "Bâtiments & Fermes", name: "Comparatifs Inter-Bâtiments", desc: "Benchmark des taux de ponte et rendements entre poulaillers" },
+
+  // Équipe & Accès
+  { key: "team", category: "Équipe & Accès", name: "Équipe & Collaborateurs", desc: "Comptes pour employés, gérants et comptables" },
+  { key: "custom_roles", category: "Équipe & Accès", name: "Rôles Sur-Mesure & RBAC", desc: "Création de rôles personnalisés avec matrice de 22 permissions" },
+
+  // Analyses
+  { key: "dashboard_advanced", category: "Analyses & Alertes", name: "Analyses Avancées", desc: "Courbes de ponte hebdomadaires et projections consolidées" },
+
+  // Intégrations & Capteurs
+  { key: "api_iot", category: "API & Capteurs", name: "API & Capteurs Connectés", desc: "Sondes de température/hygrométrie IoT et clés API développeur" },
+
+  // Assistance & Services
+  { key: "priority_support", category: "Assistance & Services", name: "Support Prioritaire WhatsApp", desc: "Assistance zootechnique dédiée et hotline prioritaire" },
 ];
 
 export function PlanDetailsModal({
@@ -113,7 +151,7 @@ export function PlanDetailsModal({
           <div className="text-xs font-bold uppercase tracking-wider text-muted">
             Modules de la plateforme
           </div>
-          <div className="divide-y divide-border rounded-2xl border border-border bg-surface-muted/50 overflow-hidden">
+          <div className="divide-y divide-border rounded-2xl border border-border bg-surface-muted/50 overflow-hidden max-h-[320px] overflow-y-auto pr-1">
             {ALL_MODULES.map((mod) => {
               const isIncluded = modulesList.includes(mod.key);
               return (
@@ -123,7 +161,7 @@ export function PlanDetailsModal({
                 >
                   <div className="flex items-center gap-2.5">
                     <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-lg ${
+                      className={`flex h-6 w-6 items-center justify-center rounded-lg shrink-0 ${
                         isIncluded
                           ? "bg-success/10 text-success"
                           : "bg-muted/10 text-muted"
@@ -136,18 +174,23 @@ export function PlanDetailsModal({
                       )}
                     </div>
                     <div>
-                      <span
-                        className={`font-semibold ${
-                          isIncluded ? "text-foreground" : "text-muted line-through"
-                        }`}
-                      >
-                        {mod.name}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-semibold ${
+                            isIncluded ? "text-foreground" : "text-muted line-through"
+                          }`}
+                        >
+                          {mod.name}
+                        </span>
+                        <span className="rounded bg-surface px-1.5 py-0.2 text-[9px] font-semibold text-muted border border-border">
+                          {mod.category}
+                        </span>
+                      </div>
                       <p className="text-[10px] text-muted">{mod.desc}</p>
                     </div>
                   </div>
                   <span
-                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold shrink-0 ${
                       isIncluded
                         ? "bg-success/15 text-success"
                         : "bg-muted/15 text-muted"

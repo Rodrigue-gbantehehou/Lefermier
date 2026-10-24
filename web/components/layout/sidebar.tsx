@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Bird,
+  Warehouse,
   Egg,
   HeartPulse,
   Package,
@@ -16,6 +17,7 @@ import {
   X,
   Settings,
   Lock,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
@@ -38,39 +40,46 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       show: true,
     },
     {
+      name: "Poulaillers & Bâtiments",
+      href: "/buildings",
+      icon: Warehouse,
+      module: "buildings",
+      show: hasPermission("building:manage") || hasPermission("farm:view"),
+    },
+    {
       name: "Poules & Bandes",
       href: "/flocks",
       icon: Bird,
       module: "flocks",
-      show: hasPermission("flock:read"),
+      show: hasPermission("flock:read") || hasPermission("flock:view"),
     },
     {
       name: "Production d'œufs",
       href: "/eggs",
       icon: Egg,
       module: "eggs",
-      show: hasPermission("egg:read"),
+      show: hasPermission("egg:read") || hasPermission("egg:view"),
     },
     {
       name: "Santé & Vaccins",
       href: "/health",
       icon: HeartPulse,
       module: "health",
-      show: hasPermission("health:view") || true,
+      show: hasPermission("health:view") || hasPermission("health:manage"),
     },
     {
       name: "Stocks & Aliments",
       href: "/inventory",
       icon: Package,
       module: "inventory",
-      show: hasPermission("inventory:read"),
+      show: hasPermission("inventory:read") || hasPermission("inventory:view"),
     },
     {
       name: "Trésorerie & Ventes",
       href: "/finances",
       icon: Wallet,
       module: "finance",
-      show: hasPermission("finance:read"),
+      show: hasPermission("finance:read") || hasPermission("finance:view"),
     },
     {
       name: "Contacts & Tiers",
@@ -84,14 +93,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/settings/members",
       icon: Users,
       module: "team",
-      show: true,
+      show: hasPermission("member:manage") || hasPermission("member:read"),
     },
     {
       name: "Rôles & Permissions",
       href: "/settings/roles",
       icon: ShieldCheck,
-      module: "team",
-      show: hasPermission("role:read") || user?.roles.includes("ROLE_ADMIN"),
+      module: "custom_roles",
+      show: hasPermission("role:manage") || hasPermission("role:read"),
+    },
+    {
+      name: "Mon abonnement",
+      href: "/settings/subscription",
+      icon: CreditCard,
+      module: undefined,
+      show: true,
     },
     {
       name: "Paramètres de la ferme",
@@ -193,8 +209,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Footer avec formule active */}
         <div className="border-t border-border p-4">
-          <div className="rounded-xl bg-surface-hover/80 border border-border p-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+          <Link
+            href="/settings/subscription"
+            onClick={onClose}
+            className="block rounded-xl bg-surface-hover/80 border border-border p-3 hover:border-primary/40 hover:bg-primary/5 transition-all group"
+          >
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted group-hover:text-primary transition-colors">
               Formule de la ferme
             </div>
             <div className="mt-1 flex items-center justify-between">
@@ -205,7 +225,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {activePlan?.badge || activePlan?.plan || "Gratuit"}
               </span>
             </div>
-          </div>
+            <div className="mt-1.5 text-[10px] text-muted group-hover:text-primary/60 transition-colors flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              Gérer mon abonnement →
+            </div>
+          </Link>
         </div>
       </aside>
     </>

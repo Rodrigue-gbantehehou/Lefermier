@@ -12,9 +12,10 @@ import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { EggProduction, EggSession, Flock } from "@/lib/types";
 import { formatNumber, formatPercent, calcEggTrays, formatDate } from "@/lib/utils";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function EggsPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [productions, setProductions] = useState<EggProduction[]>([]);
@@ -72,8 +73,10 @@ export default function EggsPage() {
   }
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("eggs")) {
       loadData();
+    } else {
+      setIsLoading(false);
     }
   }, [activeFarm?.id]);
 
@@ -262,6 +265,17 @@ export default function EggsPage() {
         ) : null,
     },
   ];
+
+  if (!hasModule("eggs")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Production d'œufs"
+          description="L'enregistrement des ramassages d'œufs et le calcul des plateaux de 30 alvéoles ne sont pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell>

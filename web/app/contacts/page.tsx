@@ -29,6 +29,7 @@ import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
 import { Contact, ContactType } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 const TYPE_CONFIG: Record<
   ContactType,
@@ -57,7 +58,7 @@ const TYPE_CONFIG: Record<
 const CITY_PRESETS = ["Cotonou", "Abomey-Calavi", "Allada", "Porto-Novo", "Bohicon", "Parakou", "Ouidah", "Zè"];
 
 export default function ContactsPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule } = useAuth();
   const { toast } = useToast();
 
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -85,8 +86,10 @@ export default function ContactsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (activeFarm?.id) {
+    if (activeFarm?.id && hasModule("contacts")) {
       loadContacts();
+    } else {
+      setIsLoading(false);
     }
   }, [activeFarm?.id]);
 
@@ -309,6 +312,17 @@ export default function ContactsPage() {
       ),
     },
   ];
+
+  if (!hasModule("contacts")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Contacts & Tiers"
+          description="Le carnet de contacts des acheteurs, fournisseurs et partenaires n'est pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell>
