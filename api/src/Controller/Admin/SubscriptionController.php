@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Controller\Admin;
 
 use App\Entity\Organization;
+use App\Entity\SubscriptionUpgradeRequest;
+use App\Entity\User;
 use App\Enum\OrganizationStatus;
 use App\Repository\OrganizationRepository;
+use App\Repository\SubscriptionUpgradeRequestRepository;
 use App\Security\AdminPermission;
 use App\Service\Admin\CommercialPlanService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +34,7 @@ class SubscriptionController extends AbstractController
         private readonly OrganizationRepository $organizationRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly \App\Service\Admin\AdminAuditService $auditService,
+        private readonly SubscriptionUpgradeRequestRepository $upgradeRequestRepository,
     ) {
     }
 
@@ -404,6 +408,188 @@ class SubscriptionController extends AbstractController
             'status' => 'success',
             'message' => sprintf('Souscription de "%s" mise à jour avec succès.', $organization->getName()),
             'data' => $this->planService->serializeSubscription($organization),
+        ]);
+    }
+
+    /**
+     * Liste des demandes de changement d'offre formulées par les éleveurs.
+     *
+     * GET /api/admin/subscriptions/upgrade-requests?status=PENDING
+     */
+    #[Route('/upgrade-requests', name: 'upgrade_requests_list', methods: ['GET'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_VIEW)]
+    public function listUpgradeRequests(Request $request): JsonResponse
+    {
+        $status = $request->query->get('status');
+
+        $criteria = [];
+        if ($status !== null && in_array(strtoupper($status), ['PENDING', 'APPROVED', 'REJECTED'], true)) {
+            $criteria['status'] = strtoupper($status);
+        }
+
+        $requests = $this->upgradeRequestRepository->findBy($criteria, ['createdAt' => 'DESC']);
+        $pendingCount = $this->upgradeRequestRepository->count(['status' => 'PENDING']);
+
+        return $this->json([
+            'status' => 'success',
+            'data' => array_map(fn (SubscriptionUpgradeRequest $r) => $r->toArray(), $requests),
+            'pendingCount' => $pendingCount,
+            'total' => count($requests),
+        ]);
+    }
+
+    /**
+     * Valide et applique la demande de changement d'offre (1-clic).
+     *
+     * POST /api/admin/subscriptions/upgrade-requests/{id}/approve
+     */
+    #[Route('/upgrade-requests/{id}/approve', name: 'upgrade_requests_approve', methods: ['POST'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
+    public function approveUpgradeRequest(string $id, Request $request): JsonResponse
+    {
+        try {
+            $ulid = Ulid::fromString($id);
+        } catch (\InvalidArgumentException) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Identifiant de demande invalide.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $upgradeReq = $this->upgradeRequestRepository->find($ulid);
+        if (!$upgradeReq instanceof SubscriptionUpgradeRequest) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Demande de changement d\'offre introuvable.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($upgradeReq->getStatus() !== 'PENDING') {
+            return $this->json([
+                'status' => 'error',
+                'message' => sprintf('Cette demande a déjà été traitée (statut actuel : %s).', $upgradeReq->getStatus()),
+            ], Response::HTTP_CONFLICT);
+        }
+
+        $targetPlan = $upgradeReq->getTargetPlan();
+        $targetPlanDef = $this->planService->getPlan($targetPlan);
+        if ($targetPlanDef === null) {
+            return $this->json([
+                'status' => 'error',
+                'message' => sprintf('L\'offre cible "%s" n\'existe pas dans le catalogue.', $targetPlan),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $organization = $upgradeReq->getOrganization();
+        $oldPlan = $organization->getSubscriptionPlan();
+
+        // 1. Appliquer le changement de formule à l'organisation
+        $organization->setSubscriptionPlan($targetPlan);
+        if ($organization->getStatus() === OrganizationStatus::SUSPENDED) {
+            $organization->setStatus(OrganizationStatus::ACTIVE);
+        }
+
+        // 2. Marquer la demande comme approuvée
+        $adminUser = $this->getUser();
+        $body = $request->toArray();
+        $adminNotes = isset($body['adminNotes']) ? trim((string) $body['adminNotes']) : null;
+        if ($adminUser instanceof User) {
+            $upgradeReq->approve($adminUser, $adminNotes);
+        }
+
+        $this->entityManager->flush();
+
+        // 3. Journal d'audit
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_PLAN_CHANGE',
+            label: 'Validation demande de mise à niveau',
+            targetType: 'ORGANIZATION',
+            targetId: $organization->getId()?->toBase32() ?? $id,
+            targetName: $organization->getName(),
+            details: sprintf(
+                'Validation de la demande d\'offre pour la ferme "%s" (%s) : passage de %s à %s (%s). Facturation %s.',
+                $upgradeReq->getFarm()->getName(),
+                $organization->getName(),
+                $oldPlan,
+                $upgradeReq->getTargetPlanName(),
+                $targetPlan,
+                $upgradeReq->getBillingCycle() === 'ANNUALLY' ? 'annuelle' : 'mensuelle'
+            ),
+        );
+
+        return $this->json([
+            'status' => 'success',
+            'message' => sprintf(
+                'Demande validée ! L\'exploitation "%s" bénéficie désormais de l\'offre %s.',
+                $upgradeReq->getFarm()->getName(),
+                $upgradeReq->getTargetPlanName()
+            ),
+            'data' => $upgradeReq->toArray(),
+        ]);
+    }
+
+    /**
+     * Refuse une demande de changement d'offre avec motif.
+     *
+     * POST /api/admin/subscriptions/upgrade-requests/{id}/reject
+     */
+    #[Route('/upgrade-requests/{id}/reject', name: 'upgrade_requests_reject', methods: ['POST'])]
+    #[IsGranted(AdminPermission::SUBSCRIPTIONS_MANAGE)]
+    public function rejectUpgradeRequest(string $id, Request $request): JsonResponse
+    {
+        try {
+            $ulid = Ulid::fromString($id);
+        } catch (\InvalidArgumentException) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Identifiant de demande invalide.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $upgradeReq = $this->upgradeRequestRepository->find($ulid);
+        if (!$upgradeReq instanceof SubscriptionUpgradeRequest) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Demande de changement d\'offre introuvable.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($upgradeReq->getStatus() !== 'PENDING') {
+            return $this->json([
+                'status' => 'error',
+                'message' => sprintf('Cette demande a déjà été traitée (statut actuel : %s).', $upgradeReq->getStatus()),
+            ], Response::HTTP_CONFLICT);
+        }
+
+        $adminUser = $this->getUser();
+        $body = $request->toArray();
+        $adminNotes = isset($body['adminNotes']) ? trim((string) $body['adminNotes']) : 'Demande refusée par l\'administrateur';
+
+        if ($adminUser instanceof User) {
+            $upgradeReq->reject($adminUser, $adminNotes);
+        }
+
+        $this->entityManager->flush();
+
+        // Journal d'audit
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_UPGRADE_REJECTED',
+            label: 'Refus demande d\'offre',
+            targetType: 'ORGANIZATION',
+            targetId: $upgradeReq->getOrganization()->getId()?->toBase32() ?? $id,
+            targetName: $upgradeReq->getFarm()->getName(),
+            details: sprintf(
+                'Refus de la demande de mise à niveau vers "%s" pour la ferme "%s". Motif : "%s"',
+                $upgradeReq->getTargetPlanName(),
+                $upgradeReq->getFarm()->getName(),
+                $adminNotes
+            ),
+        );
+
+        return $this->json([
+            'status' => 'success',
+            'message' => 'Demande refusée.',
+            'data' => $upgradeReq->toArray(),
         ]);
     }
 }

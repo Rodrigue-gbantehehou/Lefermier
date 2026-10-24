@@ -337,5 +337,23 @@ export interface AuditLogItem {
   details: string;
 }
 
-
-
+export interface SubscriptionUpgradeRequestItem {
+  id: string;
+  farmId: string;
+  farmName: string;
+  organizationId: string;
+  organizationName: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  currentPlan: string;
+  targetPlan: string;
+  targetPlanName: string;
+  billingCycle: string;
+  message?: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  adminNotes?: string | null;
+  processedByName?: string | null;
+  createdAt: string;
+  processedAt?: string | null;
+}

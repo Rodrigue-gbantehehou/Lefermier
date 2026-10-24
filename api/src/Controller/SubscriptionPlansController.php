@@ -25,6 +25,8 @@ class SubscriptionPlansController extends AbstractController
     public function __construct(
         private readonly CommercialPlanService $planService,
         private readonly FarmRepository $farmRepository,
+        private readonly \Doctrine\ORM\EntityManagerInterface $entityManager,
+        private readonly \App\Service\Admin\AdminAuditService $auditService,
     ) {
     }
 
@@ -177,10 +179,49 @@ class SubscriptionPlansController extends AbstractController
         }
 
         $org = $farm->getOrganization();
-        $currentPlan = $org ? strtoupper($org->getSubscriptionPlan()) : 'FREE';
+        if (!$org) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Organisation rattachée introuvable.',
+            ], Response::HTTP_NOT_FOUND);
+        }
 
-        // TODO: En production, déclencher ici un email/webhook vers l'équipe commerciale
-        // ou intégrer un système de paiement (Moov Money, MTN MoMo, virement bancaire)
+        $currentPlan = strtoupper($org->getSubscriptionPlan());
+
+        // Enregistrer la demande formelle en base de données
+        $upgradeRequest = new \App\Entity\SubscriptionUpgradeRequest(
+            farm: $farm,
+            organization: $org,
+            user: $user,
+            currentPlan: $currentPlan,
+            targetPlan: $targetPlan,
+            targetPlanName: $targetPlanData['name'],
+            billingCycle: (string) ($payload['billingCycle'] ?? 'MONTHLY'),
+            message: $message !== '' ? $message : null,
+        );
+
+        $this->entityManager->persist($upgradeRequest);
+        $this->entityManager->flush();
+
+        // Enregistrer l'événement dans le journal d'audit de la plateforme (visible dans Admin > Audit)
+        $this->auditService->log(
+            action: 'SUBSCRIPTION_UPGRADE_REQUEST',
+            label: 'Demande de changement d\'offre',
+            targetType: 'ORGANIZATION',
+            targetId: $org->getId()?->toBase32() ?? $farmId,
+            targetName: $farm->getName(),
+            details: sprintf(
+                'L\'éleveur %s (%s) demande le passage de la ferme "%s" (%s) à l\'offre "%s" (%s).%s',
+                method_exists($user, 'getFullName') ? $user->getFullName() : $user->getUserIdentifier(),
+                method_exists($user, 'getEmail') ? $user->getEmail() : '',
+                $farm->getName(),
+                $currentPlan,
+                $targetPlanData['name'],
+                $targetPlan,
+                $message !== '' ? ' Message : "' . $message . '"' : ''
+            ),
+            actor: $user,
+        );
 
         return $this->json([
             'status' => 'success',
@@ -189,6 +230,7 @@ class SubscriptionPlansController extends AbstractController
                 $targetPlanData['name']
             ),
             'data' => [
+                'requestId' => $upgradeRequest->getId()->toBase32(),
                 'farmId' => $farmId,
                 'farmName' => $farm->getName(),
                 'currentPlan' => $currentPlan,
@@ -196,6 +238,7 @@ class SubscriptionPlansController extends AbstractController
                 'requestedPlanName' => $targetPlanData['name'],
                 'userEmail' => method_exists($user, 'getEmail') ? $user->getEmail() : null,
                 'message' => $message,
+                'status' => 'PENDING',
             ],
         ]);
     }

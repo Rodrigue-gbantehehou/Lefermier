@@ -15,6 +15,8 @@ import {
   Filter,
   Layers,
   ArrowUpRight,
+  ArrowRight,
+  MessageSquare,
   AlertTriangle,
   Calendar,
   Users,
@@ -53,6 +55,7 @@ import {
   BillingCycle,
   PlatformModuleGroup,
   SubscriptionItem,
+  SubscriptionUpgradeRequestItem,
   OrganizationStatus,
   UpdatePlanPayload,
 } from "@/lib/api-client";
@@ -324,13 +327,19 @@ export default function SubscriptionsPage() {
   const { hasPermission } = useAdminAuth();
   const canManageSubscriptions = hasPermission("admin:subscriptions:manage");
 
-  // Vue active : "offers" (Fiches d'offres - Principale) | "subscriptions" (Clients abonnés) | "analytics" (MRR/ARR)
-  const [activeView, setActiveView] = useState<"offers" | "subscriptions" | "analytics">("offers");
+  // Vue active : "offers" | "subscriptions" | "analytics" | "requests"
+  const [activeView, setActiveView] = useState<"offers" | "subscriptions" | "analytics" | "requests">("offers");
 
   const [plans, setPlans] = useState<CommercialPlan[]>([]);
   const [moduleGroups, setModuleGroups] = useState<PlatformModuleGroup[]>(DEFAULT_MODULE_GROUPS);
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [metrics, setMetrics] = useState<FinancialMetrics | null>(null);
+  const [upgradeRequests, setUpgradeRequests] = useState<SubscriptionUpgradeRequestItem[]>([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string>("ALL");
+  const [requestSearch, setRequestSearch] = useState<string>("");
+  const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(null);
+  const [requestFeedbackMsg, setRequestFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -414,7 +423,7 @@ export default function SubscriptionsPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const [plansData, modulesData, metricsData, subsData] = await Promise.all([
+      const [plansData, modulesData, metricsData, subsData, requestsData] = await Promise.all([
         adminApi.subscriptions.getPlans(),
         adminApi.subscriptions.getModules().catch(() => DEFAULT_MODULE_GROUPS),
         adminApi.subscriptions.getMetrics().catch(() => null),
@@ -423,6 +432,7 @@ export default function SubscriptionsPage() {
           plan: subPlanFilter || undefined,
           search: subSearch || undefined,
         }).catch(() => ({ data: [], total: 0 })),
+        adminApi.subscriptions.getUpgradeRequests().catch(() => ({ data: [], pendingCount: 0, total: 0 })),
       ]);
 
       setPlans(plansData);
@@ -431,6 +441,8 @@ export default function SubscriptionsPage() {
       }
       setMetrics(metricsData);
       setSubscriptions(subsData.data || []);
+      setUpgradeRequests(requestsData.data || []);
+      setPendingRequestsCount(requestsData.pendingCount ?? 0);
     } catch (err: unknown) {
       setApiError(
         (err as Error).message || "Impossible de joindre le serveur API Symfony sur http://127.0.0.1:8000."
@@ -443,6 +455,16 @@ export default function SubscriptionsPage() {
   useEffect(() => {
     fetchData();
   }, [subStatusFilter, subPlanFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab") || params.get("view");
+      if (tab === "requests" || tab === "subscriptions" || tab === "analytics" || tab === "offers") {
+        setActiveView(tab as any);
+      }
+    }
+  }, []);
 
   // Filtrage des fiches d'offres
   const filteredPlans = useMemo(() => {
@@ -719,6 +741,78 @@ export default function SubscriptionsPage() {
     }
   };
 
+  // Traitement des demandes d'offres formulées par les éleveurs
+  const handleApproveRequest = async (req: SubscriptionUpgradeRequestItem) => {
+    if (
+      !window.confirm(
+        `Valider la demande pour l'exploitation "${req.farmName}" et activer immédiatement l'offre "${req.targetPlanName}" ?`
+      )
+    ) {
+      return;
+    }
+
+    setIsProcessingRequest(req.id);
+    setRequestFeedbackMsg(null);
+    try {
+      const res = await adminApi.subscriptions.approveUpgradeRequest(req.id);
+      setRequestFeedbackMsg({ type: "success", text: res.message });
+      await fetchData();
+    } catch (err: unknown) {
+      setRequestFeedbackMsg({
+        type: "error",
+        text: (err as Error).message || "Erreur lors de la validation de la demande.",
+      });
+    } finally {
+      setIsProcessingRequest(null);
+    }
+  };
+
+  const handleRejectRequest = async (req: SubscriptionUpgradeRequestItem) => {
+    const reason = window.prompt(
+      `Motif du refus pour la ferme "${req.farmName}" :`,
+      "Non éligible ou conditions d'accès non remplies"
+    );
+    if (reason === null) return;
+
+    setIsProcessingRequest(req.id);
+    setRequestFeedbackMsg(null);
+    try {
+      const res = await adminApi.subscriptions.rejectUpgradeRequest(
+        req.id,
+        reason.trim() || "Demande refusée par l'administrateur"
+      );
+      setRequestFeedbackMsg({ type: "success", text: res.message });
+      await fetchData();
+    } catch (err: unknown) {
+      setRequestFeedbackMsg({
+        type: "error",
+        text: (err as Error).message || "Erreur lors du rejet de la demande.",
+      });
+    } finally {
+      setIsProcessingRequest(null);
+    }
+  };
+
+  const filteredRequests = useMemo(() => {
+    return upgradeRequests.filter((r) => {
+      if (requestStatusFilter !== "ALL" && r.status !== requestStatusFilter) {
+        return false;
+      }
+      if (requestSearch.trim()) {
+        const q = requestSearch.toLowerCase();
+        const matches =
+          r.farmName.toLowerCase().includes(q) ||
+          r.organizationName.toLowerCase().includes(q) ||
+          r.userName.toLowerCase().includes(q) ||
+          r.userEmail.toLowerCase().includes(q) ||
+          r.targetPlan.toLowerCase().includes(q) ||
+          r.targetPlanName.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [upgradeRequests, requestStatusFilter, requestSearch]);
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-background">
       <AdminHeader
@@ -768,6 +862,36 @@ export default function SubscriptionsPage() {
           />
         </div>
 
+        {/* Alerte demande(s) en attente */}
+        {pendingRequestsCount > 0 && activeView !== "requests" && (
+          <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-foreground flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <Clock className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                  <span>{pendingRequestsCount} demande{pendingRequestsCount > 1 ? "s" : ""} de changement d'offre en attente</span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500 text-white">
+                    Action requise
+                  </span>
+                </p>
+                <p className="text-[11px] text-muted mt-0.5">
+                  Une ou plusieurs exploitations demandent à changer de formule. Consultez et validez les demandes en 1 clic.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setActiveView("requests")}
+              className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-xs gap-1.5 self-start sm:self-auto shrink-0"
+            >
+              <span>Consulter la demande</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
         {/* Barre d'actions & Sélecteur de vue */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
           <div className="flex items-center gap-1.5 p-1 bg-surface-muted/60 border border-border rounded-xl">
@@ -800,6 +924,23 @@ export default function SubscriptionsPage() {
               }`}
             >
               Revenus
+            </button>
+            <button
+              onClick={() => setActiveView("requests")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeView === "requests"
+                  ? "bg-surface text-foreground shadow-xs"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              <span>Demandes</span>
+              {pendingRequestsCount > 0 ? (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500 text-white animate-pulse">
+                  {pendingRequestsCount}
+                </span>
+              ) : (
+                <span className="text-[10px] text-muted">({upgradeRequests.length})</span>
+              )}
             </button>
           </div>
 
@@ -1431,6 +1572,216 @@ export default function SubscriptionsPage() {
                     </div>
                   );
                 })}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* VUE 4 : DEMANDES DE CHANGEMENT D'OFFRE */}
+        {activeView === "requests" && (
+          <div className="space-y-6">
+            {/* Feedback message banner */}
+            {requestFeedbackMsg && (
+              <div
+                className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                  requestFeedbackMsg.type === "success"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                    : "bg-danger/10 border-danger/30 text-danger"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {requestFeedbackMsg.type === "success" ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  )}
+                  <span>{requestFeedbackMsg.text}</span>
+                </div>
+                <button
+                  onClick={() => setRequestFeedbackMsg(null)}
+                  className="hover:opacity-75 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Barre de filtres des demandes */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-surface border border-border">
+              <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted" />
+                  <Input
+                    placeholder="Rechercher par ferme, éleveur, formule..."
+                    value={requestSearch}
+                    onChange={(e) => setRequestSearch(e.target.value)}
+                    className="pl-9 text-xs h-9"
+                  />
+                </div>
+
+                <select
+                  value={requestStatusFilter}
+                  onChange={(e) => setRequestStatusFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-border bg-surface text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+                >
+                  <option value="ALL">Tous les statuts ({upgradeRequests.length})</option>
+                  <option value="PENDING">
+                    En attente ({upgradeRequests.filter((r) => r.status === "PENDING").length})
+                  </option>
+                  <option value="APPROVED">
+                    Validées ({upgradeRequests.filter((r) => r.status === "APPROVED").length})
+                  </option>
+                  <option value="REJECTED">
+                    Refusées ({upgradeRequests.filter((r) => r.status === "REJECTED").length})
+                  </option>
+                </select>
+              </div>
+
+              <span className="text-xs text-muted">
+                {filteredRequests.length} demande{filteredRequests.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Liste des demandes */}
+            <Card>
+              <CardContent className="p-0">
+                {filteredRequests.length === 0 ? (
+                  <EmptyState
+                    icon={<Clock className="h-8 w-8 text-muted" />}
+                    title="Aucune demande de changement d'offre"
+                    description={
+                      requestStatusFilter === "PENDING"
+                        ? "Toutes les demandes ont été traitées."
+                        : "Aucune demande ne correspond à vos critères de recherche."
+                    }
+                    className="py-12"
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface-muted/50 border-b border-border/80 text-muted uppercase text-[10px] tracking-wider font-semibold">
+                        <tr>
+                          <th className="py-3 px-4">Exploitation / Éleveur</th>
+                          <th className="py-3 px-3">Formule demandée</th>
+                          <th className="py-3 px-3">Facturation</th>
+                          <th className="py-3 px-3">Date</th>
+                          <th className="py-3 px-3">Statut</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {filteredRequests.map((req) => {
+                          const isProcessing = isProcessingRequest === req.id;
+
+                          return (
+                            <tr key={req.id} className="hover:bg-surface-hover transition-colors">
+                              <td className="py-3.5 px-4">
+                                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                  <span>{req.farmName}</span>
+                                  <span className="text-[10px] font-normal text-muted">
+                                    ({req.organizationName})
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-muted mt-0.5">
+                                  Demandé par <span className="text-foreground font-medium">{req.userName}</span>
+                                  {req.userEmail && <span> — {req.userEmail}</span>}
+                                </div>
+                                {req.message && (
+                                  <div className="mt-2 p-2 rounded-lg bg-surface-muted/80 border border-border/60 text-[11px] text-foreground flex items-start gap-1.5">
+                                    <MessageSquare className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                                    <span className="italic">« {req.message} »</span>
+                                  </div>
+                                )}
+                                {req.adminNotes && req.status === "REJECTED" && (
+                                  <div className="mt-1.5 text-[10px] text-danger">
+                                    Motif du refus : {req.adminNotes}
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="py-3.5 px-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] font-mono">
+                                    {req.currentPlan}
+                                  </Badge>
+                                  <ArrowRight className="h-3 w-3 text-muted" />
+                                  <Badge variant="default" className="text-xs font-bold">
+                                    {req.targetPlanName} ({req.targetPlan})
+                                  </Badge>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-3">
+                                <span className="text-xs text-foreground font-medium">
+                                  {req.billingCycle === "ANNUALLY" ? "Annuel (-17%)" : "Mensuel"}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-3 text-muted text-[11px]">
+                                {formatDate(req.createdAt)}
+                              </td>
+
+                              <td className="py-3.5 px-3">
+                                {req.status === "PENDING" && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                    <Clock className="h-3 w-3" />
+                                    En attente
+                                  </span>
+                                )}
+                                {req.status === "APPROVED" && (
+                                  <div className="space-y-0.5">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Validée
+                                    </span>
+                                    {req.processedByName && (
+                                      <p className="text-[9px] text-muted">
+                                        Par {req.processedByName}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                                {req.status === "REJECTED" && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-danger/10 text-danger border border-danger/20">
+                                    <X className="h-3 w-3" />
+                                    Refusée
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-right">
+                                {req.status === "PENDING" && canManageSubscriptions && (
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      disabled={isProcessing}
+                                      onClick={() => handleApproveRequest(req)}
+                                      className="text-xs h-8 gap-1 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      <span>Valider</span>
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={isProcessing}
+                                      onClick={() => handleRejectRequest(req)}
+                                      className="text-xs h-8 gap-1 text-danger hover:bg-danger/10 border-danger/30 cursor-pointer"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                      <span>Refuser</span>
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

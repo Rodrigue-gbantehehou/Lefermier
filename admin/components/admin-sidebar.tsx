@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ShieldAlert,
   KeyRound,
+  ArrowUpRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,12 @@ const navigationItems = [
     label: "Abonnements",
     href: "/subscriptions",
     icon: CreditCard,
+    permission: "admin:subscriptions:view",
+  },
+  {
+    label: "Demandes d'offres",
+    href: "/subscriptions?tab=requests",
+    icon: ArrowUpRight,
     permission: "admin:subscriptions:view",
   },
   {

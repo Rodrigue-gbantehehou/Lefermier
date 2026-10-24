@@ -6,6 +6,7 @@ import {
   OfferStatus,
   PlatformModuleGroup,
   SubscriptionItem,
+  SubscriptionUpgradeRequestItem,
   UpdatePlanPayload,
 } from "../types";
 
@@ -143,4 +144,43 @@ export const subscriptionsApi = {
       }
     );
   },
+
+  /**
+   * Récupère la liste des demandes de changement de formule formulées par les éleveurs.
+   */
+  async getUpgradeRequests(status?: string): Promise<{
+    data: SubscriptionUpgradeRequestItem[];
+    pendingCount: number;
+    total: number;
+  }> {
+    const qs = status ? `?status=${status}` : "";
+    return await apiRequest(`/api/admin/subscriptions/upgrade-requests${qs}`);
+  },
+
+  /**
+   * Valide en 1 clic une demande d'abonnement (met à jour la formule de l'organisation).
+   */
+  async approveUpgradeRequest(
+    id: string,
+    adminNotes?: string
+  ): Promise<{ status: string; message: string; data: SubscriptionUpgradeRequestItem }> {
+    return await apiRequest(`/api/admin/subscriptions/upgrade-requests/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ adminNotes }),
+    });
+  },
+
+  /**
+   * Refuse une demande d'abonnement avec un motif.
+   */
+  async rejectUpgradeRequest(
+    id: string,
+    adminNotes: string
+  ): Promise<{ status: string; message: string; data: SubscriptionUpgradeRequestItem }> {
+    return await apiRequest(`/api/admin/subscriptions/upgrade-requests/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ adminNotes }),
+    });
+  },
 };
+
