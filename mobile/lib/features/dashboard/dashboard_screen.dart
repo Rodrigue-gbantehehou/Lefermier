@@ -32,44 +32,56 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            InkWell(
-              onTap: () => FarmSelectionSheet.show(context),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: "Menu",
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: InkWell(
+          onTap: () => FarmSelectionSheet.show(context),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.circle, size: 8, color: AppColors.primary),
-                    const SizedBox(width: 6),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 160),
-                      child: Text(
-                        authState.activeFarm?.name ?? "Ferme Avicole",
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.primary),
-                  ],
-                ),
-              ),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.agriculture_rounded, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    authState.activeFarm?.name ?? "Ferme Avicole",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.primary),
+              ],
+            ),
+          ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: isDark ? Colors.amber : null,
+              size: 20,
+            ),
+            tooltip: isDark ? "Mode clair" : "Mode sombre",
+            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
+          ),
           IconButton(
             icon: const Icon(Icons.sync_rounded),
             tooltip: "Actualiser",
@@ -78,27 +90,13 @@ class DashboardScreen extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Tableau de bord actualisé"),
+                    content: Text("Données actualisées"),
                     backgroundColor: AppColors.primary,
                     duration: Duration(seconds: 1),
                   ),
                 );
               }
             },
-          ),
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? Colors.amber : null,
-              size: 20,
-            ),
-            tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
-            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, size: 20),
-            tooltip: "Déconnexion",
-            onPressed: () => ref.read(authProvider.notifier).logout(),
           ),
         ],
       ),
@@ -112,6 +110,49 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Salutation mobile personnalisée
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14, top: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Bonjour 👋",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                "Point de situation de votre élevage",
+                                style: TextStyle(fontSize: 12, color: AppColors.textMutedLight),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
+                                SizedBox(width: 4),
+                                Text(
+                                  "En ligne",
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     // KPI 2x2 Grid dynamique
                     GridView.count(
                       crossAxisCount: 2,

@@ -85,8 +85,27 @@ class HealthController extends AbstractController
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateHealthTreatmentRequestDto $dto,
-        #[CurrentUser] User $user
+        #[CurrentUser] User $user,
+        Request $request
     ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
+
+        if ($idempotencyKey !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $farm,
+                fn () => $this->doCreateTreatment($farm, $dto, $user)
+            );
+        }
+
+        return $this->doCreateTreatment($farm, $dto, $user);
+    }
+
+    private function doCreateTreatment(Farm $farm, CreateHealthTreatmentRequestDto $dto, User $user): JsonResponse
+    {
         $treatment = $this->healthService->createTreatment($farm, $dto, $user);
 
         return $this->json([
@@ -143,7 +162,7 @@ class HealthController extends AbstractController
         ]);
     }
 
-    #[Route('/api/health-treatments/{id}/complete', name: 'api_health_treatments_complete', methods: ['POST'])]
+    #[Route('/api/health-treatments/{id}/complete', name: 'api_health_treatments_complete', methods: ['POST', 'PUT'])]
     #[IsGranted(HealthTreatmentVoter::COMPLETE, subject: 'treatment')]
     public function complete(
         HealthTreatment $treatment,
@@ -151,7 +170,7 @@ class HealthController extends AbstractController
         #[CurrentUser] User $user,
         Request $request
     ): JsonResponse {
-        $idempotencyKey = $request->headers->get('Idempotency-Key');
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
 
         if ($idempotencyKey !== null) {
             /** @var JsonResponse */

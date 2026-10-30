@@ -394,6 +394,13 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: "Menu",
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
         title: const Text("Caisse & Finances"),
         actions: [
           IconButton(
@@ -436,27 +443,101 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Filtres par type
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                    // Filtre segmenté mobile 3 boutons
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(4),
                       child: Row(
                         children: [
-                          FilterChip(
-                            label: const Text("Toutes les opérations"),
-                            selected: financeState.filterType == null,
-                            onSelected: (_) => ref.read(financeProvider.notifier).setFilterType(null),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(financeProvider.notifier).setFilterType(null),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: financeState.filterType == null
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: financeState.filterType == null
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Toutes",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: financeState.filterType == null ? FontWeight.bold : FontWeight.w500,
+                                    color: financeState.filterType == null
+                                        ? AppColors.primary
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          FilterChip(
-                            label: const Text("Recettes (+)"),
-                            selected: financeState.filterType == "INCOME",
-                            onSelected: (_) => ref.read(financeProvider.notifier).setFilterType(financeState.filterType == "INCOME" ? null : "INCOME"),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(financeProvider.notifier).setFilterType("INCOME"),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: financeState.filterType == "INCOME"
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: financeState.filterType == "INCOME"
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Recettes (+)",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: financeState.filterType == "INCOME" ? FontWeight.bold : FontWeight.w500,
+                                    color: financeState.filterType == "INCOME"
+                                        ? AppColors.success
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          FilterChip(
-                            label: const Text("Dépenses (-)"),
-                            selected: financeState.filterType == "EXPENSE",
-                            onSelected: (_) => ref.read(financeProvider.notifier).setFilterType(financeState.filterType == "EXPENSE" ? null : "EXPENSE"),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(financeProvider.notifier).setFilterType("EXPENSE"),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: financeState.filterType == "EXPENSE"
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: financeState.filterType == "EXPENSE"
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Dépenses (-)",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: financeState.filterType == "EXPENSE" ? FontWeight.bold : FontWeight.w500,
+                                    color: financeState.filterType == "EXPENSE"
+                                        ? AppColors.danger
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -610,7 +691,7 @@ class _CaisseSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -619,61 +700,69 @@ class _CaisseSummaryCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Solde Net de Caisse",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
               Row(
                 children: [
-                  InkWell(
-                    onTap: onAddIncome,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        "+ Recette",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.success),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.success, size: 20),
                   ),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: onAddExpense,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Trésorerie & Caisse",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                       ),
-                      child: const Text(
-                        "- Dépense",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.danger),
+                      Text(
+                        "Solde cumulé du mois (FCFA)",
+                        style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isPositive ? AppColors.success : AppColors.danger).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isPositive ? "Bénéficiaire" : "Déficitaire",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isPositive ? AppColors.success : AppColors.danger,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
+
+          // Solde Net
           Text(
             "${isPositive ? '+' : ''}${CurrencyFormatter.formatFcfa(summary.netBalance)}",
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: FontWeight.w900,
               fontFamily: 'monospace',
               color: isPositive ? AppColors.success : AppColors.danger,
             ),
           ),
           const SizedBox(height: 12),
+
+          // Recettes vs Dépenses
           Row(
             children: [
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -682,14 +771,14 @@ class _CaisseSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "Total Recettes",
+                        "Entrées",
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.success),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         "+${CurrencyFormatter.formatFcfa(summary.totalIncome)}",
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                           fontFamily: 'monospace',
                           color: AppColors.success,
@@ -702,7 +791,7 @@ class _CaisseSummaryCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -711,20 +800,54 @@ class _CaisseSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "Total Dépenses",
+                        "Sorties",
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         "-${CurrencyFormatter.formatFcfa(summary.totalExpense)}",
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                           fontFamily: 'monospace',
                           color: AppColors.danger,
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Deux boutons d'action mobile larges
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onAddIncome,
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text("Encaisser"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onAddExpense,
+                  icon: const Icon(Icons.remove_rounded, size: 16),
+                  label: const Text("Dépense"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),

@@ -88,25 +88,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     final navBgColor = isDark ? AppColors.surfaceDark : Colors.white;
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
 
-    // Détermination adaptative du 4e onglet selon l'offre et les droits
-    final bool showFinance = farm == null || farm.canViewFinance;
-    final bool showEggs = !showFinance && (farm.canViewEggs);
-
-    final String dynamicTabLabel = showFinance
-        ? "Caisse"
-        : (showEggs ? "Ponte" : "Bâtiments");
-
-    final IconData dynamicTabIcon = showFinance
-        ? Icons.account_balance_wallet_outlined
-        : (showEggs ? Icons.egg_outlined : Icons.warehouse_outlined);
-
-    final IconData dynamicTabActiveIcon = showFinance
-        ? Icons.account_balance_wallet_rounded
-        : (showEggs ? Icons.egg_rounded : Icons.warehouse_rounded);
-
-    final Widget dynamicTabScreen = showFinance
-        ? const FinancesScreen()
-        : (showEggs ? const EggsScreen() : const FlocksScreen());
+    // Détermination adaptative des onglets selon l'offre et les droits
+    final bool canEgg = farm == null || farm.canViewEggs;
 
     final screens = [
       DashboardScreen(
@@ -117,7 +100,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       ),
       const FlocksScreen(),
       const EggsScreen(),
-      dynamicTabScreen,
+      const FinancesScreen(),
     ];
 
     // Sécurité d'index
@@ -132,14 +115,14 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           }
         },
       ),
-      extendBody: false, // Fond protecteur : le contenu ne passe pas sous la barre
+      extendBody: false,
       body: IndexedStack(
         index: safeIndex,
         children: screens,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openQuickActions,
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 6,
         shape: const CircleBorder(),
@@ -182,28 +165,28 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                 // 2. Bandes
                 _buildNavItem(
                   index: 1,
-                  icon: Icons.grid_view_outlined,
-                  activeIcon: Icons.grid_view_rounded,
+                  icon: Icons.pets_outlined,
+                  activeIcon: Icons.pets_rounded,
                   label: "Bandes",
                 ),
 
                 // Espace pour le FAB central
-                const SizedBox(width: 44),
+                const SizedBox(width: 48),
 
-                // 4. Onglet adaptatif selon le rôle & abonnement (Caisse ou Ponte)
+                // 3. Ponte
                 _buildNavItem(
-                  index: 3,
-                  icon: dynamicTabIcon,
-                  activeIcon: dynamicTabActiveIcon,
-                  label: dynamicTabLabel,
+                  index: 2,
+                  icon: Icons.egg_outlined,
+                  activeIcon: Icons.egg_rounded,
+                  label: canEgg ? "Ponte" : "Soins",
                 ),
 
-                // 5. Menu Complet
+                // 4. Caisse & Ventes
                 _buildNavItem(
-                  index: 4,
-                  icon: Icons.menu_rounded,
-                  activeIcon: Icons.menu_open_rounded,
-                  label: "Menu",
+                  index: 3,
+                  icon: Icons.account_balance_wallet_outlined,
+                  activeIcon: Icons.account_balance_wallet_rounded,
+                  label: "Caisse",
                 ),
               ],
             ),

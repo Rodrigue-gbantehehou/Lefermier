@@ -438,6 +438,13 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: "Menu",
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
         title: const Text("Ramassage d'œufs"),
         actions: [
           IconButton(
@@ -475,33 +482,51 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Bannière récapitulative des statistiques de ponte
-                    _EggStatsCard(summary: summary),
+                    // Bannière héro récapitulative des statistiques de ponte
+                    _EggStatsCard(
+                      summary: summary,
+                      onCollect: () => _openRecordEggDialog(eggState.layerFlocks, eggState.selectedFlockId),
+                    ),
                     const SizedBox(height: 16),
 
-                    // Filtre par bande si multiple
+                    // Sélecteur de bande compact si plusieurs bandes
                     if (eggState.layerFlocks.length > 1) ...[
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                        ),
                         child: Row(
                           children: [
-                            FilterChip(
-                              label: const Text("Toutes les bandes"),
-                              selected: eggState.selectedFlockId == null,
-                              onSelected: (_) => ref.read(eggProvider.notifier).filterByFlock(null),
-                            ),
-                            const SizedBox(width: 8),
-                            ...eggState.layerFlocks.map((flock) {
-                              final isSelected = eggState.selectedFlockId == flock.id;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  label: Text(flock.name),
-                                  selected: isSelected,
-                                  onSelected: (_) => ref.read(eggProvider.notifier).filterByFlock(isSelected ? null : flock.id),
+                            const Icon(Icons.filter_list_rounded, size: 18, color: AppColors.accent),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String?>(
+                                  value: eggState.selectedFlockId,
+                                  isExpanded: true,
+                                  hint: const Text("Toutes les bandes de pondeuses", style: TextStyle(fontSize: 13)),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text("Toutes les bandes de pondeuses", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    ),
+                                    ...eggState.layerFlocks.map((flock) {
+                                      return DropdownMenuItem<String?>(
+                                        value: flock.id,
+                                        child: Text(
+                                          "${flock.name} (${flock.currentQuantity} sujets)",
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) => ref.read(eggProvider.notifier).filterByFlock(val),
                                 ),
-                              );
-                            }),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -705,8 +730,12 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
 
 class _EggStatsCard extends StatelessWidget {
   final EggSummaryStats summary;
+  final VoidCallback onCollect;
 
-  const _EggStatsCard({required this.summary});
+  const _EggStatsCard({
+    required this.summary,
+    required this.onCollect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -718,7 +747,7 @@ class _EggStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -727,53 +756,124 @@ class _EggStatsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Bilan de ponte global",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.egg_rounded, color: AppColors.accent, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Ponte Globale",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        "Alvéoles standard (30 œufs)",
+                        style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  "${summary.collectionsCount} ramassage(s)",
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent),
+                  "${summary.collectionsCount} saisie(s)",
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accent),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+
+          // Grand Chiffre Plateaux
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                "${summary.totalTrays}",
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'monospace',
+                  color: AppColors.accent,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                "plateaux",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              if (summary.totalLooseEggs > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  "+ ${summary.totalLooseEggs} œufs",
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 12),
+
+          // Métriques complémentaires
           Row(
             children: [
               Expanded(
                 child: _KpiMiniTile(
-                  label: "Bons œufs",
+                  label: "Total récolté",
                   value: "${summary.totalGoodEggs}",
-                  unit: "unités",
+                  unit: "œufs",
                   color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _KpiMiniTile(
-                  label: "Plateaux (30)",
-                  value: "${summary.totalTrays}",
-                  unit: "${summary.totalLooseEggs} reste",
-                  color: AppColors.accent,
+                  label: "Taux moyen",
+                  value: "${summary.averageLayingRate.toStringAsFixed(1)}%",
+                  unit: "ponte",
+                  color: Colors.blue.shade600,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _KpiMiniTile(
-                  label: "Taux de ponte",
-                  value: "${summary.averageLayingRate.toStringAsFixed(1)}%",
-                  unit: "moyen",
-                  color: Colors.blue.shade600,
+                  label: "Déclassés / Cassés",
+                  value: "${summary.totalDamagedEggs}",
+                  unit: "pertes",
+                  color: summary.totalDamagedEggs > 0 ? AppColors.danger : AppColors.textMutedLight,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+
+          // Bouton direct mobile
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onCollect,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text("Enregistrer un ramassage"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
           ),
         ],
       ),

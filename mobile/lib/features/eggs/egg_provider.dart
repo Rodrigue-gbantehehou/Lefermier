@@ -17,6 +17,8 @@ class EggSummaryStats {
   final double averageLayingRate;
   final int collectionsCount;
 
+  int get totalDamagedEggs => totalCrackedEggs + totalDirtyEggs + totalDeformedEggs;
+
   const EggSummaryStats({
     this.totalGoodEggs = 0,
     this.totalCrackedEggs = 0,

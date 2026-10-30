@@ -4,6 +4,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
+import '../health/health_screen.dart';
+import '../inventory/inventory_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -175,8 +177,8 @@ class AppDrawer extends ConsumerWidget {
                       label: "Santé & Traitements",
                       onTap: () {
                         Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Module Santé & Soins")),
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const HealthScreen()),
                         );
                       },
                     ),
@@ -188,8 +190,8 @@ class AppDrawer extends ConsumerWidget {
                       label: "Stocks & Intrants",
                       onTap: () {
                         Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Module Stocks & Alimentation")),
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const InventoryScreen()),
                         );
                       },
                     ),

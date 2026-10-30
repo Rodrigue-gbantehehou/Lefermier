@@ -26,6 +26,10 @@ class ApiEndpoints {
   static String flockEggs(String flockId) => "/api/flocks/$flockId/egg-productions";
   static String farmTransactions(String farmId) => "/api/farms/$farmId/transactions";
   static String farmDashboard(String farmId) => "/api/farms/$farmId/dashboard";
+  static String farmInventory(String farmId) => "/api/farms/$farmId/inventory";
+  static String inventoryMovements(String itemId) => "/api/inventory/$itemId/movements";
+  static String farmHealth(String farmId) => "/api/farms/$farmId/health-treatments";
+  static String completeHealthTreatment(String treatmentId) => "/api/health-treatments/$treatmentId/complete";
 
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";

@@ -577,6 +577,13 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: "Menu",
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
         title: const Text("Bandes & Lots"),
         actions: [
           IconButton(
@@ -618,27 +625,101 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Filtres par type
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                    // Filtre segmenté mobile 3 boutons
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(4),
                       child: Row(
                         children: [
-                          FilterChip(
-                            label: const Text("Toutes les bandes"),
-                            selected: flockState.filterType == null,
-                            onSelected: (_) => ref.read(flockProvider.notifier).setFilterType(null),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(flockProvider.notifier).setFilterType(null),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: flockState.filterType == null
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: flockState.filterType == null
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Toutes",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: flockState.filterType == null ? FontWeight.bold : FontWeight.w500,
+                                    color: flockState.filterType == null
+                                        ? AppColors.primary
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          FilterChip(
-                            label: const Text("Pondeuses"),
-                            selected: flockState.filterType == "LAYER",
-                            onSelected: (_) => ref.read(flockProvider.notifier).setFilterType(flockState.filterType == "LAYER" ? null : "LAYER"),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(flockProvider.notifier).setFilterType("LAYER"),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: flockState.filterType == "LAYER"
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: flockState.filterType == "LAYER"
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Pondeuses",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: flockState.filterType == "LAYER" ? FontWeight.bold : FontWeight.w500,
+                                    color: flockState.filterType == "LAYER"
+                                        ? AppColors.accent
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          FilterChip(
-                            label: const Text("Poulets de chair"),
-                            selected: flockState.filterType == "BROILER",
-                            onSelected: (_) => ref.read(flockProvider.notifier).setFilterType(flockState.filterType == "BROILER" ? null : "BROILER"),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => ref.read(flockProvider.notifier).setFilterType("BROILER"),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: flockState.filterType == "BROILER"
+                                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: flockState.filterType == "BROILER"
+                                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "Poulets Chair",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: flockState.filterType == "BROILER" ? FontWeight.bold : FontWeight.w500,
+                                    color: flockState.filterType == "BROILER"
+                                        ? Colors.blue.shade700
+                                        : AppColors.textMutedLight,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -849,7 +930,7 @@ class _CheptelStatsCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -858,64 +939,108 @@ class _CheptelStatsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Cheptel Total de l'Exploitation",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              InkWell(
-                onTap: onCreateFlock,
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(6),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.pets_rounded, color: AppColors.primary, size: 20),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.add, size: 12, color: AppColors.primary),
-                      SizedBox(width: 4),
                       Text(
-                        "Nouvelle bande",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        "Cheptel Global",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        "Effectif vivant de l'exploitation",
+                        style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
                       ),
                     ],
                   ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "${summary.activeFlocksCount} lot(s)",
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+
+          // Grand Chiffre
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                "${summary.totalBirds}",
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'monospace',
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                "volailles vivantes",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
+
+          // Mini tuiles
           Row(
             children: [
               Expanded(
                 child: _CheptelMiniTile(
-                  label: "Sujets vivants",
-                  value: "${summary.totalBirds}",
-                  unit: "actifs",
+                  label: "Lots actifs",
+                  value: "${summary.activeFlocksCount}",
+                  unit: "bandes",
                   color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _CheptelMiniTile(
-                  label: "Bandes actives",
-                  value: "${summary.activeFlocksCount}",
-                  unit: "lots",
-                  color: AppColors.accent,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _CheptelMiniTile(
-                  label: "Taux perte",
+                  label: "Taux de perte",
                   value: "${summary.averageMortality.toStringAsFixed(1)}%",
                   unit: "global",
                   color: summary.averageMortality > 5 ? AppColors.danger : AppColors.success,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+
+          // Bouton direct mobile
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onCreateFlock,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text("Créer une nouvelle bande"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
           ),
         ],
       ),
