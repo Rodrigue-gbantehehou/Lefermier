@@ -7,10 +7,12 @@ namespace App\Controller;
 use App\Dto\EggProduction\CreateEggProductionRequestDto;
 use App\Dto\EggProduction\UpdateEggProductionRequestDto;
 use App\Entity\EggProduction;
+use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\User;
 use App\Repository\EggProductionRepository;
 use App\Security\Voter\EggProductionVoter;
+use App\Security\Voter\FarmVoter;
 use App\Service\EggProductionService;
 use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +31,36 @@ class EggProductionController extends AbstractController
         private readonly EggProductionRepository $eggProductionRepository,
         private readonly IdempotencyService $idempotencyService,
     ) {
+    }
+
+    #[Route('/api/farms/{id}/egg-productions', name: 'api_farms_egg_productions_list', methods: ['GET'])]
+    #[IsGranted(FarmVoter::VIEW, subject: 'farm')]
+    public function listByFarm(
+        Farm $farm,
+        Request $request,
+    ): JsonResponse {
+        $startDateParam = $request->query->get('startDate');
+        $endDateParam = $request->query->get('endDate');
+        $limit = $request->query->getInt('limit', 100);
+
+        $startDate = $startDateParam !== null ? new \DateTimeImmutable((string) $startDateParam) : null;
+        $endDate = $endDateParam !== null ? new \DateTimeImmutable((string) $endDateParam) : null;
+
+        $productions = $this->eggProductionRepository->findByFarm($farm, $startDate, $endDate, $limit);
+        $summary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate);
+
+        $serialized = array_map(
+            fn (EggProduction $p) => $this->eggProductionService->serializeEggProduction($p),
+            $productions
+        );
+
+        return $this->json([
+            'data' => $serialized,
+            'meta' => [
+                'totalItems' => count($serialized),
+                'summary' => $summary,
+            ],
+        ]);
     }
 
     #[Route('/api/flocks/{id}/egg-productions', name: 'api_flocks_egg_productions_list', methods: ['GET'])]
@@ -68,7 +100,7 @@ class EggProductionController extends AbstractController
         #[CurrentUser] ?User $user,
         Request $request,
     ): JsonResponse {
-        $idempotencyKey = $request->headers->get('Idempotency-Key');
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
 
         if ($idempotencyKey !== null && $user !== null) {
             /** @var JsonResponse */

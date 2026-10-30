@@ -109,40 +109,6 @@ class DashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Action Immédiate Bar
-              Row(
-                children: [
-                  _QuickTapTile(
-                    label: "Ramasser",
-                    icon: Icons.egg_outlined,
-                    color: AppColors.accent,
-                    onTap: onNavigateToEggs,
-                  ),
-                  const SizedBox(width: 8),
-                  _QuickTapTile(
-                    label: "Nourrir",
-                    icon: Icons.restaurant_outlined,
-                    color: Colors.blue.shade600,
-                    onTap: onOpenQuickActions,
-                  ),
-                  const SizedBox(width: 8),
-                  _QuickTapTile(
-                    label: "Perte",
-                    icon: Icons.warning_amber_rounded,
-                    color: AppColors.danger,
-                    onTap: onOpenQuickActions,
-                  ),
-                  const SizedBox(width: 8),
-                  _QuickTapTile(
-                    label: "Encaisser",
-                    icon: Icons.add_circle_outline,
-                    color: AppColors.success,
-                    onTap: onNavigateToFinances,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
               // KPI 2x2 Grid
               GridView.count(
                 crossAxisCount: 2,
@@ -300,53 +266,6 @@ class DashboardScreen extends ConsumerWidget {
               ),
 
               const SizedBox(height: 80), // Space for bottom navigation
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickTapTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickTapTile({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                ),
-              ),
             ],
           ),
         ),

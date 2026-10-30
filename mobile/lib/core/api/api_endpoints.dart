@@ -18,6 +18,12 @@ class ApiEndpoints {
   static const String inventory = "/api/inventory";
   static const String health = "/api/health";
 
+  // Helpers paramétrés par ID d'exploitation ou de bande
+  static String farmFlocks(String farmId) => "/api/farms/$farmId/flocks";
+  static String farmEggs(String farmId) => "/api/farms/$farmId/egg-productions";
+  static String flockEggs(String flockId) => "/api/flocks/$flockId/egg-productions";
+  static String farmTransactions(String farmId) => "/api/farms/$farmId/transactions";
+
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";
 }

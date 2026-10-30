@@ -52,6 +52,40 @@ class EggProductionRepository extends ServiceEntityRepository
     /**
      * @return EggProduction[]
      */
+    public function findByFarm(
+        \App\Entity\Farm $farm,
+        ?\DateTimeImmutable $startDate = null,
+        ?\DateTimeImmutable $endDate = null,
+        int $limit = 100
+    ): array {
+        $qb = $this->createQueryBuilder('p')
+            ->innerJoin('p.flock', 'f')
+            ->andWhere('f.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->leftJoin('p.recordedBy', 'u')
+            ->addSelect('u')
+            ->leftJoin('p.flock', 'flock')
+            ->addSelect('flock')
+            ->orderBy('p.productionDate', 'DESC')
+            ->addOrderBy('p.createdAt', 'DESC')
+            ->setMaxResults($limit);
+
+        if ($startDate !== null) {
+            $qb->andWhere('p.productionDate >= :startDate')
+                ->setParameter('startDate', $startDate->format('Y-m-d'));
+        }
+
+        if ($endDate !== null) {
+            $qb->andWhere('p.productionDate <= :endDate')
+                ->setParameter('endDate', $endDate->format('Y-m-d'));
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @return EggProduction[]
+     */
     public function findUpdatedSince(\App\Entity\Farm $farm, ?\DateTimeImmutable $since = null, int $limit = 500): array
     {
         $qb = $this->createQueryBuilder('p')

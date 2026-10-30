@@ -30,13 +30,13 @@ class Flock {
     return Flock(
       id: json['id'] as String,
       name: json['name'] as String,
-      type: json['type'] as String? ?? "LAYER",
-      breed: json['breed'] as String? ?? "",
+      type: json['poultryType'] as String? ?? json['type'] as String? ?? "LAYER",
+      breed: json['strain'] as String? ?? json['breed'] as String? ?? "",
       initialQuantity: json['initialQuantity'] as int? ?? 0,
       currentQuantity: json['currentQuantity'] as int? ?? (json['initialQuantity'] as int? ?? 0),
       startDate: json['startDate'] as String? ?? "",
       status: json['status'] as String? ?? "ACTIVE",
-      buildingId: json['buildingId'] as String?,
+      buildingId: json['building']?['id'] as String? ?? json['buildingId'] as String?,
       buildingName: json['building']?['name'] as String?,
     );
   }
