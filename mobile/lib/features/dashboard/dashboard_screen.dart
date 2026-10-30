@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
+import 'dashboard_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
   final VoidCallback onOpenQuickActions;
@@ -22,6 +24,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final dashState = ref.watch(dashboardProvider);
+    final kpi = dashState.kpi;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
@@ -68,13 +72,13 @@ class DashboardScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.sync_rounded),
-            tooltip: "Synchroniser",
+            tooltip: "Actualiser",
             onPressed: () async {
-              await ref.read(authProvider.notifier).loadFarms();
+              await ref.read(dashboardProvider.notifier).loadDashboard();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Données synchronisées avec succès"),
+                    content: Text("Tableau de bord actualisé"),
                     backgroundColor: AppColors.primary,
                     duration: Duration(seconds: 1),
                   ),
@@ -82,7 +86,6 @@ class DashboardScreen extends ConsumerWidget {
               }
             },
           ),
-          // Bouton du mode (Light / Dark)
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
@@ -100,175 +103,207 @@ class DashboardScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          await Future.delayed(const Duration(milliseconds: 600));
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // KPI 2x2 Grid
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 1.4,
-                children: [
-                  _KpiCard(
-                    title: "Ponte du jour",
-                    value: "420",
-                    unit: "œufs",
-                    badgeText: "14 plateaux",
-                    badgeColor: AppColors.accent,
-                    icon: Icons.egg_rounded,
-                    onTap: onNavigateToEggs,
-                  ),
-                  _KpiCard(
-                    title: "Cheptel vivant",
-                    value: "500",
-                    unit: "sujets",
-                    badgeText: "100% actif",
-                    badgeColor: AppColors.primary,
-                    icon: Icons.pets_rounded,
-                    onTap: onNavigateToFlocks,
-                  ),
-                  _KpiCard(
-                    title: "Caisse du jour",
-                    value: "+25 000",
-                    unit: "FCFA",
-                    badgeText: "Solde positif",
-                    badgeColor: AppColors.success,
-                    icon: Icons.account_balance_wallet_rounded,
-                    onTap: onNavigateToFinances,
-                  ),
-                  _KpiCard(
-                    title: "Taux de ponte",
-                    value: "84.0%",
-                    unit: "normal",
-                    badgeText: "Plein pic",
-                    badgeColor: Colors.blue.shade600,
-                    icon: Icons.show_chart_rounded,
-                    onTap: onNavigateToEggs,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Mes Lots en élevage
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Lots en élevage",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: onNavigateToFlocks,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(50, 30),
-                    ),
-                    child: const Text(
-                      "Voir tout →",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Flock Preview Card
-              Container(
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                ),
-                padding: const EdgeInsets.all(14),
+        onRefresh: () => ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false),
+        child: dashState.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    // KPI 2x2 Grid dynamique
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.4,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.egg, color: AppColors.primary, size: 20),
+                        _KpiCard(
+                          title: "Ponte du jour",
+                          value: "${kpi.todayGoodEggs}",
+                          unit: "œufs",
+                          badgeText: "${kpi.todayTraysCount} plateaux",
+                          badgeColor: AppColors.accent,
+                          icon: Icons.egg_rounded,
+                          onTap: onNavigateToEggs,
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Pondeuses Bâtiment A",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                "Lohmann Brown • 500 poules",
-                                style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                              ),
-                            ],
-                          ),
+                        _KpiCard(
+                          title: "Cheptel vivant",
+                          value: "${kpi.totalBirds}",
+                          unit: "sujets",
+                          badgeText: "${kpi.activeFlocksCount} lot(s) actif(s)",
+                          badgeColor: AppColors.primary,
+                          icon: Icons.pets_rounded,
+                          onTap: onNavigateToFlocks,
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "84% ponte",
-                            style: TextStyle(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
+                        _KpiCard(
+                          title: "Caisse du mois",
+                          value: CurrencyFormatter.formatFcfa(kpi.currentMonthNetBalance),
+                          unit: "FCFA",
+                          badgeText: kpi.currentMonthNetBalance >= 0 ? "Solde positif" : "Solde négatif",
+                          badgeColor: kpi.currentMonthNetBalance >= 0 ? AppColors.success : AppColors.danger,
+                          icon: Icons.account_balance_wallet_rounded,
+                          onTap: onNavigateToFinances,
+                        ),
+                        _KpiCard(
+                          title: "Taux de ponte",
+                          value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
+                          unit: "journalier",
+                          badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
+                          badgeColor: Colors.blue.shade600,
+                          icon: Icons.show_chart_rounded,
+                          onTap: onNavigateToEggs,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
+
+                    // Lots en élevage réels
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "Hier : 14 plateaux récoltés",
-                          style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                          "Lots en élevage",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        ElevatedButton.icon(
-                          onPressed: onOpenQuickActions,
-                          icon: const Icon(Icons.restaurant_outlined, size: 14),
-                          label: const Text("Nourrir"),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        TextButton(
+                          onPressed: onNavigateToFlocks,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(50, 30),
+                          ),
+                          child: const Text(
+                            "Gérer les bandes →",
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+
+                    if (kpi.flocks.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            const Icon(Icons.pets_outlined, size: 36, color: AppColors.textMutedLight),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Aucun lot actif en élevage",
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: onNavigateToFlocks,
+                              child: const Text("Créer une nouvelle bande"),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ...kpi.flocks.take(2).map((flock) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: surfaceColor,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor),
+                          ),
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: (flock.isLayer ? AppColors.accent : AppColors.primary).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      flock.isLayer ? Icons.egg_rounded : Icons.pets_rounded,
+                                      color: flock.isLayer ? AppColors.accent : AppColors.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          flock.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          "${flock.breed} • ${flock.currentQuantity} sujets vivants",
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      flock.isLayer ? "Pondeuses" : "Chair",
+                                      style: const TextStyle(
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              const Divider(height: 1),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Mortalité: ${flock.calculatedMortalityRate.toStringAsFixed(1)}% (${flock.deathsCount} perte(s))",
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: flock.isLayer ? onNavigateToEggs : onNavigateToFlocks,
+                                    icon: Icon(flock.isLayer ? Icons.egg_outlined : Icons.remove_circle_outline, size: 14),
+                                    label: Text(flock.isLayer ? "Collecte" : "Mouvement"),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                    const SizedBox(height: 80), // Space for bottom navigation
                   ],
                 ),
               ),
-
-              const SizedBox(height: 80), // Space for bottom navigation
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -331,12 +366,15 @@ class _KpiCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'monospace',
+                Flexible(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'monospace',
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -362,6 +400,8 @@ class _KpiCard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: badgeColor,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
