@@ -104,7 +104,7 @@ class TransactionController extends AbstractController
         #[CurrentUser] ?User $user,
         Request $request,
     ): JsonResponse {
-        $idempotencyKey = $request->headers->get('Idempotency-Key');
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
 
         if ($idempotencyKey !== null && $user !== null) {
             /** @var JsonResponse */
