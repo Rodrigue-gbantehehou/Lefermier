@@ -21,7 +21,7 @@ class Farm {
       name: json['name'] as String,
       code: json['code'] as String?,
       productionType: json['productionType'] as String?,
-      city: json['city'] as String?,
+      city: (json['locationCity'] ?? json['city']) as String?,
       currency: json['currency'] as String? ?? "XOF",
     );
   }

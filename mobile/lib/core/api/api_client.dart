@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../config/app_config.dart';
 import 'api_endpoints.dart';
 
 class ApiClient {
@@ -18,7 +19,6 @@ class ApiClient {
   ApiClient._internal() {
     dio = Dio(
       BaseOptions(
-        baseUrl: ApiEndpoints.defaultBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
@@ -81,6 +81,7 @@ class ApiClient {
     final prefs = await SharedPreferences.getInstance();
     _jwtToken = prefs.getString(_tokenKey);
     _activeFarmId = prefs.getString(_activeFarmKey);
+    dio.options.baseUrl = await AppConfig.resolveApiBaseUrl();
   }
 
   void setBaseUrl(String url) {

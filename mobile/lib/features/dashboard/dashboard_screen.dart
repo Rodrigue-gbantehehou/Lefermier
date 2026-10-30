@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../auth/auth_provider.dart';
+import '../auth/farm_selection_sheet.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends ConsumerWidget {
   final VoidCallback onOpenQuickActions;
   final VoidCallback onNavigateToEggs;
   final VoidCallback onNavigateToFlocks;
@@ -16,7 +19,8 @@ class DashboardScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
@@ -25,27 +29,37 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.circle, size: 8, color: AppColors.primary),
-                  SizedBox(width: 6),
-                  Text(
-                    "Ferme Avicole",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+            InkWell(
+              onTap: () => FarmSelectionSheet.show(context),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 160),
+                      child: Text(
+                        authState.activeFarm?.name ?? "Ferme Avicole",
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.primary),
+                  ],
+                ),
               ),
             ),
           ],
@@ -54,14 +68,23 @@ class DashboardScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.sync_rounded),
             tooltip: "Synchroniser",
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Synchronisation des données en cours..."),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+            onPressed: () async {
+              await ref.read(authProvider.notifier).loadFarms();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Données synchronisées avec succès"),
+                    backgroundColor: AppColors.primary,
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, size: 20),
+            tooltip: "Déconnexion",
+            onPressed: () => ref.read(authProvider.notifier).logout(),
           ),
         ],
       ),
