@@ -205,7 +205,7 @@ class AppDrawer extends ConsumerWidget {
                       children: [
                         Icon(
                           isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                          color: isDark ? Colors.amber : AppColors.primary,
+                          color: isDark ? AppColors.accent : AppColors.primary,
                           size: 22,
                         ),
                         const SizedBox(width: 14),

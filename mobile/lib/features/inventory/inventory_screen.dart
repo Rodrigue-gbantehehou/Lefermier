@@ -109,7 +109,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: movementType == "FEEDING" ? Colors.blue.shade600 : Colors.transparent,
+                                color: movementType == "FEEDING" ? AppColors.primary : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               alignment: Alignment.center,
@@ -359,7 +359,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            backgroundColor: movementType == "FEEDING" ? Colors.blue.shade600 : AppColors.success,
+                            backgroundColor: movementType == "FEEDING" ? AppColors.primary : AppColors.success,
                             foregroundColor: Colors.white,
                           ),
                           child: invState.isSubmitting
@@ -681,7 +681,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? Colors.amber : null,
+              color: isDark ? AppColors.accent : null,
               size: 20,
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
@@ -696,7 +696,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openStockMovementDialog(invState.items),
-        backgroundColor: Colors.blue.shade600,
+        backgroundColor: AppColors.primary,
         icon: const Icon(Icons.swap_horiz_rounded, color: Colors.white),
         label: const Text("Nourrir / Mouvement", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
@@ -710,12 +710,57 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Synthèse Stock
-                    _InventoryStatsCard(
-                      summary: summary,
-                      onCreateItem: _openCreateItemDialog,
+                    // En-tête simple et aéré (sans carte encombrante)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12, top: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    CurrencyFormatter.formatFcfa(summary.estimatedTotalValue),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'monospace',
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    "FCFA",
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                "${summary.totalItems} références • ${summary.lowStockCount} alerte(s)",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: summary.lowStockCount > 0 ? AppColors.danger : AppColors.textMutedLight,
+                                  fontWeight: summary.lowStockCount > 0 ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _openCreateItemDialog,
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text("Nouvel article", style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
 
                     // Filtre segmenté mobile 3 boutons
                     Container(
@@ -748,7 +793,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     fontSize: 12,
                                     fontWeight: invState.selectedCategory == null ? FontWeight.bold : FontWeight.w500,
                                     color: invState.selectedCategory == null
-                                        ? Colors.blue.shade700
+                                        ? AppColors.primary
                                         : AppColors.textMutedLight,
                                   ),
                                 ),
@@ -777,7 +822,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     fontSize: 12,
                                     fontWeight: invState.selectedCategory == "FEED" ? FontWeight.bold : FontWeight.w500,
                                     color: invState.selectedCategory == "FEED"
-                                        ? Colors.blue.shade700
+                                        ? AppColors.primary
                                         : AppColors.textMutedLight,
                                   ),
                                 ),
@@ -806,7 +851,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     fontSize: 12,
                                     fontWeight: invState.selectedCategory == "MEDICINE" ? FontWeight.bold : FontWeight.w500,
                                     color: invState.selectedCategory == "MEDICINE"
-                                        ? Colors.blue.shade700
+                                        ? AppColors.primary
                                         : AppColors.textMutedLight,
                                   ),
                                 ),
@@ -848,7 +893,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.inventory_2_outlined, size: 48, color: Colors.blue.shade600.withValues(alpha: 0.6)),
+                            Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.primary.withValues(alpha: 0.6)),
                             const SizedBox(height: 12),
                             const Text(
                               "Aucun article dans cette catégorie",
@@ -866,7 +911,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               icon: const Icon(Icons.add, size: 18),
                               label: const Text("Ajouter un article"),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade600,
+                                backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                               ),
                             ),
@@ -953,18 +998,18 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.shade600.withValues(alpha: 0.1),
+                                            color: AppColors.primarySoft,
                                             borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.blue.shade600.withValues(alpha: 0.3)),
+                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                                           ),
-                                          child: Row(
+                                          child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.swap_horiz, size: 14, color: Colors.blue.shade700),
-                                              const SizedBox(width: 4),
+                                              Icon(Icons.swap_horiz, size: 14, color: AppColors.primary),
+                                              SizedBox(width: 4),
                                               Text(
                                                 "Mouvement",
-                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                                               ),
                                             ],
                                           ),
@@ -981,209 +1026,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   ],
                 ),
               ),
-      ),
-    );
-  }
-}
-
-class _InventoryStatsCard extends StatelessWidget {
-  final InventorySummary summary;
-  final VoidCallback onCreateItem;
-
-  const _InventoryStatsCard({
-    required this.summary,
-    required this.onCreateItem,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "État Global des Stocks",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMutedLight,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (summary.lowStockCount > 0 ? AppColors.danger : AppColors.success).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      summary.lowStockCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
-                      size: 14,
-                      color: summary.lowStockCount > 0 ? AppColors.danger : AppColors.success,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      summary.lowStockCount > 0 ? "${summary.lowStockCount} alerte(s) rupture" : "Stocks normaux",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: summary.lowStockCount > 0 ? AppColors.danger : AppColors.success,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                CurrencyFormatter.formatFcfa(summary.estimatedTotalValue),
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  fontFamily: 'monospace',
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                "FCFA",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                "valeur totale",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _InvMiniTile(
-                  label: "Références",
-                  value: "${summary.totalItems}",
-                  unit: "articles actifs",
-                  color: Colors.blue.shade700,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _InvMiniTile(
-                  label: "Alertes rupture",
-                  value: "${summary.lowStockCount}",
-                  unit: "seuil franchi",
-                  color: summary.lowStockCount > 0 ? AppColors.danger : AppColors.success,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onCreateItem,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text(
-                "Créer un nouvel article / intrant",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InvMiniTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  const _InvMiniTile({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'monospace',
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            unit,
-            style: TextStyle(fontSize: 9, color: color.withValues(alpha: 0.8)),
-          ),
-        ],
       ),
     );
   }
@@ -1206,16 +1048,16 @@ class _QuickQtyBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.blue.shade600.withValues(alpha: 0.12),
+          color: AppColors.primarySoft,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue.shade600.withValues(alpha: 0.25)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Colors.blue.shade700,
+            color: AppColors.primary,
           ),
         ),
       ),

@@ -140,7 +140,7 @@ class QuickActionSheet extends ConsumerWidget {
                 icon: Icons.restaurant_outlined,
                 label: "Nourrir",
                 subtitle: "Aliment & Eau",
-                color: Colors.blue.shade600,
+                color: AppColors.primary,
                 onTap: () {
                   Navigator.pop(context);
                   onRecordFeeding();
@@ -179,7 +179,7 @@ class QuickActionSheet extends ConsumerWidget {
                   icon: Icons.medical_services_outlined,
                   label: "Soin / Vaccin",
                   subtitle: "Suivi vétérinaire",
-                  color: Colors.teal,
+                  color: AppColors.primary,
                   onTap: () {
                     Navigator.pop(context);
                     if (onRecordHealth != null) {
@@ -205,9 +205,9 @@ class QuickActionSheet extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.08),
+                color: AppColors.danger.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
               ),
               child: const Row(
                 children: [

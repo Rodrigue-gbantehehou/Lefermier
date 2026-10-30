@@ -860,7 +860,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? Colors.amber : null,
+              color: isDark ? AppColors.accent : null,
               size: 20,
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
@@ -889,13 +889,69 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Synthèse Sanitaire
-                    _HealthStatsCard(
-                      summary: summary,
-                      onGenerateProgram: _openGenerateProgramDialog,
-                      onNewTreatment: _openCreateTreatmentDialog,
+                    // En-tête simple et aéré (sans carte encombrante)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12, top: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "${summary.pendingCount}",
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'monospace',
+                                      color: summary.overdueCount > 0 ? AppColors.danger : AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    "soin(s) à réaliser",
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                "${summary.completedCount} administrés${summary.overdueCount > 0 ? ' • ${summary.overdueCount} en retard !' : ''}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: summary.overdueCount > 0 ? AppColors.danger : AppColors.textMutedLight,
+                                  fontWeight: summary.overdueCount > 0 ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              OutlinedButton(
+                                onPressed: _openGenerateProgramDialog,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: const Text("Programme", style: TextStyle(fontSize: 12)),
+                              ),
+                              const SizedBox(width: 6),
+                              ElevatedButton(
+                                onPressed: _openCreateTreatmentDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: const Text("Nouveau", style: TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
 
                     // Filtres par onglets segmentés mobile
                     Container(
@@ -954,7 +1010,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: _activeTabFilter == 'SCHEDULED' ? FontWeight.bold : FontWeight.w500,
-                                    color: _activeTabFilter == 'SCHEDULED' ? Colors.blue.shade700 : AppColors.textMutedLight,
+                                    color: _activeTabFilter == 'SCHEDULED' ? AppColors.primary : AppColors.textMutedLight,
                                   ),
                                 ),
                               ),
@@ -1103,11 +1159,11 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                           final item = filteredList[index];
 
                           final Color typeColor = switch (item.type) {
-                            'VACCINATION' => Colors.purple.shade600,
-                            'ANTIBIOTIC' => Colors.amber.shade800,
-                            'DEWORMING' => Colors.teal.shade700,
+                            'VACCINATION' => AppColors.primary,
+                            'ANTIBIOTIC' => AppColors.accent,
+                            'DEWORMING' => AppColors.primaryLight,
                             'VITAMIN' => AppColors.success,
-                            _ => Colors.blueGrey,
+                            _ => AppColors.primary,
                           };
 
                           return Card(
@@ -1140,10 +1196,10 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                                             const SizedBox(height: 2),
                                             Text(
                                               item.flockName,
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w600,
-                                                color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                                                color: AppColors.textMutedLight,
                                               ),
                                             ),
                                           ],
@@ -1194,13 +1250,13 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.withValues(alpha: 0.12),
+                                            color: AppColors.primarySoft,
                                             borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                                           ),
                                           child: const Text(
                                             "Prévu",
-                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue),
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                                           ),
                                         ),
                                     ],
@@ -1313,188 +1369,3 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
   }
 }
 
-class _HealthStatsCard extends StatelessWidget {
-  final HealthSummary summary;
-  final VoidCallback onGenerateProgram;
-  final VoidCallback onNewTreatment;
-
-  const _HealthStatsCard({
-    required this.summary,
-    required this.onGenerateProgram,
-    required this.onNewTreatment,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.health_and_safety_rounded, color: AppColors.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Suivi Sanitaire & Vaccinal",
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    Text(
-                      "Prophylaxie et prévention des maladies",
-                      style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Métriques
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(
-                  label: "Interventions",
-                  value: "${summary.totalTreatments}",
-                  color: AppColors.primary,
-                  icon: Icons.list_alt_rounded,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(
-                  label: "En retard",
-                  value: "${summary.overdueCount}",
-                  color: summary.overdueCount > 0 ? AppColors.danger : AppColors.textMutedLight,
-                  icon: Icons.warning_amber_rounded,
-                  highlight: summary.overdueCount > 0,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(
-                  label: "À venir",
-                  value: "${summary.upcomingCount}",
-                  color: Colors.blue.shade600,
-                  icon: Icons.schedule_rounded,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Bouton d'action standard : Générer le calendrier vaccinal
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onGenerateProgram,
-                  icon: const Icon(Icons.auto_awesome, size: 16),
-                  label: const Text("Programme auto"),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onNewTreatment,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text("Ajouter soin"),
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-  final bool highlight;
-
-  const _MetricTile({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-    this.highlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: highlight
-            ? color.withValues(alpha: 0.12)
-            : (isDark ? Colors.grey.shade900 : Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: highlight ? color.withValues(alpha: 0.4) : (isDark ? AppColors.borderDark : AppColors.borderLight),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: highlight ? color : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

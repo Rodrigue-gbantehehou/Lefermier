@@ -76,7 +76,7 @@ class DashboardScreen extends ConsumerWidget {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? Colors.amber : null,
+              color: isDark ? AppColors.accent : null,
               size: 20,
             ),
             tooltip: isDark ? "Mode clair" : "Mode sombre",
@@ -194,7 +194,7 @@ class DashboardScreen extends ConsumerWidget {
                           value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
                           unit: "journalier",
                           badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
-                          badgeColor: Colors.blue.shade600,
+                          badgeColor: AppColors.primary,
                           icon: Icons.show_chart_rounded,
                           onTap: onNavigateToEggs,
                         ),

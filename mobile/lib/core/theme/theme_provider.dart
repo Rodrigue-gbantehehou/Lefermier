@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   static const String _themeKey = "lefermier_theme_mode";
 
-  ThemeModeNotifier() : super(ThemeMode.system) {
+  ThemeModeNotifier() : super(ThemeMode.light) {
     _loadSavedTheme();
   }
 
@@ -15,10 +15,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
       final saved = prefs.getString(_themeKey);
       if (saved == 'dark') {
         state = ThemeMode.dark;
-      } else if (saved == 'light') {
-        state = ThemeMode.light;
       } else {
-        state = ThemeMode.system;
+        state = ThemeMode.light;
       }
     } catch (_) {}
   }

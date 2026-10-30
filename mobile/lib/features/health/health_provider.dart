@@ -15,6 +15,9 @@ class HealthSummary {
     this.overdueCount = 0,
     this.upcomingCount = 0,
   });
+
+  int get pendingCount => upcomingCount;
+  int get completedCount => totalTreatments >= upcomingCount ? totalTreatments - upcomingCount : 0;
 }
 
 class HealthState {

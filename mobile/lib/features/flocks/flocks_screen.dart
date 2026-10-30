@@ -138,7 +138,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                       _TypeChip(
                         label: "Réforme",
                         icon: Icons.sync_problem_rounded,
-                        color: Colors.orange.shade800,
+                        color: AppColors.accent,
                         isSelected: movementType == "CULLING",
                         onTap: () => setModalState(() => movementType = "CULLING"),
                       ),
@@ -396,9 +396,9 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: poultryType == "BROILER" ? Colors.blue.shade700 : Colors.transparent,
+                              color: poultryType == "BROILER" ? AppColors.primary : Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: poultryType == "BROILER" ? Colors.blue.shade700 : borderColor),
+                              border: Border.all(color: poultryType == "BROILER" ? AppColors.primary : borderColor),
                             ),
                             alignment: Alignment.center,
                             child: Text(
@@ -589,7 +589,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? Colors.amber : null,
+              color: isDark ? AppColors.accent : null,
               size: 20,
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
@@ -618,12 +618,53 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Synthèse Cheptel
-                    _CheptelStatsCard(
-                      summary: summary,
-                      onCreateFlock: _openCreateFlockDialog,
+                    // En-tête simple et aéré (sans carte encombrante)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12, top: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "${summary.totalBirds}",
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'monospace',
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    "volailles vivantes",
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                "${summary.activeFlocksCount} lot(s) actif(s) • Perte: ${summary.averageMortality.toStringAsFixed(1)}%",
+                                style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _openCreateFlockDialog,
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text("Nouveau lot", style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
 
                     // Filtre segmenté mobile 3 boutons
                     Container(
@@ -714,7 +755,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                     fontSize: 12,
                                     fontWeight: flockState.filterType == "BROILER" ? FontWeight.bold : FontWeight.w500,
                                     color: flockState.filterType == "BROILER"
-                                        ? Colors.blue.shade700
+                                        ? AppColors.primary
                                         : AppColors.textMutedLight,
                                   ),
                                 ),
@@ -815,7 +856,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: flock.isLayer ? AppColors.accentSoft : Colors.blue.shade50,
+                                          color: flock.isLayer ? AppColors.accentSoft : AppColors.primarySoft,
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
@@ -823,7 +864,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
-                                            color: flock.isLayer ? AppColors.accent : Colors.blue.shade700,
+                                            color: flock.isLayer ? AppColors.accent : AppColors.primary,
                                           ),
                                         ),
                                       ),
@@ -911,193 +952,6 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
   }
 }
 
-class _CheptelStatsCard extends StatelessWidget {
-  final FlockSummary summary;
-  final VoidCallback onCreateFlock;
-
-  const _CheptelStatsCard({
-    required this.summary,
-    required this.onCreateFlock,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.pets_rounded, color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Cheptel Global",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        "Effectif vivant de l'exploitation",
-                        style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "${summary.activeFlocksCount} lot(s)",
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Grand Chiffre
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                "${summary.totalBirds}",
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  fontFamily: 'monospace',
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                "volailles vivantes",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Mini tuiles
-          Row(
-            children: [
-              Expanded(
-                child: _CheptelMiniTile(
-                  label: "Lots actifs",
-                  value: "${summary.activeFlocksCount}",
-                  unit: "bandes",
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _CheptelMiniTile(
-                  label: "Taux de perte",
-                  value: "${summary.averageMortality.toStringAsFixed(1)}%",
-                  unit: "global",
-                  color: summary.averageMortality > 5 ? AppColors.danger : AppColors.success,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Bouton direct mobile
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onCreateFlock,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text("Créer une nouvelle bande"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CheptelMiniTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  const _CheptelMiniTile({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'monospace',
-              color: color,
-            ),
-          ),
-          Text(
-            unit,
-            style: TextStyle(fontSize: 9, color: color.withValues(alpha: 0.8)),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _TypeChip extends StatelessWidget {
   final String label;
