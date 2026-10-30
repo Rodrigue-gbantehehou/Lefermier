@@ -124,8 +124,8 @@ export function EditBuildingModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Modifier le bâtiment : ${building.name}`}
-      description="Ajustez la capacité d'accueil, les caractéristiques physiques ou l'état d'archivage."
+      title={building.name}
+      description="Modifier le bâtiment"
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -140,12 +140,12 @@ export function EditBuildingModal({
         <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted p-3">
           <div>
             <div className="text-xs font-bold text-foreground">
-              {isActive ? "Bâtiment en exploitation active" : "Bâtiment archivé / Hors service"}
+              {isActive ? "Bâtiment en exploitation" : "Bâtiment hors service"}
             </div>
             <div className="text-[11px] text-muted">
               {isActive
-                ? "Disponible pour loger de nouvelles bandes de volailles."
-                : "Masqué des sélecteurs de création de lots, conserve l'historique."}
+                ? "Disponible pour loger des bandes."
+                : "Masqué des sélecteurs de lots."}
             </div>
           </div>
           <button
@@ -175,7 +175,7 @@ export function EditBuildingModal({
         {/* Nom du bâtiment */}
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Nom ou Numéro du bâtiment *
+            Nom *
           </label>
           <input
             type="text"
@@ -190,7 +190,7 @@ export function EditBuildingModal({
         {/* Type de bâtiment */}
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Type d'installation
+            Type
           </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <button
@@ -249,7 +249,7 @@ export function EditBuildingModal({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-foreground">
-                Capacité d'accueil (poules) *
+                Capacité (sujets) *
               </label>
             </div>
             <input
@@ -282,7 +282,7 @@ export function EditBuildingModal({
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Surface en m² (optionnel)
+              Surface (m²)
             </label>
             <input
               type="number"
@@ -307,7 +307,7 @@ export function EditBuildingModal({
           {confirmDelete ? (
             <div className="rounded-xl border border-danger/30 bg-danger-soft p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs text-danger font-medium">
-                Confirmer la suppression définitive de ce bâtiment ?
+                Supprimer ce bâtiment ?
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -323,7 +323,7 @@ export function EditBuildingModal({
                   disabled={deleting}
                   className="rounded-lg bg-danger px-3 py-1 text-xs font-bold text-white hover:bg-danger/90 disabled:opacity-50"
                 >
-                  {deleting ? "Suppression..." : "Oui, supprimer"}
+                  {deleting ? "Suppression..." : "Supprimer"}
                 </button>
               </div>
             </div>
@@ -334,7 +334,7 @@ export function EditBuildingModal({
               className="text-[11px] text-muted hover:text-danger flex items-center gap-1 transition-colors"
             >
               <Trash2 className="h-3 w-3" />
-              <span>Supprimer définitivement ce bâtiment</span>
+              <span>Supprimer ce bâtiment</span>
             </button>
           )}
         </div>
@@ -354,7 +354,7 @@ export function EditBuildingModal({
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            <span>{submitting ? "Enregistrement..." : "Enregistrer les modifications"}</span>
+            <span>{submitting ? "Enregistrement..." : "Enregistrer"}</span>
           </button>
         </div>
       </form>

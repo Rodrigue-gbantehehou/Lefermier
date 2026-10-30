@@ -3,6 +3,7 @@
 import React from "react";
 import { X, Check, Lock, Zap, ShieldCheck } from "lucide-react";
 import { DashboardSubscription } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
 
 interface PlanDetailsModalProps {
   isOpen: boolean;
@@ -71,7 +72,8 @@ export function PlanDetailsModal({
   badge,
   activeModules = [],
 }: PlanDetailsModalProps) {
-  if (!isOpen) return null;
+  const { isOwner } = useAuth();
+  if (!isOpen || !isOwner) return null;
 
   const currentPlanName = subscription?.planName || planName || "Formule Starter";
   const currentBadge = subscription?.badge || badge || "Actif";

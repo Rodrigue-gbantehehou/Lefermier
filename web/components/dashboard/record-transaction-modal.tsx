@@ -13,6 +13,7 @@ interface RecordTransactionModalProps {
   onClose: () => void;
   onSuccess: () => void;
   activeFarmId?: string;
+  initialType?: "INCOME" | "EXPENSE";
 }
 
 export function RecordTransactionModal({
@@ -20,12 +21,13 @@ export function RecordTransactionModal({
   onClose,
   onSuccess,
   activeFarmId,
+  initialType = "INCOME",
 }: RecordTransactionModalProps) {
   const { toast } = useToast();
 
-  const [txType, setTxType] = useState<"INCOME" | "EXPENSE">("INCOME");
+  const [txType, setTxType] = useState<"INCOME" | "EXPENSE">(initialType);
   const [txAmount, setTxAmount] = useState<number | string>(0);
-  const [txCategory, setTxCategory] = useState("Vente Oeufs");
+  const [txCategory, setTxCategory] = useState(initialType === "EXPENSE" ? "Aliments" : "Vente Oeufs");
   const [txCustomCategory, setTxCustomCategory] = useState("");
   const [txPaymentMethod, setTxPaymentMethod] = useState<PaymentMethod>("MTN_MOMO");
   const [txNotes, setTxNotes] = useState("");
@@ -35,14 +37,14 @@ export function RecordTransactionModal({
   useEffect(() => {
     if (isOpen) {
       setFinanceError(null);
-      setTxType("INCOME");
+      setTxType(initialType);
       setTxAmount(0);
-      setTxCategory("Vente Oeufs");
+      setTxCategory(initialType === "EXPENSE" ? "Aliments" : "Vente Oeufs");
       setTxCustomCategory("");
       setTxPaymentMethod("MTN_MOMO");
       setTxNotes("");
     }
-  }, [isOpen]);
+  }, [isOpen, initialType]);
 
   async function handleFinanceSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,10 +88,10 @@ export function RecordTransactionModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Enregistrer une transaction financière"
-      description="Encaissement ou décaissement en FCFA avec mode de paiement local."
+      title="Nouvelle opération"
+      description="Recette ou dépense"
     >
-      <form onSubmit={handleFinanceSubmit} className="space-y-4">
+      <form onSubmit={handleFinanceSubmit} className="space-y-3.5">
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -97,13 +99,13 @@ export function RecordTransactionModal({
               setTxType("INCOME");
               setTxCategory("Vente Oeufs");
             }}
-            className={`rounded-xl border py-2.5 text-xs font-bold transition-colors ${
+            className={`rounded-xl border py-2 text-xs font-bold transition-colors ${
               txType === "INCOME"
                 ? "border-primary bg-primary text-white"
                 : "border-border bg-surface text-muted hover:bg-surface-hover"
             }`}
           >
-            + Recette / Vente
+            + Recette
           </button>
           <button
             type="button"
@@ -111,19 +113,19 @@ export function RecordTransactionModal({
               setTxType("EXPENSE");
               setTxCategory("Alimentation");
             }}
-            className={`rounded-xl border py-2.5 text-xs font-bold transition-colors ${
+            className={`rounded-xl border py-2 text-xs font-bold transition-colors ${
               txType === "EXPENSE"
                 ? "border-danger bg-danger text-white"
                 : "border-border bg-surface text-muted hover:bg-surface-hover"
             }`}
           >
-            - Dépense / Achat
+            - Dépense
           </button>
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Montant en FCFA
+            Montant (FCFA) *
           </label>
           <input
             type="number"
@@ -188,18 +190,18 @@ export function RecordTransactionModal({
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Moyen de paiement
+              Paiement
             </label>
             <select
               value={txPaymentMethod}
               onChange={(e) => setTxPaymentMethod(e.target.value as PaymentMethod)}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground"
             >
-              <option value="MTN_MOMO">MTN Mobile Money</option>
+              <option value="MTN_MOMO">MTN MoMo</option>
               <option value="MOOV_MONEY">Moov Money</option>
-              <option value="CELTIIS_CASH">Celtiis Cash</option>
+              <option value="CELTIIS_CASH">Celtiis</option>
               <option value="CASH">Espèces</option>
-              <option value="BANK_TRANSFER">Virement Bancaire</option>
+              <option value="BANK_TRANSFER">Virement</option>
               <option value="CHECK">Chèque</option>
             </select>
           </div>
@@ -207,13 +209,13 @@ export function RecordTransactionModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Référence / Client / Fournisseur
+            Note / Tiers
           </label>
           <input
             type="text"
             value={txNotes}
             onChange={(e) => setTxNotes(e.target.value)}
-            placeholder="ex. Vente à la restauratrice Mme Dossou"
+            placeholder="ex. Client Mme Dossou"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
           />
         </div>
@@ -240,7 +242,7 @@ export function RecordTransactionModal({
             disabled={submittingTx}
             className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover"
           >
-            {submittingTx ? "Enregistrement..." : "Valider l'opération"}
+            {submittingTx ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>
       </form>

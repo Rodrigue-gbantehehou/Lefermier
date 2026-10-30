@@ -1,5 +1,18 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  // Client-side detection for mobile devices on LAN (ex: smartphone on Wi-Fi hotspot)
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return "/api";
+    }
+  }
+  return "http://127.0.0.1:8000/api";
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;
@@ -20,9 +33,11 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const baseUrl = getApiBaseUrl();
   const url = endpoint.startsWith("http")
     ? endpoint
-    : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+    : `${baseUrl}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -105,9 +120,11 @@ export async function downloadApiFile(
   endpoint: string,
   defaultFilename: string = "document.pdf"
 ): Promise<void> {
+  const baseUrl = getApiBaseUrl();
   const url = endpoint.startsWith("http")
     ? endpoint
-    : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+    : `${baseUrl}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
 
   const headers: Record<string, string> = {
     Accept: "application/pdf, application/octet-stream, */*",

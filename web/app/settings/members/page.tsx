@@ -26,6 +26,7 @@ import { api } from "@/lib/api-client";
 import { FarmMember, FarmRole } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { ModuleLockedState } from "@/components/ui/module-locked-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function MembersManagementPage() {
   const { activeFarm, hasPermission, hasModule, user: currentUser, isLoading: authLoading } = useAuth();
@@ -315,27 +316,21 @@ export default function MembersManagementPage() {
 
   return (
     <Shell>
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Gestion des Utilisateurs & Employés
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Employés, techniciens avicoles, vétérinaires, magasiniers ou chefs d'élevage rattachés à{" "}
-            <span className="font-semibold text-foreground">{activeFarm?.name || "l'exploitation"}</span>.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setCreateModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span>Ajouter un Utilisateur / Employé</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Équipe & Membres"
+        subtitle={`${members.length} collaborateur(s)`}
+        icon={<Users className="h-4 w-4" />}
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary px-3 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span>Nouveau</span>
+          </button>
+        }
+      />
 
       {feedbackMsg && (
         <div
@@ -355,47 +350,33 @@ export default function MembersManagementPage() {
       )}
 
       {/* KPI Stats Grid */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <StatCard
-          title="Nombre total d'employés"
-          value={`${members.length} personne(s)`}
-          subtitle={`${activeCount} personne(s) en service`}
+          title="Membres"
+          value={members.length}
+          subtitle={activeCount < members.length ? `${activeCount} actifs` : undefined}
           accent="primary"
           icon={<Users className="h-5 w-5" />}
-          trend={{
-            value: "Équipe au complet",
-            isPositive: true,
-          }}
+          className="col-span-2 sm:col-span-1"
         />
         <StatCard
-          title="Postes attribués"
-          value={`${customRoleCount} assigné(s)`}
-          subtitle="Postes créés pour la ferme"
+          title="Rôles assignés"
+          value={customRoleCount}
           accent="amber"
           icon={<ShieldCheck className="h-5 w-5" />}
-          trend={{
-            value: "Postes de la ferme",
-            isPositive: true,
-          }}
         />
         <StatCard
-          title="Comptes autorisés"
-          value={members.length > 0 ? `${Math.round((activeCount / members.length) * 100)}%` : "100%"}
-          subtitle="Personnes pouvant se connecter"
+          title="Accès actifs"
+          value={`${activeCount} / ${members.length}`}
           accent={activeCount === members.length ? "primary" : "rose"}
           icon={<Shield className="h-5 w-5" />}
-          trend={{
-            value: activeCount === members.length ? "Accès autorisés" : "Comptes bloqués",
-            isPositive: activeCount === members.length,
-          }}
         />
       </div>
 
       {/* DataTable Members */}
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <DataTable<FarmMember>
-          title="Liste des Utilisateurs & Employés"
-          subtitle="Attribution des accès et contrôle des privilèges par profil métier."
+          title="Membres de l'équipe"
           data={members}
           columns={memberColumns}
           searchable={true}
@@ -408,7 +389,7 @@ export default function MembersManagementPage() {
             const isCurrent = currentUser?.id === m.userId;
             const roleName = m.roleDefinition?.name || m.role || "Membre";
             return (
-              <div className="rounded-2xl border border-border bg-surface p-4 shadow-xs space-y-3">
+              <div className="rounded-xl border border-border bg-surface p-4 shadow-xs space-y-3">
                 <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft font-bold text-primary text-xs uppercase shadow-2xs">
@@ -492,8 +473,8 @@ export default function MembersManagementPage() {
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Ajouter un Utilisateur / Employé"
-        description={`Ajoutez un employé, technicien, chef d'élevage, ... pour "${activeFarm?.name}".`}
+        title="Nouveau membre"
+        description={activeFarm?.name || "Ajout membre"}
       >
         <form onSubmit={handleAddMember} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -527,7 +508,7 @@ export default function MembersManagementPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Adresse Email (Identifiant de connexion) *
+              Email *
             </label>
             <input
               type="email"
@@ -541,7 +522,7 @@ export default function MembersManagementPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Numéro de téléphone
+              Téléphone
             </label>
             <input
               type="tel"
@@ -554,7 +535,7 @@ export default function MembersManagementPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Attribution du Rôle dans l'agence *
+              Rôle *
             </label>
             <select
               value={newRoleId}
@@ -567,7 +548,7 @@ export default function MembersManagementPage() {
               }}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             >
-              <optgroup label="Rôles de la matrice d'agence">
+              <optgroup label="Rôles personnalisés">
                 {roles
                   .filter((r) => r.name !== "Propriétaire")
                   .map((r) => (
@@ -576,25 +557,25 @@ export default function MembersManagementPage() {
                     </option>
                   ))}
               </optgroup>
-              <optgroup label="Rôles standards prédéfinis">
-                <option value="">Gestionnaire / Manager d'exploitation</option>
+              <optgroup label="Standards">
+                <option value="">Gestionnaire d'exploitation</option>
               </optgroup>
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Mot de passe initial (Optionnel)
+              Mot de passe (optionnel)
             </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Laisser vide pour mot de passe par défaut : Lefermier@2026"
+              placeholder="Par défaut : Lefermier@2026"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
             <p className="mt-1 text-[11px] text-muted">
-              L'employé pourra modifier son mot de passe après sa première connexion.
+              Modifiable à la 1ère connexion.
             </p>
           </div>
 
@@ -621,7 +602,7 @@ export default function MembersManagementPage() {
               disabled={submittingCreate}
               className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover"
             >
-              {submittingCreate ? "Ajout..." : "Créer l'utilisateur / employé"}
+              {submittingCreate ? "Ajout..." : "Ajouter"}
             </button>
           </div>
         </form>
@@ -631,20 +612,20 @@ export default function MembersManagementPage() {
       <Modal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
-        title={`Modifier les accès de ${selectedMember?.fullName || ""}`}
-        description="Mettez à jour son profil métier ou suspendez temporairement ses accès."
+        title={selectedMember?.fullName || "Modifier membre"}
+        description="Rôle et statut d'accès"
       >
         <form onSubmit={handleUpdateMember} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Rôle dans la matrice d'agence
+              Rôle
             </label>
             <select
               value={editRoleId}
               onChange={(e) => setEditRoleId(e.target.value)}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             >
-              <option value="">Rôle standard (sans matrice)</option>
+              <option value="">Standard</option>
               {roles
                 .filter((r) => r.name !== "Propriétaire")
                 .map((r) => (
@@ -657,7 +638,7 @@ export default function MembersManagementPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Statut du compte
+              Statut
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -669,7 +650,7 @@ export default function MembersManagementPage() {
                     : "border-border bg-surface text-muted"
                 }`}
               >
-                Actif (Accès autorisé)
+                Actif
               </button>
               <button
                 type="button"
@@ -680,7 +661,7 @@ export default function MembersManagementPage() {
                     : "border-border bg-surface text-muted"
                 }`}
               >
-                Suspendu (Bloqué)
+                Suspendu
               </button>
             </div>
           </div>

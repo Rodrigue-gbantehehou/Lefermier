@@ -88,21 +88,13 @@ export function RecordMovementModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-        selectedFlock && isFlockLocked
-          ? `Mouvement / Perte — ${selectedFlock.name}`
-          : "Déclarer un mouvement ou une mortalité"
-      }
-      description={
-        selectedFlock && isFlockLocked
-          ? `Mise à jour automatique de l'effectif vif pour ${selectedFlock.name} (${formatNumber(selectedFlock.currentQuantity)} sujets vivants).`
-          : "Mise à jour automatique de l'effectif vif de la bande."
-      }
+      title={selectedFlock && isFlockLocked ? `Mouvement — ${selectedFlock.name}` : "Perte ou Vente"}
+      description={selectedFlock ? `${formatNumber(selectedFlock.currentQuantity)} sujets vivants` : "Mise à jour effectif"}
     >
-      <form onSubmit={handleMoveSubmit} className="space-y-4">
+      <form onSubmit={handleMoveSubmit} className="space-y-3.5">
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Bande concernée
+            Bande
           </label>
           {isFlockLocked && selectedFlock ? (
             <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary-soft/30 px-3 py-2 text-xs font-semibold text-foreground h-[38px]">
@@ -173,7 +165,7 @@ export function RecordMovementModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Quantité (têtes / sujets)
+            Quantité (sujets) *
           </label>
           <input
             type="number"
@@ -191,13 +183,13 @@ export function RecordMovementModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Cause / Motif
+            Motif
           </label>
           <input
             type="text"
             value={moveReason}
             onChange={(e) => setMoveReason(e.target.value)}
-            placeholder="ex. Piquage, étouffement, autopsie suspecte..."
+            placeholder="ex. Chaleur, piquage, vente"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-border-hover focus:outline-hidden"
           />
         </div>
@@ -222,7 +214,7 @@ export function RecordMovementModal({
             disabled={submittingMove}
             className="rounded-xl bg-danger px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90"
           >
-            {submittingMove ? "Enregistrement..." : "Confirmer le mouvement"}
+            {submittingMove ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>
       </form>

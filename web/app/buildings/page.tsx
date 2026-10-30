@@ -18,6 +18,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { CreateBuildingModal } from "@/components/farms/create-building-modal";
 import { EditBuildingModal } from "@/components/farms/edit-building-modal";
 import { ModuleLockedState } from "@/components/ui/module-locked-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
 import { formatNumber } from "@/lib/utils";
@@ -98,62 +99,55 @@ export default function BuildingsPage() {
 
   return (
     <Shell>
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl flex items-center gap-2.5">
-            <Warehouse className="h-6 w-6 text-primary" />
-            <span>Poulaillers & Bâtiments d'élevage</span>
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Gestion des infrastructures, poulaillers, poussinières et capacités d'accueil.
-          </p>
-        </div>
+      <PageHeader
+        title="Poulaillers"
+        subtitle={`${buildings.length} bâtiment(s) enregistrés`}
+        icon={<Warehouse className="h-4 w-4" />}
+        actions={
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={loadBuildings}
+              title="Actualiser"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-foreground shadow-xs hover:bg-surface-hover active:scale-95 transition-all"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-primary" : "text-muted"}`} />
+            </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={loadBuildings}
-            title="Actualiser la liste"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-hover transition-colors"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-primary" : "text-muted"}`} />
-            <span>Actualiser</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCreateModalOpen(true)}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau poulailler</span>
-          </button>
-        </div>
-      </div>
+            {(hasPermission("farm:update") || hasPermission("building:create")) && (
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(true)}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary px-3 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Nouveau</span>
+              </button>
+            )}
+          </div>
+        }
+      />
 
       {/* KPI Stats */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <StatCard
-          title="Bâtiments d'élevage"
-          value={`${buildings.length} bâtiment(s)`}
-          subtitle={`${totalPoultryHouses} poulailler(s) et poussinière(s)`}
+          title="Bâtiments"
+          value={buildings.length}
           accent="primary"
           icon={<Warehouse className="h-5 w-5" />}
+          className="col-span-2 sm:col-span-1"
         />
 
         <StatCard
-          title="Capacité d'accueil totale"
-          value={`${formatNumber(totalCapacity)} sujets`}
-          subtitle="Places disponibles sur l'ensemble du site"
+          title="Capacité totale"
+          value={`${formatNumber(totalCapacity)} places`}
           accent="amber"
           icon={<Users className="h-5 w-5" />}
         />
 
         <StatCard
-          title="État des installations"
-          value={buildings.filter((b) => b.isActive).length.toString()}
-          subtitle="Bâtiments actuellement en service actif"
+          title="En service"
+          value={buildings.filter((b) => b.isActive).length}
           accent="sky"
           icon={<CheckCircle2 className="h-5 w-5" />}
         />
@@ -174,7 +168,7 @@ export default function BuildingsPage() {
             {buildings.map((b) => (
               <div
                 key={b.id}
-                className="rounded-2xl border border-border bg-surface p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 transition-colors"
+                className="rounded-xl border border-border bg-surface p-4 sm:p-5 shadow-xs flex flex-col justify-between hover:border-primary/40 transition-colors"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 border-b border-border/70 pb-3">
@@ -220,26 +214,32 @@ export default function BuildingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-border/70 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingBuilding(b)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-muted px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover hover:border-primary/40 transition-colors"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    <span>Modifier</span>
-                  </button>
+                {(hasPermission("farm:update") || hasPermission("building:update") || hasPermission("building:delete")) && (
+                  <div className="mt-5 pt-3 border-t border-border/70 flex items-center justify-end gap-2">
+                    {(hasPermission("farm:update") || hasPermission("building:update")) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingBuilding(b)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-muted px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover hover:border-primary/40 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>Modifier</span>
+                      </button>
+                    )}
 
-                  <button
-                    type="button"
-                    disabled={deletingId === b.id}
-                    onClick={() => handleDelete(b.id)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-danger/20 bg-danger/10 px-2.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>{deletingId === b.id ? "..." : "Supprimer"}</span>
-                  </button>
-                </div>
+                    {(hasPermission("farm:update") || hasPermission("building:delete")) && (
+                      <button
+                        type="button"
+                        disabled={deletingId === b.id}
+                        onClick={() => handleDelete(b.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-danger/20 bg-danger/10 px-2.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>{deletingId === b.id ? "..." : "Supprimer"}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -260,6 +260,19 @@ export default function BuildingsPage() {
           onClose={() => setEditingBuilding(null)}
           onSuccess={loadBuildings}
         />
+      )}
+
+      {/* Floating Action Button (FAB) Mobile */}
+      {(hasPermission("farm:update") || hasPermission("building:create")) && (
+        <button
+          type="button"
+          onClick={() => setCreateModalOpen(true)}
+          aria-label="Nouveau poulailler"
+          className="fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-xs font-bold text-white shadow-xl shadow-primary/40 border-2 border-surface active:scale-90 transition-all sm:hidden cursor-pointer"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Poulailler</span>
+        </button>
       )}
     </Shell>
   );

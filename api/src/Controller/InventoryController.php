@@ -14,6 +14,7 @@ use App\Enum\InventoryCategory;
 use App\Repository\InventoryItemRepository;
 use App\Security\Voter\FarmVoter;
 use App\Security\Voter\InventoryVoter;
+use App\Service\IdempotencyService;
 use App\Service\InventoryService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,6 +30,7 @@ class InventoryController extends AbstractController
     public function __construct(
         private readonly InventoryService $inventoryService,
         private readonly InventoryItemRepository $itemRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -101,6 +103,28 @@ class InventoryController extends AbstractController
         InventoryItem $item,
         #[MapRequestPayload] CreateStockMovementRequestDto $dto,
         #[CurrentUser] ?User $user,
+        Request $request,
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key');
+
+        if ($idempotencyKey !== null && $user !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $item->getFarm(),
+                fn () => $this->doRecordMovement($item, $dto, $user)
+            );
+        }
+
+        return $this->doRecordMovement($item, $dto, $user);
+    }
+
+    private function doRecordMovement(
+        InventoryItem $item,
+        CreateStockMovementRequestDto $dto,
+        ?User $user,
     ): JsonResponse {
         $movement = $this->inventoryService->recordMovement($item, $dto, $user);
 

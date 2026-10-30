@@ -3,6 +3,7 @@
 import React from "react";
 import { Zap, ArrowRight, AlertTriangle } from "lucide-react";
 import { DashboardSubscription } from "@/lib/types";
+import { useAuth } from "@/context/auth-context";
 
 interface SubscriptionBannerProps {
   subscription?: DashboardSubscription;
@@ -29,6 +30,8 @@ export function SubscriptionBanner({
   maxFarms = 1,
   onOpenPlanModal,
 }: SubscriptionBannerProps) {
+  const { isOwner } = useAuth();
+  if (!isOwner) return null;
   const flockQuota = subscription?.quotas?.flocks || {
     current: flocksCount,
     max: maxFlocks,

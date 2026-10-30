@@ -138,14 +138,13 @@ export function FlocksOverviewWidget({
   ];
 
   return (
-    <div className="mt-8">
+    <div className="mt-6 sm:mt-8">
       <DataTable<Flock>
-        title="Vos groupes de volaille en élevage"
-        subtitle="Nombre de poules par groupe, race, pertes et date d'arrivée."
+        title="Lots en élevage"
         data={flocks}
         columns={columns}
         searchable={true}
-        searchPlaceholder="Rechercher un groupe..."
+        searchPlaceholder="Rechercher un lot..."
         searchAccessor={(f: Flock) => `${f.name} ${f.code || ""} ${f.breed || ""} ${f.strain || ""}`}
         pageSize={10}
         actions={
@@ -153,7 +152,7 @@ export function FlocksOverviewWidget({
             href="/flocks"
             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
           >
-            <span>Gérer les volailles</span>
+            <span>Voir tout</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         }

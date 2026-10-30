@@ -29,6 +29,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -44,8 +45,11 @@ import { formatDate, formatNumber } from "@/lib/utils";
 import { ModuleLockedState } from "@/components/ui/module-locked-state";
 
 export default function HealthPage() {
-  const { activeFarm, hasModule } = useAuth();
+  const { activeFarm, hasModule, hasPermission, isOwner } = useAuth();
   const { toast } = useToast();
+
+  const canManageHealth = hasPermission("health:manage") || hasPermission("health:create") || isOwner;
+  const canDeleteHealth = hasPermission("health:delete") || hasPermission("health:manage") || isOwner;
 
   const [treatments, setTreatments] = useState<HealthTreatment[]>([]);
   const [flocks, setFlocks] = useState<Flock[]>([]);
@@ -361,137 +365,158 @@ export default function HealthPage() {
 
   return (
     <Shell>
-      <div className="space-y-6">
-        {/* En-tête */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
-              <HeartPulse className="h-7 w-7 text-accent" />
-              Santé & Prophylaxie
-            </h1>
-            <p className="mt-1 text-sm text-muted">
-              Calendrier vaccinal, rappels sanitaires et suivi des traitements par bande.
-            </p>
-          </div>
+      <div className="space-y-3.5 sm:space-y-4">
+        {/* En-tête mobile natif */}
+        <PageHeader
+          title="Santé & Soins"
+          subtitle={`${meta.totalItems} soin(s) planifié(s)`}
+          icon={<HeartPulse className="h-4 w-4 text-accent" />}
+          actions={
+            canManageHealth && (
+              <>
+                {hasModule("prophylaxis_program") ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (flocks.length === 0) {
+                        toast.warning("Veuillez d'abord créer une bande de volailles.");
+                        return;
+                      }
+                      setProgramError(null);
+                      setProgramModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    <span className="hidden xs:inline">1-Clic</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => toast.info("La génération automatique 1-clic des programmes prophylactiques selon la souche est disponible à partir de la formule Professionnel.")}
+                    className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-muted/60 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-muted hover:text-foreground transition-colors cursor-pointer"
+                    title="Disponible à partir de la formule Professionnel"
+                  >
+                    <Lock className="h-3 w-3 text-muted" />
+                    <span className="hidden xs:inline">1-Clic</span>
+                  </button>
+                )}
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {hasModule("prophylaxis_program") ? (
-              <button
-                onClick={() => {
-                  if (flocks.length === 0) {
-                    toast.warning("Veuillez d'abord créer une bande de volailles.");
-                    return;
-                  }
-                  setProgramError(null);
-                  setProgramModalOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2 text-sm font-semibold text-accent hover:bg-accent/20 transition-colors shadow-sm"
-              >
-                <Zap className="h-4 w-4" />
-                Programme Standard 1-Clic
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => toast.info("La génération automatique 1-clic des programmes prophylactiques selon la souche est disponible à partir de la formule Professionnel.")}
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-muted/50 px-3.5 py-2 text-sm font-semibold text-muted hover:text-foreground transition-colors shadow-sm"
-                title="Disponible à partir de la formule Professionnel"
-              >
-                <Lock className="h-4 w-4 text-muted" />
-                Programme Standard 1-Clic
-              </button>
-            )}
-
-            <button
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-hover transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Planifier un soin
-            </button>
-          </div>
-        </div>
+                <button
+                  type="button"
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Nouveau soin</span>
+                </button>
+              </>
+            )
+          }
+        />
 
         {/* Cartes KPI */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
           <StatCard
-            title="Total interventions"
+            title="Interventions"
             value={meta.totalItems}
-            subtitle={`${treatments.length} affichée(s)`}
             icon={<Calendar className="h-5 w-5" />}
             accent="sky"
           />
           <StatCard
             title="En retard"
             value={meta.overdueCount}
-            subtitle={meta.overdueCount > 0 ? "⚠️ Nécessite attention" : "À jour"}
+            subtitle={meta.overdueCount > 0 ? "Action requise" : undefined}
             icon={<AlertTriangle className="h-5 w-5" />}
             accent={meta.overdueCount > 0 ? "rose" : "zinc"}
           />
           <StatCard
-            title="Soins administrés"
+            title="Administrés"
             value={completedCount}
-            subtitle={`${meta.totalItems > 0 ? Math.round((completedCount / meta.totalItems) * 100) : 0}% de couverture`}
+            subtitle={meta.totalItems > 0 ? `${Math.round((completedCount / meta.totalItems) * 100)}% réalisé` : undefined}
             icon={<CheckCircle2 className="h-5 w-5" />}
             accent="primary"
           />
           <StatCard
-            title="Dépenses sanitaires"
-            value={`${formatNumber(totalCost)} FCFA`}
-            subtitle="Coût total des soins"
+            title="Coût des soins"
+            value={totalCost > 0 ? `${formatNumber(totalCost)} F` : "0 F"}
             icon={<Coins className="h-5 w-5" />}
             accent="amber"
           />
         </div>
 
-        {/* Barre de filtres */}
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3.5 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted uppercase tracking-wider">
-            <Filter className="h-4 w-4" />
-            Filtres :
+        {/* Filtres Hors Tableau (Style Vraie App Mobile) */}
+        <div className="space-y-2">
+          {/* Rangée 1 : Statuts en pastilles tactiles défilantes */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 -mx-1 px-1 touch-pan-x">
+            {[
+              { label: `Tous (${meta.totalItems})`, value: "ALL" },
+              { label: `À venir (${meta.upcomingCount})`, value: "SCHEDULED" },
+              { label: `Administrés (${completedCount})`, value: "COMPLETED" },
+              ...(meta.overdueCount > 0 ? [{ label: `En retard (${meta.overdueCount})`, value: "MISSED" }] : []),
+            ].map((tab) => {
+              const isActive = selectedStatus === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setSelectedStatus(tab.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                    isActive
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Bande */}
-          <select
-            value={selectedFlockId}
-            onChange={(e) => setSelectedFlockId(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-          >
-            <option value="ALL">Toutes les bandes</option>
-            {flocks.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name} ({f.code || "Lot"})
-              </option>
-            ))}
-          </select>
+          {/* Rangée 2 : Sélecteur de Bande & Pastilles Catégories */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 -mx-1 px-1 touch-pan-x">
+            {/* Filtre Bande */}
+            {flocks.length > 1 && (
+              <select
+                value={selectedFlockId}
+                onChange={(e) => setSelectedFlockId(e.target.value)}
+                className="rounded-full border border-border/80 bg-surface px-3 py-1.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden transition-all shadow-2xs shrink-0 cursor-pointer"
+              >
+                <option value="ALL">Toutes les bandes</option>
+                {flocks.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.code || "Lot"})
+                  </option>
+                ))}
+              </select>
+            )}
 
-          {/* Statut */}
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="SCHEDULED">Planifiés / À venir</option>
-            <option value="COMPLETED">Administrés</option>
-            <option value="MISSED">En retard</option>
-            <option value="CANCELLED">Annulés</option>
-          </select>
-
-          {/* Catégorie */}
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-          >
-            <option value="ALL">Toutes les catégories</option>
-            <option value="VACCINATION">Vaccinations</option>
-            <option value="TREATMENT">Traitements curatifs</option>
-            <option value="DEWORMING">Déparasitages</option>
-            <option value="VITAMIN">Vitamines & Fortifiants</option>
-            <option value="DISINFECTION">Désinfections</option>
-            <option value="OTHER">Autres soins</option>
-          </select>
+            {/* Pastilles Catégories */}
+            {[
+              { label: "Toutes catégories", value: "ALL" },
+              { label: "Vaccinations", value: "VACCINATION" },
+              { label: "Traitements", value: "TREATMENT" },
+              { label: "Déparasitages", value: "DEWORMING" },
+              { label: "Vitamines", value: "VITAMIN" },
+              { label: "Désinfections", value: "DISINFECTION" },
+            ].map((cat) => {
+              const isActive = selectedType === cat.value;
+              return (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => setSelectedType(cat.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                    isActive
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Liste des interventions */}
@@ -629,25 +654,31 @@ export default function HealthPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {isScheduled && (
-                        <button
-                          onClick={() => handleOpenComplete(t)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-success-hover transition-colors"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          Valider
-                        </button>
-                      )}
+                    {(canManageHealth || canDeleteHealth) && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-border/60">
+                        {isScheduled && canManageHealth && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenComplete(t)}
+                            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3.5 py-2.5 sm:py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-success-hover active:scale-95 transition-all cursor-pointer"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Valider
+                          </button>
+                        )}
 
-                      <button
-                        onClick={() => handleDeleteTreatment(t.id)}
-                        className="rounded-lg border border-border p-1.5 text-muted hover:border-danger hover:text-danger transition-colors"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                        {canDeleteHealth && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTreatment(t.id)}
+                            className="rounded-lg border border-border p-2 sm:p-1.5 text-muted hover:border-danger hover:text-danger active:scale-95 transition-all cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -660,15 +691,15 @@ export default function HealthPage() {
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Planifier une intervention sanitaire"
-        description="Enregistrez une vaccination, un déparasitage ou un traitement préventif."
+        title="Planifier un soin"
+        description="Vaccin ou traitement"
         maxWidth="lg"
       >
-        <form onSubmit={handleCreateTreatment} className="space-y-4">
+        <form onSubmit={handleCreateTreatment} className="space-y-3.5">
           {/* Puces de presets rapides */}
           <div>
             <label className="text-xs font-semibold text-muted block mb-1.5">
-              💡 Raccourcis fréquents (1-clic pour pré-remplir) :
+              Modèles rapides :
             </label>
             <div className="flex flex-wrap gap-1.5">
               {PRESET_TREATMENTS.map((p, idx) => (
@@ -684,10 +715,10 @@ export default function HealthPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">
-                Bande concernée *
+                Bande *
               </label>
               <select
                 value={createFlockId}
@@ -697,7 +728,7 @@ export default function HealthPage() {
               >
                 {flocks.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.name} ({f.code || "Lot"} - {f.currentQuantity} têtes)
+                    {f.name} ({f.currentQuantity} têtes)
                   </option>
                 ))}
               </select>
@@ -705,7 +736,7 @@ export default function HealthPage() {
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">
-                Titre de l'intervention *
+                Titre du soin *
               </label>
               <input
                 type="text"
@@ -911,28 +942,18 @@ export default function HealthPage() {
       <Modal
         isOpen={programModalOpen}
         onClose={() => setProgramModalOpen(false)}
-        title="Générer le programme prophylactique standard"
-        description="Génère automatiquement la chronologie vaccinale complète adaptée au Bénin et à l'Afrique de l'Ouest."
+        title="Programme 1-Clic"
+        description="Chronologie vaccinale"
       >
-        <form onSubmit={handleGenerateProgram} className="space-y-4">
-          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-xs text-foreground space-y-2">
-            <div className="font-semibold text-accent flex items-center gap-1.5">
-              <Zap className="h-4 w-4" />
-              Programme officiel pré-calibré :
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-muted">
-              <li>
-                <strong>Poulets de chair :</strong> Réception anti-stress (J1), Gumboro (J7, J14), Newcastle (J10, J21), Anticoccidien (J18), Déparasitage (J28).
-              </li>
-              <li>
-                <strong>Poules pondeuses :</strong> Programme complet jusqu'à l'entrée en ponte (Gumboro x3, Newcastle, Variole aviaire, Coryza x2, purge vermifuge).
-              </li>
-            </ul>
+        <form onSubmit={handleGenerateProgram} className="space-y-3.5">
+          <div className="rounded-xl border border-accent/25 bg-accent/5 p-2.5 text-xs text-foreground flex items-center gap-2">
+            <Zap className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-[11px] text-muted">Génère les vaccins et soins recommandés selon le type de bande.</span>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-foreground block mb-1">
-              Bande de volailles cible *
+              Bande *
             </label>
             <select
               value={programFlockId}
@@ -942,7 +963,7 @@ export default function HealthPage() {
             >
               {flocks.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.name} ({f.breed} - {f.currentQuantity} têtes - Début : {formatDate(f.startDate)})
+                  {f.name} ({f.breed} - {f.currentQuantity} têtes)
                 </option>
               ))}
             </select>
@@ -950,16 +971,16 @@ export default function HealthPage() {
 
           <div>
             <label className="text-xs font-semibold text-foreground block mb-1">
-              Protocole à appliquer
+              Protocole
             </label>
             <select
               value={programType}
               onChange={(e) => setProgramType(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
             >
-              <option value="AUTO">Automatique (Détecter selon le type de la bande)</option>
-              <option value="STANDARD_BROILER">Protocole Poulet de Chair (45 jours)</option>
-              <option value="STANDARD_LAYER">Protocole Pondeuses (Démarrage jusqu'à ponte)</option>
+              <option value="AUTO">Automatique (selon le type)</option>
+              <option value="STANDARD_BROILER">Poulet de chair (45 jours)</option>
+              <option value="STANDARD_LAYER">Pondeuses (démarrage à ponte)</option>
             </select>
           </div>
 
@@ -986,7 +1007,7 @@ export default function HealthPage() {
               disabled={generatingProgram}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50 transition-colors shadow-sm"
             >
-              {generatingProgram ? "Génération en cours..." : "Générer les interventions"}
+              {generatingProgram ? "Génération..." : "Générer"}
             </button>
           </div>
         </form>
@@ -996,14 +1017,14 @@ export default function HealthPage() {
       <Modal
         isOpen={completeModalOpen}
         onClose={() => setCompleteModalOpen(false)}
-        title="Valider l'administration du soin"
-        description={`Confirmez la réalisation de : ${selectedTreatment?.title}`}
+        title="Valider le soin"
+        description={selectedTreatment?.title || "Confirmation"}
       >
-        <form onSubmit={handleCompleteTreatment} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form onSubmit={handleCompleteTreatment} className="space-y-3.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">
-                Date d'administration *
+                Date *
               </label>
               <input
                 type="date"
@@ -1120,6 +1141,17 @@ export default function HealthPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Floating Action Button (FAB) Mobile */}
+      <button
+        type="button"
+        onClick={handleOpenCreateModal}
+        aria-label="Planifier un soin"
+        className="fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-xs font-bold text-white shadow-xl shadow-primary/40 border-2 border-surface active:scale-90 transition-all sm:hidden"
+      >
+        <Plus className="h-4 w-4" />
+        <span>Planifier soin</span>
+      </button>
     </Shell>
   );
 }

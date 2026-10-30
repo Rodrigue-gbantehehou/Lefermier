@@ -16,6 +16,7 @@ use App\Repository\FlockRepository;
 use App\Repository\HealthTreatmentRepository;
 use App\Security\Voter\HealthTreatmentVoter;
 use App\Service\HealthService;
+use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +33,7 @@ class HealthController extends AbstractController
         private readonly HealthService $healthService,
         private readonly HealthTreatmentRepository $treatmentRepository,
         private readonly FlockRepository $flockRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -146,7 +148,29 @@ class HealthController extends AbstractController
     public function complete(
         HealthTreatment $treatment,
         #[MapRequestPayload] CompleteHealthTreatmentRequestDto $dto,
-        #[CurrentUser] User $user
+        #[CurrentUser] User $user,
+        Request $request
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key');
+
+        if ($idempotencyKey !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $treatment->getFarm(),
+                fn () => $this->doCompleteTreatment($treatment, $dto, $user)
+            );
+        }
+
+        return $this->doCompleteTreatment($treatment, $dto, $user);
+    }
+
+    private function doCompleteTreatment(
+        HealthTreatment $treatment,
+        CompleteHealthTreatmentRequestDto $dto,
+        User $user
     ): JsonResponse {
         $completed = $this->healthService->completeTreatment($treatment, $dto, $user);
 

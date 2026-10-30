@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   CreditCard,
   ChevronRight,
@@ -26,6 +27,7 @@ import {
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { api, PublicPlan } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -225,7 +227,7 @@ function PlanCard({ plan, currentSku, billingCycle, onSelect }: PlanCardProps) {
 /* ─── Page principale ─── */
 
 export default function SubscriptionPage() {
-  const { activeFarm, activePlan } = useAuth();
+  const { activeFarm, activePlan, isOwner, isLoading: authLoading } = useAuth();
 
   const [publicPlans, setPublicPlans] = useState<PublicPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -239,8 +241,12 @@ export default function SubscriptionPage() {
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPlans();
-  }, []);
+    if (isOwner) {
+      fetchPlans();
+    } else {
+      setIsLoading(false);
+    }
+  }, [isOwner]);
 
   async function fetchPlans() {
     try {
@@ -285,28 +291,40 @@ export default function SubscriptionPage() {
     setSuccessMsg(null);
   }
 
+  if (!authLoading && !isOwner) {
+    return (
+      <Shell>
+        <div className="max-w-md mx-auto mt-12 sm:mt-16 rounded-3xl border border-border bg-surface p-8 text-center space-y-4 shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger">
+            <Shield className="h-7 w-7" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Accès réservé</h2>
+          <p className="text-xs text-muted leading-relaxed">
+            Seul le propriétaire de l'exploitation avicole est autorisé à consulter et gérer l'abonnement de la ferme.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-all"
+            >
+              Retour au tableau de bord
+            </Link>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       <div className="max-w-6xl mx-auto space-y-8 pb-16">
 
-        {/* En-tête */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-muted font-medium mb-1.5">
-              <span>Paramètres</span>
-              <ChevronRight className="h-3 w-3" />
-              <span className="text-foreground">Mon abonnement</span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl flex items-center gap-2.5">
-              <CreditCard className="h-6 w-6 text-primary" />
-              <span>Mon abonnement</span>
-            </h1>
-            <p className="mt-1 text-xs text-muted">
-              Consultez les offres disponibles et demandez un changement d'abonnement pour{" "}
-              <strong>{activeFarm?.name || "votre ferme"}</strong>.
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Mon abonnement"
+          subtitle={`Formule ${activePlan?.planName || "Starter"}`}
+          icon={<CreditCard className="h-4 w-4" />}
+          backHref="/settings/farm"
+        />
 
         {/* Alerte succès */}
         {successMsg && (
@@ -326,25 +344,23 @@ export default function SubscriptionPage() {
         )}
 
         {/* KPI — récapitulatif de l'offre active */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           <StatCard
-            title="Offre actuelle"
-            value={activePlan?.planName || "Starter (Découverte)"}
-            subtitle={activePlan?.badge ? `Formule ${activePlan.badge}` : "Formule gratuite"}
+            title="Formule"
+            value={activePlan?.planName || "Starter"}
             accent="primary"
             icon={<CreditCard className="h-5 w-5" />}
+            className="col-span-2 sm:col-span-1"
           />
           <StatCard
-            title="Modules actifs"
-            value={`${activePlan?.modules?.length ?? 0} module(s)`}
-            subtitle="Fonctionnalités accessibles"
+            title="Modules inclus"
+            value={activePlan?.modules?.length ?? 0}
             accent="amber"
             icon={<Sparkles className="h-5 w-5" />}
           />
           <StatCard
-            title="Statut abonnement"
+            title="Statut"
             value="Actif"
-            subtitle="Abonnement en cours"
             accent="primary"
             icon={<CheckCircle2 className="h-5 w-5" />}
           />
@@ -354,9 +370,6 @@ export default function SubscriptionPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-base font-bold text-foreground">Catalogue des offres</h2>
-            <p className="text-xs text-muted mt-0.5">
-              Choisissez la formule adaptée à votre exploitation
-            </p>
           </div>
           <div className="flex items-center gap-1 rounded-xl border border-border bg-surface-muted p-1 self-start sm:self-auto">
             <button

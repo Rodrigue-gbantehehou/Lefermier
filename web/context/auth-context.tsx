@@ -13,6 +13,7 @@ interface AuthContextType {
   permissions: string[];
   token: string | null;
   isLoading: boolean;
+  isOwner: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   register: (data: {
     email: string;
@@ -194,6 +195,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadCurrentUser();
   }
 
+  const isOwner = Boolean(
+    activeFarm?.userRole?.toUpperCase() === "OWNER" ||
+    role?.name?.toUpperCase() === "OWNER" ||
+    user?.roles?.includes("ROLE_ADMIN") ||
+    user?.roles?.includes("ROLE_SUPER_ADMIN")
+  );
+
   function hasModule(moduleKey: string): boolean {
     if (!activeFarm) return false;
     const modules = activeFarm.subscription?.modules;
@@ -203,6 +211,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function hasPermission(permissionKey: string): boolean {
     if (!activeFarm) return false;
+
+    // Le propriétaire de l'exploitation ou administrateur dispose de toutes les permissions opérationnelles
+    if (isOwner) return true;
 
     if (permissions.includes("*")) return true;
     if (permissions.includes(permissionKey)) return true;
@@ -229,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permissions,
         token,
         isLoading,
+        isOwner,
         login,
         register,
         logout,

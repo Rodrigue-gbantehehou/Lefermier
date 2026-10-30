@@ -6,12 +6,15 @@ namespace App\Controller;
 
 use App\Dto\Auth\RegisterRequestDto;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\AuthService;
+use App\Service\DeviceAuthService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -20,6 +23,9 @@ class AuthController extends AbstractController
 {
     public function __construct(
         private readonly AuthService $authService,
+        private readonly DeviceAuthService $deviceAuthService,
+        private readonly UserRepository $userRepository,
+        private readonly UserPasswordHasherInterface $passwordHasher,
     ) {
     }
 
@@ -59,6 +65,107 @@ class AuthController extends AbstractController
     {
         // Géré automatiquement par le firewall JSON Login de LexikJWTAuthenticationBundle
         throw new \LogicException('Cette méthode ne doit pas être appelée directement.');
+    }
+
+    #[Route('/device-session', name: 'device_session', methods: ['POST'])]
+    public function deviceSession(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $email = mb_strtolower(trim((string) ($payload['email'] ?? '')));
+        $password = (string) ($payload['password'] ?? '');
+        $deviceId = trim((string) ($payload['deviceId'] ?? ''));
+        $deviceName = isset($payload['deviceName']) ? trim((string) $payload['deviceName']) : null;
+
+        if (empty($email) || empty($password) || empty($deviceId)) {
+            return $this->json([
+                'title' => 'Paramètres obligatoires manquants',
+                'detail' => 'L\'email, le mot de passe et l\'identifiant de terminal (deviceId) sont obligatoires.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+        if ($user === null || !$this->passwordHasher->isPasswordValid($user, $password)) {
+            return $this->json([
+                'title' => 'Identifiants invalides',
+                'detail' => 'Email ou mot de passe incorrect.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $session = $this->deviceAuthService->createDeviceSession($user, $deviceId, $deviceName);
+
+        return $this->json([
+            'data' => [
+                'token' => $session['token'],
+                'refreshToken' => $session['refreshToken'],
+                'expiresAt' => $session['expiresAt'],
+                'user' => [
+                    'id' => $user->getId()?->toBase32(),
+                    'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'fullName' => $user->getFullName(),
+                ],
+                'profile' => $this->authService->getUserProfile($user),
+            ],
+        ]);
+    }
+
+    #[Route('/refresh', name: 'refresh', methods: ['POST'])]
+    public function refresh(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $refreshToken = trim((string) ($payload['refreshToken'] ?? ''));
+        $deviceId = trim((string) ($payload['deviceId'] ?? ''));
+
+        if (empty($refreshToken) || empty($deviceId)) {
+            return $this->json([
+                'title' => 'Paramètres manquants',
+                'detail' => 'Le jeton de rafraîchissement (refreshToken) et l\'identifiant de terminal (deviceId) sont obligatoires.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $session = $this->deviceAuthService->rotateRefreshToken($refreshToken, $deviceId);
+        } catch (\Symfony\Component\Security\Core\Exception\AuthenticationException $e) {
+            return $this->json([
+                'title' => 'Échec de renouvellement',
+                'detail' => $e->getMessage(),
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json([
+            'data' => [
+                'token' => $session['token'],
+                'refreshToken' => $session['refreshToken'],
+                'expiresAt' => $session['expiresAt'],
+            ],
+        ]);
+    }
+
+    #[Route('/device-logout', name: 'device_logout', methods: ['POST'])]
+    public function deviceLogout(
+        #[CurrentUser] ?User $user,
+        Request $request
+    ): JsonResponse {
+        if ($user === null) {
+            return $this->json([
+                'title' => 'Non authentifié',
+                'detail' => 'Vous devez être authentifié pour révoquer une session.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $deviceId = trim((string) ($payload['deviceId'] ?? ''));
+
+        if (!empty($deviceId)) {
+            $this->deviceAuthService->revokeDeviceSession($user, $deviceId);
+        }
+
+        return $this->json([
+            'data' => [
+                'message' => 'Session de l\'appareil révoquée avec succès.',
+            ],
+        ]);
     }
 
     #[Route('/me', name: 'me', methods: ['GET'])]

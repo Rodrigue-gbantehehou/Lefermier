@@ -39,14 +39,14 @@ export function InventoryAlertsWidget({
             <Package className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">
-              Surveillance des stocks & Aliments
+            <h2 className="text-sm sm:text-base font-bold text-foreground">
+              Alertes stocks
             </h2>
-            <p className="text-xs text-muted">
-              {lowStockItems.length > 0
-                ? `${lowStockItems.length} produit(s) en alerte ou presque épuisé(s)`
-                : "Réserves d'aliments et produits de soin suffisantes"}
-            </p>
+            {lowStockItems.length > 0 && (
+              <p className="text-xs text-danger font-medium mt-0.5">
+                {lowStockItems.length} article(s) sous le seuil d'alerte
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -54,7 +54,7 @@ export function InventoryAlertsWidget({
             href="/inventory"
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-hover transition-colors"
           >
-            <span>Gérer tous les stocks</span>
+            <span>Voir tout</span>
             <ArrowRight className="h-3.5 w-3.5 text-muted" />
           </Link>
         </div>

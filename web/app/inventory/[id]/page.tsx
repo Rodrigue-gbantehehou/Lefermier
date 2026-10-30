@@ -30,6 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { ModuleLockedState } from "@/components/ui/module-locked-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -104,7 +106,7 @@ const MOVEMENT_CONFIG: Record<
 function InventoryItemDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule, isOwner } = useAuth();
   const { toast } = useToast();
   const itemId = params?.id as string;
 
@@ -123,10 +125,14 @@ function InventoryItemDetailContent() {
   const [moveUnit, setMoveUnit] = useState<string>("KG");
   const [moveQty, setMoveQty] = useState<number | string>(15);
   const [moveUnitPrice, setMoveUnitPrice] = useState<number | string>("");
-  const [moveDate, setMoveDate] = useState(new Date().toISOString().split("T")[0]);
+  const [moveDate, setMoveDate] = useState("");
   const [moveReason, setMoveReason] = useState("");
   const [moveFlockId, setMoveFlockId] = useState("");
   const [submittingMove, setSubmittingMove] = useState(false);
+
+  useEffect(() => {
+    setMoveDate(new Date().toISOString().split("T")[0]);
+  }, []);
 
   // Détection article aliment / provende & conditionnement en sacs
   const isFeed = Boolean(
@@ -509,93 +515,97 @@ function InventoryItemDetailContent() {
     );
   }
 
+  if (!hasModule("inventory")) {
+    return (
+      <Shell>
+        <ModuleLockedState
+          moduleName="Stocks & Aliments"
+          description="Le suivi des stocks d'aliments et produits de soins n'est pas inclus dans votre formule actuelle."
+        />
+      </Shell>
+    );
+  }
+
   const categoryBadge = CATEGORY_LABELS[item.category] || { label: item.category, badge: "neutral" };
   const unitLabel = getUnitLabel(item.unit);
   const unitShort = getUnitShortLabel(item.unit);
 
   return (
     <Shell>
-      {/* Back Button & Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/inventory"
-            className="rounded-xl border border-border bg-surface p-2 text-muted hover:bg-surface-hover hover:text-foreground transition-colors shadow-xs"
-            title="Retour à la liste des stocks"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-                {item.name}
-              </h1>
-              <Badge variant={categoryBadge.badge} size="sm">
-                {item.category === "OTHER" && item.customCategory
-                  ? item.customCategory
-                  : categoryBadge.label}
-              </Badge>
-              {item.isActive === false && (
-                <Badge variant="neutral" size="sm">
-                  Archivé
-                </Badge>
-              )}
-            
-            </div>
-            <p className="mt-1 text-xs text-muted flex items-center gap-2">
-              <span>
-                Unité standard : <strong className="text-foreground">{unitLabel}</strong>
-                {isBagItem && (
-                  <span className="font-mono text-primary font-semibold ml-1">
-                    ({itemBagWeight} kg / sac)
-                  </span>
-                )}
-              </span>
-              <span>•</span>
-              <span>Seuil de sécurité : <strong className="text-foreground">{formatNumber(item.minThreshold)} {unitShort}</strong></span>
-            </p>
+      <PageHeader
+        backHref="/inventory"
+        title={item.name}
+        subtitle={
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span>{categoryBadge.label}</span>
+            <span>•</span>
+            <span>{unitLabel}</span>
+            <span>•</span>
+            <span>Seuil {formatNumber(item.minThreshold)} {unitShort}</span>
           </div>
-        </div>
+        }
+        icon={<Package className="h-4 w-4" />}
+        actions={
+          <div className="flex items-center gap-1.5">
+            {hasPermission("inventory:update") && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openMovementModal("IN")}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-full bg-success px-2.5 text-xs font-bold text-white shadow-xs hover:bg-success/90 active:scale-95 transition-all cursor-pointer"
+                  title="Approvisionner"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Entrée</span>
+                </button>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {hasPermission("inventory:update") && (
-            <>
+                <button
+                  type="button"
+                  onClick={() => openMovementModal("OUT")}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-full bg-primary px-2.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+                  title={isFeed ? "Distribuer la provende aux volailles" : "Enregistrer une sortie"}
+                >
+                  {isFeed ? <Utensils className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                  <span>{isFeed ? "Nourrir" : "Sortie"}</span>
+                </button>
+              </>
+            )}
+
+            {hasPermission("inventory:create") && (
               <button
                 type="button"
-                onClick={() => openMovementModal("IN")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-success px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-success/90 transition-colors cursor-pointer"
+                onClick={() => setEditModalOpen(true)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-muted hover:text-foreground hover:bg-surface-hover active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="Modifier l'article"
               >
-                <Plus className="h-4 w-4" />
-                <span>Approvisionner</span>
+                <Edit2 className="h-3.5 w-3.5" />
               </button>
+            )}
+          </div>
+        }
+      />
 
-              <button
-                type="button"
-                onClick={() => openMovementModal("OUT")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors cursor-pointer"
-                title={isFeed ? "Distribuer la provende aux volailles" : "Enregistrer une sortie ou un traitement"}
-              >
-                {isFeed ? <Utensils className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
-                <span>{isFeed ? "Nourrir" : "Distribuer"}</span>
-              </button>
-            </>
-          )}
-          {hasPermission("inventory:create") && (
-            <button
-              type="button"
-              onClick={() => setEditModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface p-2 text-xs font-semibold text-muted hover:text-foreground hover:bg-surface-hover transition-colors shadow-xs"
-              title="Modifier les paramètres de l'article"
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+      {/* Badges bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar -mt-3 mb-4">
+        <Badge variant={categoryBadge.badge} size="sm">
+          {item.category === "OTHER" && item.customCategory
+            ? item.customCategory
+            : categoryBadge.label}
+        </Badge>
+        {item.isActive === false && (
+          <Badge variant="neutral" size="sm">
+            Archivé
+          </Badge>
+        )}
+        {isBagItem && (
+          <span className="font-mono text-[11px] text-primary font-semibold">
+            {itemBagWeight} kg / sac
+          </span>
+        )}
       </div>
 
       {/* Jauge d'Alerte de Stock */}
-      <div className={`mb-6 rounded-2xl border p-4 shadow-xs transition-colors ${
+      <div className={`mb-6 rounded-xl border p-4 shadow-xs transition-colors ${
         isCriticalStock
           ? "border-danger/30 bg-danger-soft/50"
           : isLowStock
@@ -638,38 +648,37 @@ function InventoryItemDetailContent() {
       </div>
 
       {/* 4 KPI Highlight Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard
-          title="Stock Actuel Disponible"
+          title="Stock actuel"
           value={formatInventoryUnit(item.currentStock, item.unit, { packageWeightKg: item.packageWeightKg })}
           subtitle={
             isBagItem
-              ? `Soit ~${formatNumber(item.currentStock * itemBagWeight)} kg au total`
+              ? `~${formatNumber(item.currentStock * itemBagWeight)} kg`
               : isLowStock
-              ? `Alerte sous le seuil (${formatNumber(item.minThreshold)} ${unitShort})`
-              : `Seuil d'alerte à ${formatNumber(item.minThreshold)} ${unitShort}`
+              ? `Seuil : ${formatNumber(item.minThreshold)} ${unitShort}`
+              : undefined
           }
           icon={<Package className="h-5 w-5" />}
         />
 
         <StatCard
-          title="Valeur Marchande du Stock"
+          title="Valeur en stock"
           value={formatFcfa(totalStockValue)}
-          subtitle={`Coût unitaire : ${formatFcfa(item.unitCostFcfa)} / ${unitShort}`}
+          subtitle={`${formatFcfa(item.unitCostFcfa)} / ${unitShort}`}
           icon={<Wallet className="h-5 w-5" />}
         />
 
         <StatCard
-          title="Cumul des Entrées"
+          title="Total entrées"
           value={`${formatNumber(totalInQty)} ${unitShort}`}
-          subtitle={`Dépense cumulée : ${formatFcfa(totalSpentFcfa)}`}
+          subtitle={totalSpentFcfa > 0 ? formatFcfa(totalSpentFcfa) : undefined}
           icon={<TrendingUp className="h-5 w-5" />}
         />
 
         <StatCard
-          title="Cumul des Sorties"
+          title="Total sorties"
           value={`${formatNumber(totalOutQty)} ${unitShort}`}
-          subtitle="Distribué aux bandes de volailles"
           icon={<TrendingDown className="h-5 w-5" />}
         />
       </div>
@@ -924,22 +933,22 @@ function InventoryItemDetailContent() {
         onClose={() => setMoveModalOpen(false)}
         title={
           moveType === "IN"
-            ? "Approvisionnement de stock"
+            ? "Approvisionnement"
             : moveType === "OUT"
             ? isFeed
-              ? "Distribution d'aliment"
-              : "Sortie de stock"
-            : "Ajustement d'inventaire"
+              ? "Nourrir"
+              : "Sortie"
+            : "Ajustement"
         }
-        description={`${item.name} • Stock disponible : ${formatInventoryUnit(item.currentStock, item.unit, { packageWeightKg: item.packageWeightKg })}`}
+        description={`Stock : ${formatInventoryUnit(item.currentStock, item.unit, { packageWeightKg: item.packageWeightKg })}`}
         maxWidth="md"
       >
-        <form onSubmit={handleRecordMovement} className="space-y-4">
+        <form onSubmit={handleRecordMovement} className="space-y-3.5">
           {/* Ligne 1 : Type d'opération & Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Type d'opération *
+                Type *
               </label>
               <select
                 value={moveType}
@@ -1133,7 +1142,7 @@ function InventoryItemDetailContent() {
               disabled={submittingMove}
               className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <span>{submittingMove ? "Enregistrement..." : "Enregistrer le mouvement"}</span>
+              <span>{submittingMove ? "Enregistrement..." : "Enregistrer"}</span>
             </button>
           </div>
         </form>
@@ -1143,14 +1152,14 @@ function InventoryItemDetailContent() {
       <Modal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
-        title={`Modifier l'article : ${item.name}`}
-        description="Ajustez les paramètres de cet intrant, son unité ou son seuil d'alerte."
+        title={`Modifier : ${item.name}`}
+        description="Paramètres de l'article"
         maxWidth="md"
       >
-        <form onSubmit={handleSaveEdit} className="space-y-4">
+        <form onSubmit={handleSaveEdit} className="space-y-3.5">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Désignation de l'article *
+              Désignation *
             </label>
             <input
               type="text"

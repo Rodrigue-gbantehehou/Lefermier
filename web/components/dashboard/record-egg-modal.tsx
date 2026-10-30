@@ -123,22 +123,10 @@ export function RecordEggModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-        editingEgg
-          ? "Modifier le ramassage d'œufs"
-          : isFlockLocked && targetFlock
-            ? `Collecte de ponte — ${targetFlock.name}`
-            : "Enregistrer une collecte de ponte"
-      }
-      description={
-        editingEgg
-          ? "Mise à jour des quantités récoltées pour ce créneau de ponte."
-          : isFlockLocked && targetFlock
-            ? `Saisie des œufs récoltés pour ${targetFlock.name} avec calcul instantané en plateaux.`
-            : "Saisie des œufs récoltés avec calcul instantané en plateaux de 30 alvéoles."
-      }
+      title={editingEgg ? "Modifier ramassage" : "Collecte d'œufs"}
+      description={targetFlock?.name || "Saisie journalière"}
     >
-      <form onSubmit={handleEggSubmit} className="space-y-4">
+      <form onSubmit={handleEggSubmit} className="space-y-3.5">
         {!editingEgg &&
           recentEggs.some(
             (e) =>
@@ -146,11 +134,9 @@ export function RecordEggModal({
               e.date === (eggDate || todayStr) &&
               e.session === eggSession
           ) && (
-            <div className="rounded-xl border border-warning/30 bg-warning-soft/30 p-3 text-xs text-warning flex items-center gap-2">
+            <div className="rounded-xl border border-warning/30 bg-warning-soft/30 p-2 text-xs text-warning flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>
-                Une collecte existe déjà pour ce créneau. La validation mettra à jour directement ces chiffres.
-              </span>
+              <span>Collecte déjà existante sur ce créneau (mise à jour directe).</span>
             </div>
           )}
 
@@ -227,10 +213,10 @@ export function RecordEggModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-success mb-1">
-              Bons œufs (vendables)
+              Bons œufs
             </label>
             <input
               type="number"
@@ -249,7 +235,7 @@ export function RecordEggModal({
 
           <div>
             <label className="block text-xs font-semibold text-danger mb-1">
-              Cassés / Fêlés
+              Cassés
             </label>
             <input
               type="number"
@@ -267,7 +253,7 @@ export function RecordEggModal({
 
           <div>
             <label className="block text-xs font-semibold text-warning mb-1">
-              Anormaux / Petits
+              Anormaux
             </label>
             <input
               type="number"
@@ -284,10 +270,10 @@ export function RecordEggModal({
           </div>
         </div>
 
-        {/* Estimation plateaux de 30 alvéoles */}
-        <div className="rounded-2xl border border-accent/20 bg-accent-soft/30 p-3.5 space-y-2">
+        {/* Estimation plateaux */}
+        <div className="rounded-2xl border border-accent/20 bg-accent-soft/30 p-3 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-accent">
-            <span>Équivalence en plateaux de 30</span>
+            <span>Équivalence plateaux</span>
             <span className="flex items-center gap-1 font-mono text-foreground bg-surface px-2.5 py-1 rounded-lg border border-accent/20 shadow-2xs">
               <CheckCircle2 className="h-3.5 w-3.5 text-success" />
               {trayCalc.text}
@@ -295,19 +281,19 @@ export function RecordEggModal({
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="rounded-xl bg-surface p-2 border border-border">
-              <span className="text-[10px] text-muted block">Plateaux de 30</span>
+              <span className="text-[10px] text-muted block">Plateaux</span>
               <span className="font-bold font-mono text-base text-accent">
                 {trayCalc.trays}
               </span>
             </div>
             <div className="rounded-xl bg-surface p-2 border border-border">
-              <span className="text-[10px] text-muted block">Œufs libres</span>
+              <span className="text-[10px] text-muted block">Libres</span>
               <span className="font-bold font-mono text-base text-foreground">
                 {trayCalc.loose}
               </span>
             </div>
             <div className="rounded-xl bg-surface p-2 border border-border">
-              <span className="text-[10px] text-muted block">Total récolté</span>
+              <span className="text-[10px] text-muted block">Total</span>
               <span className="font-bold font-mono text-base text-foreground">
                 {Number(goodEggs) + Number(brokenEggs) + Number(abnormalEggs)}
               </span>
@@ -317,13 +303,13 @@ export function RecordEggModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Notes / Observations
+            Notes
           </label>
           <input
             type="text"
             value={eggNotes}
             onChange={(e) => setEggNotes(e.target.value)}
-            placeholder="ex. Légère baisse de ponte, couleur normale, coquille solide..."
+            placeholder="ex. RAS, ponte normale"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-accent focus:outline-hidden"
           />
         </div>
@@ -351,8 +337,8 @@ export function RecordEggModal({
             {submittingEgg
               ? "Enregistrement..."
               : editingEgg
-              ? "Mettre à jour le ramassage"
-              : "Valider la collecte"}
+              ? "Modifier"
+              : "Enregistrer"}
           </button>
         </div>
       </form>

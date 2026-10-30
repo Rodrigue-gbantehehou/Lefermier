@@ -17,6 +17,7 @@ use App\Repository\FlockRepository;
 use App\Repository\TransactionRepository;
 use App\Security\Voter\FlockVoter;
 use App\Security\Voter\TransactionVoter;
+use App\Service\IdempotencyService;
 use App\Service\PdfService;
 use App\Service\TransactionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,6 +38,7 @@ class TransactionController extends AbstractController
         private readonly ContactRepository $contactRepository,
         private readonly FlockRepository $flockRepository,
         private readonly PdfService $pdfService,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -100,6 +102,28 @@ class TransactionController extends AbstractController
         Farm $farm,
         #[MapRequestPayload] CreateTransactionRequestDto $dto,
         #[CurrentUser] ?User $user,
+        Request $request,
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key');
+
+        if ($idempotencyKey !== null && $user !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $farm,
+                fn () => $this->doRecordTransaction($farm, $dto, $user)
+            );
+        }
+
+        return $this->doRecordTransaction($farm, $dto, $user);
+    }
+
+    private function doRecordTransaction(
+        Farm $farm,
+        CreateTransactionRequestDto $dto,
+        ?User $user,
     ): JsonResponse {
         $transaction = $this->transactionService->recordTransaction($farm, $dto, $user);
 

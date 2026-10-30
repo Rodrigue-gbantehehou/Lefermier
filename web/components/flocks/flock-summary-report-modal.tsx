@@ -41,8 +41,8 @@ export function FlockSummaryReportModal({
     <PrintableModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Bilan Technique & Financier de Bande"
-      description="Rapport officiel de synthèse pour l'archivage de fin de lot ou la présentation aux partenaires."
+      title="Bilan du lot"
+      description={`${flock.name} • Synthèse technique et financière`}
       farm={farm}
       downloadEndpoint={`/flocks/${flock.id}/report/pdf?download=1`}
       defaultFilename={`bilan-bande-${(flock.code || flock.id.slice(-6)).toLowerCase()}.pdf`}

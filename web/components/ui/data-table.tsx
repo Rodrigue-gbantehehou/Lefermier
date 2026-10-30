@@ -251,35 +251,86 @@ export function DataTable<T>({
     return idx;
   };
 
+  const hasHeader = Boolean(title || subtitle || actions || (renderGridItem && onViewModeChange));
+  const hasFilters = Boolean(periodFilter || secondaryFilter || searchable);
+
+  const renderPagination = () => (
+    <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-muted">
+      <div>
+        Affichage de{" "}
+        <span className="font-semibold text-foreground">
+          {Math.min(totalItems, (safePage - 1) * pageSize + 1)}
+        </span>{" "}
+        à{" "}
+        <span className="font-semibold text-foreground">
+          {Math.min(totalItems, safePage * pageSize)}
+        </span>{" "}
+        sur <span className="font-semibold text-foreground">{totalItems}</span> éléments
+        {periodFilter && selectedPeriod && (
+          <span className="ml-1.5 opacity-75">
+            ({TIME_PERIOD_LABELS[selectedPeriod] || selectedPeriod})
+          </span>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <button
+            type="button"
+            disabled={safePage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-foreground disabled:opacity-30 disabled:pointer-events-none hover:bg-surface-hover transition-colors cursor-pointer shadow-2xs"
+            title="Page précédente"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <span className="text-xs font-semibold px-2">
+            Page {safePage} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={safePage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-foreground disabled:opacity-30 disabled:pointer-events-none hover:bg-surface-hover transition-colors cursor-pointer shadow-2xs"
+            title="Page suivante"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className={`rounded-2xl border border-border bg-surface p-3.5 sm:p-5 shadow-xs ${className}`}>
-      {/* 1. Header Toolbar */}
-      <div className="flex flex-col gap-4 pb-4 border-b border-border">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className={`space-y-3 sm:space-y-4 ${className}`}>
+      {/* 1. En-tête Hors Tableau (Style Vraie App Mobile) */}
+      {hasHeader && (
+        <div className="flex items-center justify-between gap-2">
           <div>
             {title && (
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-foreground">{title}</h2>
-                
+                <h2 className="text-sm sm:text-base font-bold text-foreground">{title}</h2>
+                {badge}
               </div>
             )}
-            {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-[11px] sm:text-xs text-muted mt-0.5">{subtitle}</p>}
           </div>
 
-          {/* Action buttons (New, Export, etc.) & View Switcher */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {actions}
 
-            {/* Toggle Table vs Grid if renderGridItem provided */}
+            {/* Bascule Tableau vs Grille */}
             {renderGridItem && onViewModeChange && (
-              <div className="flex items-center rounded-xl border border-border bg-surface-muted p-0.5">
+              <div className="flex items-center rounded-xl border border-border bg-surface p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => onViewModeChange("table")}
                   title="Vue Tableau"
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors cursor-pointer ${
                     viewMode === "table"
-                      ? "bg-surface text-primary shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -289,9 +340,9 @@ export function DataTable<T>({
                   type="button"
                   onClick={() => onViewModeChange("grid")}
                   title="Vue Grille / Cartes"
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors cursor-pointer ${
                     viewMode === "grid"
-                      ? "bg-surface text-primary shadow-xs"
+                      ? "bg-primary text-white shadow-xs"
                       : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -301,42 +352,46 @@ export function DataTable<T>({
             )}
           </div>
         </div>
+      )}
 
-        {/* 2. Secondary Filter & Period Filter Toolbar */}
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between pt-1">
-          {/* Left: Period Tabs (Jour / Semaine / Mois / Tout) */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {periodFilter && (
-              <div className="flex items-center gap-1 rounded-xl bg-surface-muted p-1 border border-border/60">
-                <Calendar className="h-3.5 w-3.5 text-muted ml-1.5 hidden sm:block" />
-                {periodOptions.map((opt) => {
-                  const isActive = selectedPeriod === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handlePeriodChange(opt.value)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                        isActive
-                          ? "bg-primary text-white shadow-xs"
-                          : "text-muted hover:text-foreground hover:bg-surface/50"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+      {/* 2. Filtres Hors Tableau : Pastilles Défilantes Tactiles & Recherche Mobile */}
+      {hasFilters && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          {/* Rangée de pastilles de filtres (Scroll horizontal fluide tactile mobile) */}
+          {(periodFilter || secondaryFilter) && (
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 -mx-1 px-1 touch-pan-x">
+              {/* Périodes temporelles en pastilles tactiles */}
+              {periodFilter && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {periodOptions.map((opt) => {
+                    const isActive = selectedPeriod === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handlePeriodChange(opt.value)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                          isActive
+                            ? "bg-primary text-white shadow-xs"
+                            : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Slot for category or custom pills */}
-            {secondaryFilter}
-          </div>
+              {/* Filtres métiers secondaires (catégories, types, etc.) */}
+              {secondaryFilter}
+            </div>
+          )}
 
-          {/* Right: Search Input */}
+          {/* Barre de Recherche Mobile Arrondie */}
           {searchable && (
-            <div className="relative w-full lg:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -345,7 +400,7 @@ export function DataTable<T>({
                   setCurrentPage(1);
                 }}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-xl border border-border bg-surface-muted pl-8.5 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-hidden transition-colors"
+                className="w-full rounded-full border border-border bg-surface pl-9 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted focus:border-primary focus:bg-surface-muted/30 focus:outline-hidden transition-all shadow-2xs"
               />
               {searchQuery && (
                 <button
@@ -354,7 +409,7 @@ export function DataTable<T>({
                     setSearchQuery("");
                     setCurrentPage(1);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground p-0.5 cursor-pointer"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -362,48 +417,53 @@ export function DataTable<T>({
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* 3. Table / Grid Content */}
+      {/* 3. Données : Cartes Mobiles ou Tableau Desktop */}
       {isLoading ? (
-        <div className="py-16 text-center text-xs text-muted animate-pulse">
+        <div className="rounded-2xl border border-border bg-surface py-16 text-center text-xs text-muted animate-pulse shadow-xs">
           Chargement des données...
         </div>
       ) : totalItems === 0 ? (
-        <EmptyState
-          icon={emptyState?.icon || <Filter className="h-6 w-6 text-muted" />}
-          title={searchQuery ? "Aucun résultat trouvé" : emptyState?.title || "Aucune donnée disponible"}
-          description={
-            searchQuery
-              ? "Modifiez vos filtres de recherche."
-              : emptyState?.description || "Aucun enregistrement trouvé pour cette période."
-          }
-          actionLabel={
-            searchQuery
-              ? "Effacer la recherche"
-              : emptyState?.actionLabel
-          }
-          onAction={
-            searchQuery
-              ? () => {
-                  setSearchQuery("");
-                }
-              : emptyState?.onAction
-          }
-          className="my-6 border-none"
-        />
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-xs">
+          <EmptyState
+            icon={emptyState?.icon || <Filter className="h-6 w-6 text-muted" />}
+            title={searchQuery ? "Aucun résultat trouvé" : emptyState?.title || "Aucune donnée disponible"}
+            description={
+              searchQuery
+                ? "Modifiez vos filtres de recherche."
+                : emptyState?.description || "Aucun enregistrement trouvé pour cette période."
+            }
+            actionLabel={
+              searchQuery
+                ? "Effacer la recherche"
+                : emptyState?.actionLabel
+            }
+            onAction={
+              searchQuery
+                ? () => {
+                    setSearchQuery("");
+                  }
+                : emptyState?.onAction
+            }
+            className="my-2 border-none"
+          />
+        </div>
       ) : viewMode === "grid" && renderGridItem ? (
-        <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedData.map((item, idx) => (
-            <React.Fragment key={getKey(item, idx)}>
-              {renderGridItem(item)}
-            </React.Fragment>
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedData.map((item, idx) => (
+              <React.Fragment key={getKey(item, idx)}>
+                {renderGridItem(item)}
+              </React.Fragment>
+            ))}
+          </div>
+          {renderPagination()}
         </div>
       ) : (
-        <>
-          {/* VUE MOBILE (< 768px) : Cartes tactiles empilées sans aucun défilement horizontal forcé */}
-          <div className="mt-4 space-y-3 md:hidden">
+        <div className="space-y-3">
+          {/* VUE MOBILE (< 768px) : Cartes tactiles directes (comme une vraie app mobile) */}
+          <div className="space-y-2.5 md:hidden">
             {paginatedData.map((item, idx) => {
               const rowKey = getKey(item, idx);
               const customRowClass = rowClassName ? rowClassName(item) : "";
@@ -514,151 +574,106 @@ export function DataTable<T>({
           </div>
 
           {/* VUE TABLEAU DESKTOP & TABLETTE (>= 768px) */}
-          <div className="hidden md:block mt-4 overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface-muted text-muted">
-                <tr>
-                  {columns.map((col, idx) => {
-                    const isSorted = sortState?.key === col.key;
-                    const isFirst = idx === 0;
-                    const isLast = idx === columns.length - 1;
-                    const alignClass =
-                      col.align === "right"
-                        ? "text-right"
-                        : col.align === "center"
-                        ? "text-center"
-                        : "text-left";
+          <div className="hidden md:block rounded-2xl border border-border bg-surface overflow-hidden shadow-xs">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-muted text-muted">
+                  <tr>
+                    {columns.map((col, idx) => {
+                      const isSorted = sortState?.key === col.key;
+                      const isFirst = idx === 0;
+                      const isLast = idx === columns.length - 1;
+                      const alignClass =
+                        col.align === "right"
+                          ? "text-right"
+                          : col.align === "center"
+                          ? "text-center"
+                          : "text-left";
+
+                      return (
+                        <th
+                          key={col.key}
+                          className={`py-2.5 px-3 font-semibold whitespace-nowrap ${alignClass} ${
+                            isFirst ? "rounded-l-lg" : ""
+                          } ${isLast ? "rounded-r-lg" : ""} ${col.headerClassName || ""}`}
+                        >
+                          {col.sortable ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSort(col.key)}
+                              className={`inline-flex items-center gap-1 hover:text-foreground transition-colors group cursor-pointer ${
+                                alignClass === "text-right" ? "justify-end ml-auto" : ""
+                              }`}
+                            >
+                              <span>{col.header}</span>
+                              {isSorted ? (
+                                sortState?.direction === "asc" ? (
+                                  <ArrowUp className="h-3.5 w-3.5 text-primary" />
+                                ) : (
+                                  <ArrowDown className="h-3.5 w-3.5 text-primary" />
+                                )
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
+                              )}
+                            </button>
+                          ) : (
+                            <span>{col.header}</span>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedData.map((item, idx) => {
+                    const rowKey = getKey(item, idx);
+                    const customRowClass = rowClassName ? rowClassName(item) : "";
+                    const isClickable = !!onRowClick;
 
                     return (
-                      <th
-                        key={col.key}
-                        className={`py-2.5 px-3 font-semibold whitespace-nowrap ${alignClass} ${
-                          isFirst ? "rounded-l-lg" : ""
-                        } ${isLast ? "rounded-r-lg" : ""} ${col.headerClassName || ""}`}
+                      <tr
+                        key={rowKey}
+                        onClick={() => onRowClick?.(item)}
+                        className={`transition-colors ${
+                          isClickable ? "cursor-pointer hover:bg-surface-hover/80" : "hover:bg-surface-hover/50"
+                        } ${customRowClass}`}
                       >
-                        {col.sortable ? (
-                          <button
-                            type="button"
-                            onClick={() => handleSort(col.key)}
-                            className={`inline-flex items-center gap-1 hover:text-foreground transition-colors group ${
-                              alignClass === "text-right" ? "justify-end ml-auto" : ""
-                            }`}
-                          >
-                            <span>{col.header}</span>
-                            {isSorted ? (
-                              sortState?.direction === "asc" ? (
-                                <ArrowUp className="h-3.5 w-3.5 text-primary" />
-                              ) : (
-                                <ArrowDown className="h-3.5 w-3.5 text-primary" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-100 transition-opacity" />
-                            )}
-                          </button>
-                        ) : (
-                          <span>{col.header}</span>
-                        )}
-                      </th>
+                        {columns.map((col) => {
+                          const alignClass =
+                            col.align === "right"
+                              ? "text-right"
+                              : col.align === "center"
+                              ? "text-center"
+                              : "text-left";
+
+                          let content: React.ReactNode;
+                          if (col.cell) {
+                            content = col.cell(item);
+                          } else if (col.accessor) {
+                            content = col.accessor(item);
+                          } else {
+                            content = (item as any)[col.key];
+                          }
+
+                          return (
+                            <td
+                              key={col.key}
+                              className={`py-3 px-3 ${alignClass} ${col.className || ""}`}
+                            >
+                              {content}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     );
                   })}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedData.map((item, idx) => {
-                  const rowKey = getKey(item, idx);
-                  const customRowClass = rowClassName ? rowClassName(item) : "";
-                  const isClickable = !!onRowClick;
-
-                  return (
-                    <tr
-                      key={rowKey}
-                      onClick={() => onRowClick?.(item)}
-                      className={`transition-colors ${
-                        isClickable ? "cursor-pointer hover:bg-surface-hover/80" : "hover:bg-surface-hover/50"
-                      } ${customRowClass}`}
-                    >
-                      {columns.map((col) => {
-                        const alignClass =
-                          col.align === "right"
-                            ? "text-right"
-                            : col.align === "center"
-                            ? "text-center"
-                            : "text-left";
-
-                        let content: React.ReactNode;
-                        if (col.cell) {
-                          content = col.cell(item);
-                        } else if (col.accessor) {
-                          content = col.accessor(item);
-                        } else {
-                          content = (item as any)[col.key];
-                        }
-
-                        return (
-                          <td
-                            key={col.key}
-                            className={`py-3 px-3 ${alignClass} ${col.className || ""}`}
-                          >
-                            {content}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* 4. Footer Pagination & Status */}
-      {totalItems > 0 && (
-        <div className="mt-4 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-muted">
-          <div>
-            Affichage de{" "}
-            <span className="font-semibold text-foreground">
-              {Math.min(totalItems, (safePage - 1) * pageSize + 1)}
-            </span>{" "}
-            à{" "}
-            <span className="font-semibold text-foreground">
-              {Math.min(totalItems, safePage * pageSize)}
-            </span>{" "}
-            sur <span className="font-semibold text-foreground">{totalItems}</span> éléments
-            {periodFilter && selectedPeriod && (
-              <span className="ml-1.5 opacity-75">
-                (Période : {TIME_PERIOD_LABELS[selectedPeriod] || selectedPeriod})
-              </span>
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-foreground disabled:opacity-30 disabled:pointer-events-none hover:bg-surface-hover transition-colors"
-                title="Page précédente"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-
-              <span className="text-xs font-semibold px-2">
-                Page {safePage} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-foreground disabled:opacity-30 disabled:pointer-events-none hover:bg-surface-hover transition-colors"
-                title="Page suivante"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
+
+          {/* Pagination */}
+          {renderPagination()}
         </div>
       )}
     </div>

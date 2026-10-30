@@ -8,6 +8,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -297,77 +298,68 @@ export default function InventoryPage() {
 
   return (
     <Shell>
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Stocks, Aliments & Approvisionnements
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Suivi des sacs d'aliments, vaccins, vitamines et matériel avec alertes de seuil critique.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => exportInventoryToCsv(items, activeFarm?.name || "ferme")}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
-          >
-            <Download className="h-4 w-4 text-muted" />
-            <span>Exporter CSV</span>
-          </button>
-
-          {hasPermission("inventory:create") && (
+      {/* En-tête mobile natif */}
+      <PageHeader
+        title="Stocks & Intrants"
+        subtitle={`${items.length} référence(s) en stock`}
+        icon={<Package className="h-4 w-4" />}
+        actions={
+          <>
             <button
               type="button"
-              onClick={() => {
-                setCreateError(null);
-                setCreateModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+              onClick={() => exportInventoryToCsv(items, activeFarm?.name || "ferme")}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover shadow-2xs active:scale-95 transition-all cursor-pointer"
+              title="Exporter CSV"
             >
-              <Plus className="h-4 w-4" />
-              <span>Nouvel Article</span>
+              <Download className="h-3.5 w-3.5 text-muted" />
+              <span className="hidden xs:inline">Export</span>
             </button>
-          )}
-        </div>
-      </div>
+
+            {hasPermission("inventory:create") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateError(null);
+                  setCreateModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Nouvel article</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* KPI Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-2 sm:mt-3.5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
         <StatCard
           title="Valeur du stock"
           value={formatFcfa(totalStockValue)}
-          subtitle="Argent total investi dans le stock"
           accent="primary"
           icon={<Package className="h-5 w-5" />}
         />
         <StatCard
-          title="Produits en réserve"
-          value={`${items.length} produit(s)`}
-          subtitle="Aliments, vaccins et matériel"
+          title="Références"
+          value={items.length}
           accent="sky"
           icon={<Package className="h-5 w-5" />}
         />
         <StatCard
-          title="Produits presque épuisés"
-          value={`${lowStockCount} produit(s)`}
-          subtitle="Articles à recommander rapidement"
-          accent={lowStockCount > 0 ? "rose" : "primary"}
+          title="Alertes réappro"
+          value={lowStockCount}
+          subtitle={lowStockCount > 0 ? "Sous le seuil d'alerte" : undefined}
+          accent={lowStockCount > 0 ? "rose" : "zinc"}
           icon={<AlertTriangle className="h-5 w-5" />}
-          trend={{
-            value: lowStockCount === 0 ? "Stock suffisant" : "À commander vite",
-            isPositive: lowStockCount === 0,
-          }}
+          className="col-span-2 sm:col-span-1"
         />
       </div>
 
       {/* DataTable Articles en Stock */}
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <DataTable<InventoryItem>
-          title="Articles & Intrants en stock"
-          subtitle="Suivi des sacs d'aliments, produits vétérinaires et consommables."
+          title="Articles en stock"
           data={filteredItems}
           columns={itemColumns}
           searchable={true}
@@ -377,27 +369,30 @@ export default function InventoryPage() {
           initialSort={{ key: "name", direction: "asc" }}
           isLoading={isLoading}
           secondaryFilter={
-            <div className="flex flex-wrap items-center gap-1 rounded-xl bg-surface-muted p-1 border border-border/60">
+            <div className="flex items-center gap-1.5 shrink-0">
               {[
                 { label: "Tous", value: "ALL" },
                 { label: "Aliments", value: "FEED" },
                 { label: "Vaccins", value: "VACCINE" },
                 { label: "Médicaments", value: "MEDICINE" },
                 { label: "Matériel", value: "EQUIPMENT" },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setFilterCategory(tab.value)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    filterCategory === tab.value
-                      ? "bg-primary text-white shadow-xs"
-                      : "text-muted hover:text-foreground hover:bg-surface/50"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ].map((tab) => {
+                const isActive = filterCategory === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setFilterCategory(tab.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           }
           renderMobileCard={(item) => {
@@ -494,13 +489,13 @@ export default function InventoryPage() {
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Créer un article d'inventaire"
-        description="Ajoutez un aliment, intrant ou matériel au stock de l'exploitation."
+        title="Nouvel article"
+        description="Aliment ou intrant"
       >
-        <form onSubmit={handleCreateItem} className="space-y-4">
+        <form onSubmit={handleCreateItem} className="space-y-3.5">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Désignation du produit
+              Désignation *
             </label>
             <input
               type="text"
@@ -524,15 +519,15 @@ export default function InventoryPage() {
               >
                 <option value="FEED">Alimentation</option>
                 <option value="VACCINE">Vaccin</option>
-                <option value="MEDICINE">Médicament / Traitement</option>
-                <option value="EQUIPMENT">Matériel / Équipement</option>
-                <option value="OTHER">Autre Intrant</option>
+                <option value="MEDICINE">Médicament</option>
+                <option value="EQUIPMENT">Matériel</option>
+                <option value="OTHER">Autre</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Unité de stockage *
+                Unité *
               </label>
               <select
                 value={unit}
@@ -628,7 +623,7 @@ export default function InventoryPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
                 Stock Initial {isBagUnit ? "(Nombre de sacs)" : `(${getUnitShortLabel(unit)})`} *
@@ -719,39 +714,39 @@ export default function InventoryPage() {
       <Modal
         isOpen={movementModalOpen}
         onClose={() => setMovementModalOpen(false)}
-        title={`Mouvement de stock : ${selectedItem?.name || ""}`}
-        description="Enregistrez une livraison (entrée) ou une distribution aux poulaillers (sortie)."
+        title={selectedItem ? `Stock : ${selectedItem.name}` : "Mouvement"}
+        description="Entrée ou sortie"
       >
-        <form onSubmit={handleAddMovement} className="space-y-4">
+        <form onSubmit={handleAddMovement} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setMoveType("IN")}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${
+              className={`rounded-xl border py-2 text-xs font-bold ${
                 moveType === "IN"
                   ? "border-primary bg-primary text-white"
                   : "border-border bg-surface text-muted"
               }`}
             >
-              + Entrée / Achat
+              + Entrée
             </button>
             <button
               type="button"
               onClick={() => setMoveType("OUT")}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${
+              className={`rounded-xl border py-2 text-xs font-bold ${
                 moveType === "OUT"
                   ? "border-accent bg-accent text-white"
                   : "border-border bg-surface text-muted"
               }`}
             >
-              - Sortie / Consommation
+              - Sortie
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Quantité mouvementée
+                Quantité *
               </label>
               <div className="flex gap-2">
                 <input

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { BottomNav } from "./bottom-nav";
 import { Bird } from "lucide-react";
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -42,10 +43,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 sm:pb-32 lg:pb-8">
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
+      <BottomNav onOpenMenu={() => setSidebarOpen(true)} />
     </div>
   );
 }
+

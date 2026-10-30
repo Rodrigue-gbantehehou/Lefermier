@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -221,7 +222,7 @@ export default function ContactsPage() {
     const clients = contacts.filter((c) => c.type === "CLIENT" || c.type === "BOTH").length;
     const suppliers = contacts.filter((c) => c.type === "SUPPLIER" || c.type === "BOTH").length;
     const active = contacts.filter((c) => c.isActive).length;
-    return { total, clients, suppliers, active };
+    return { total, clients, suppliers, active, inactive: total - active };
   }, [contacts]);
 
   // Colonnes de la table
@@ -260,13 +261,27 @@ export default function ContactsPage() {
       header: "Téléphone / MoMo",
       sortable: true,
       cell: (c) =>
-        c.phone ? (
-          <a
-            className="inline-flex items-center gap-1 text-xs font-semibold "
-          >
-            {c.phone} <br /> {c.email}
-          </a>
-          
+        c.phone || c.email ? (
+          <div className="flex flex-col gap-0.5 text-xs">
+            {c.phone && (
+              <a
+                href={`tel:${c.phone.replace(/\s+/g, "")}`}
+                className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary"
+              >
+                <Phone className="h-3 w-3 text-muted" />
+                {c.phone}
+              </a>
+            )}
+            {c.email && (
+              <a
+                href={`mailto:${c.email}`}
+                className="inline-flex items-center gap-1 text-muted hover:text-primary break-all"
+              >
+                <Mail className="h-3 w-3" />
+                {c.email}
+              </a>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-muted italic">Non renseigné</span>
         ),
@@ -294,20 +309,24 @@ export default function ContactsPage() {
       className: "text-right",
       cell: (c) => (
         <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => openEditModal(c)}
-            className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-primary-soft transition-colors"
-            title="Modifier le contact"
-          >
-            <Edit2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => openDeleteModal(c)}
-            className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-            title="Supprimer le contact"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission("contact:update") && (
+            <button
+              onClick={() => openEditModal(c)}
+              className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-primary-soft transition-colors cursor-pointer"
+              title="Modifier le contact"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission("contact:delete") && (
+            <button
+              onClick={() => openDeleteModal(c)}
+              className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+              title="Supprimer le contact"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -326,123 +345,117 @@ export default function ContactsPage() {
 
   return (
     <Shell>
-      <div className="space-y-6">
-        {/* Header avec Actions Principales */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Annuaire des Contacts & Tiers
-              </h1>
-            </div>
-            <p className="text-sm text-muted mt-1">
-              Gérez votre carnet de partenaires commerciaux : revendeuses d'œufs, grossistes, provenderies et vétérinaires.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => openCreateModal("CLIENT")}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover shadow-xs transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-           Nouveau contact
-            </button>
-            </div>
-          
-          
-        </div>
+      <div className="space-y-3.5 sm:space-y-4">
+        {/* En-tête mobile natif */}
+        <PageHeader
+          title="Contacts & Tiers"
+          subtitle={`${stats.total} tiers enregistré(s)`}
+          icon={<ContactRound className="h-4 w-4" />}
+          actions={
+            hasPermission("contact:create") && (
+              <button
+                type="button"
+                onClick={() => openCreateModal("CLIENT")}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Nouveau contact</span>
+              </button>
+            )
+          }
+        />
 
         {/* Indicateurs Clés */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatCard
-            title="Total Tiers"
+            title="Contacts"
             value={stats.total}
             icon={<Users className="h-5 w-5" />}
-            subtitle={`${stats.active} contacts actifs`}
+            subtitle={stats.active < stats.total ? `${stats.active} actifs` : undefined}
             accent="primary"
           />
           <StatCard
-            title="Clients & Revendeuses"
+            title="Clients"
             value={stats.clients}
             icon={<ShoppingBag className="h-5 w-5" />}
-            subtitle="Acheteurs réguliers"
             accent="primary"
           />
           <StatCard
-            title="Fournisseurs Intrants"
+            title="Fournisseurs"
             value={stats.suppliers}
             icon={<Truck className="h-5 w-5" />}
-            subtitle="Aliments, vaccins & matériel"
             accent="sky"
           />
           <StatCard
-            title="Couverture Régionale"
-            value="Bénin"
-            icon={<MapPin className="h-5 w-5" />}
-            subtitle="Cotonou, Calavi, Allada..."
-            accent="amber"
+            title="Archivés"
+            value={stats.inactive}
+            icon={<AlertCircle className="h-5 w-5" />}
+            accent="zinc"
           />
         </div>
 
-        {/* Barre de Recherche & Filtres */}
-        <div className="bg-surface rounded-xl border border-border p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
-          {/* Recherche textuelle */}
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-            <input
-              type="text"
-              placeholder="Rechercher nom, téléphone, ville..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-          </div>
-
-          {/* Filtres par Onglets */}
-          <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        {/* Filtres & Recherche Hors Tableau (Style Vraie App Mobile) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          {/* Pastilles de Filtres Tactiles Défilantes */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 -mx-1 px-1 touch-pan-x">
             <button
+              type="button"
               onClick={() => setFilterType("ALL")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
                 filterType === "ALL"
-                  ? "bg-primary text-white"
-                  : "bg-background border border-border text-muted hover:text-foreground"
+                  ? "bg-primary text-white shadow-xs"
+                  : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
               }`}
             >
               Tous ({stats.total})
             </button>
             <button
+              type="button"
               onClick={() => setFilterType("CLIENT")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                 filterType === "CLIENT"
-                  ? "bg-success text-white"
-                  : "bg-background border border-border text-muted hover:text-foreground"
+                  ? "bg-success text-white shadow-xs"
+                  : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
               }`}
             >
               <ShoppingBag className="h-3.5 w-3.5" />
               Clients ({stats.clients})
             </button>
             <button
+              type="button"
               onClick={() => setFilterType("SUPPLIER")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                 filterType === "SUPPLIER"
-                  ? "bg-info text-white"
-                  : "bg-background border border-border text-muted hover:text-foreground"
+                  ? "bg-info text-white shadow-xs"
+                  : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
               }`}
             >
               <Truck className="h-3.5 w-3.5" />
               Fournisseurs ({stats.suppliers})
             </button>
             <button
+              type="button"
               onClick={() => setFilterType("BOTH")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
                 filterType === "BOTH"
-                  ? "bg-warning text-white"
-                  : "bg-background border border-border text-muted hover:text-foreground"
+                  ? "bg-warning text-white shadow-xs"
+                  : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
               }`}
             >
               Mixtes
             </button>
+          </div>
+
+          {/* Recherche textuelle mobile */}
+          <div className="relative w-full sm:w-72 shrink-0">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Rechercher nom, contact, ville..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-full border border-border bg-surface pl-9 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted focus:border-primary focus:bg-surface-muted/30 focus:outline-hidden transition-all shadow-2xs"
+            />
           </div>
         </div>
 
@@ -462,7 +475,7 @@ export default function ContactsPage() {
                 ? `Aucun tiers ne correspond au filtre "${searchQuery}". Essayez un autre critère.`
                 : "Constituez votre répertoire d'acheteurs d'œufs, clients de poulets de chair et fournisseurs d'aliments."
             }
-            actionLabel="Ajouter un premier contact"
+            actionLabel={hasPermission("contact:create") ? "Ajouter un premier contact" : undefined}
             onAction={() => openCreateModal()}
           />
         ) : (
@@ -470,6 +483,64 @@ export default function ContactsPage() {
             data={filteredContacts}
             columns={columns}
             pageSize={15}
+            renderMobileCard={(c) => {
+              const conf = TYPE_CONFIG[c.type] || TYPE_CONFIG.CLIENT;
+              const TypeIcon = conf.icon;
+              return (
+                <div className="rounded-xl border border-border bg-surface p-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                      <TypeIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-sm text-foreground break-words">{c.name}</p>
+                        {!c.isActive && (
+                          <Badge variant="neutral">Inactif</Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {conf.label}
+                        {c.city ? ` · ${c.city}` : ""}
+                      </p>
+                      {c.phone && (
+                        <p className="mt-1 text-xs font-mono text-foreground">{c.phone}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-3">
+                    {c.phone ? (
+                      <a
+                        href={`tel:${c.phone.replace(/\s+/g, "")}`}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-white active:scale-95 transition-all"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Appeler
+                      </a>
+                    ) : (
+                      <span className="flex-1 text-xs text-muted italic">Aucun téléphone</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(c)}
+                      aria-label={`Modifier ${c.name}`}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:text-primary active:scale-95 transition-all"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDeleteModal(c)}
+                      aria-label={`Supprimer ${c.name}`}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-border text-muted hover:text-danger active:scale-95 transition-all"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            }}
           />
         )}
 
@@ -477,18 +548,18 @@ export default function ContactsPage() {
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingContact ? "Modifier le contact" : "Nouveau contact"}
-          description="Enregistrez les coordonnées et le rôle de votre partenaire commercial."
+          title={editingContact ? "Modifier contact" : "Nouveau contact"}
+          description="Client ou fournisseur"
         >
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Nom ou Raison Sociale <span className="text-danger">*</span>
+                Nom <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ex: Revendeuse Maman Pascaline, Provenderie Vano, Dr. Gbaguidi"
+                placeholder="Ex: Maman Pascaline, Provenderie Vano"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -498,22 +569,22 @@ export default function ContactsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Type de partenaire <span className="text-danger">*</span>
+                  Type <span className="text-danger">*</span>
                 </label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as ContactType)}
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
-                  <option value="CLIENT">Client / Acheteur (Œufs, Volailles)</option>
-                  <option value="SUPPLIER">Fournisseur (Aliments, Médicaments)</option>
-                  <option value="BOTH">Client & Fournisseur (Mixte)</option>
+                  <option value="CLIENT">Client (Œufs, Volailles)</option>
+                  <option value="SUPPLIER">Fournisseur (Aliments, Soins)</option>
+                  <option value="BOTH">Mixte (Client & Fournisseur)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Téléphone / Mobile Money
+                  Téléphone
                 </label>
                 <input
                   type="text"
@@ -528,11 +599,11 @@ export default function ContactsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Ville / Commune
+                  Ville
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Abomey-Calavi, Allada, Cotonou"
+                  placeholder="Ex: Abomey-Calavi, Cotonou"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -553,7 +624,7 @@ export default function ContactsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Adresse email
+                  Email
                 </label>
                 <input
                   type="email"
@@ -567,11 +638,11 @@ export default function ContactsPage() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Adresse géographique & Repères
+                Adresse / Repère
               </label>
               <input
                 type="text"
-                placeholder="Ex: Marché Dantokpa Hangars Œufs, Carrefour Bidossessi"
+                placeholder="Ex: Marché Dantokpa, Hangar 4"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -580,11 +651,11 @@ export default function ContactsPage() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Remarques & Conditions commerciales
+                Notes
               </label>
               <textarea
                 rows={2}
-                placeholder="Ex: Règle toujours par MoMo MTN à la livraison, commande 50 plateaux par semaine"
+                placeholder="Ex: Règle par MoMo à la livraison"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
@@ -630,7 +701,7 @@ export default function ContactsPage() {
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {submitting && <RefreshCw className="h-4 w-4 animate-spin" />}
-                {editingContact ? "Mettre à jour" : "Enregistrer le contact"}
+                {editingContact ? "Mettre à jour" : "Enregistrer"}
               </button>
             </div>
           </form>
@@ -641,11 +712,11 @@ export default function ContactsPage() {
           isOpen={deleteModalOpen}
           onClose={() => setDeleteModalOpen(false)}
           title="Supprimer le contact"
-          description="Cette action est irréversible. Les transactions passées associées à ce contact conserveront leur historique."
+          description="Action irréversible"
         >
           <div className="space-y-4 pt-2">
             <p className="text-sm text-foreground">
-              Êtes-vous sûr de vouloir supprimer définitivement le contact{" "}
+              Supprimer définitivement{" "}
               <strong className="text-danger">{contactToDelete?.name}</strong> ?
             </p>
 
@@ -659,13 +730,13 @@ export default function ContactsPage() {
                 Annuler
               </button>
               <button
-                type="button"
+                type="submit"
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-danger text-white hover:bg-danger/90 shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {deleting && <RefreshCw className="h-4 w-4 animate-spin" />}
-                Confirmer la suppression
+                Supprimer
               </button>
             </div>
           </div>

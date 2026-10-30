@@ -97,9 +97,14 @@
 
   * {
     border-color: var(--border-color);
+    -webkit-tap-highlight-color: transparent;
   }
 
-  html,
+  html {
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
   body {
     background-color: var(--bg-main);
     color: var(--text-primary);
@@ -107,8 +112,25 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  /* Empêche le zoom automatique forcé sur iOS lors du focus dans les inputs */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, textarea, select {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Micro-animation tactile pour les boutons et cartes mobiles */
+  button, a {
+    touch-action: manipulation;
   }
 }
+
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {

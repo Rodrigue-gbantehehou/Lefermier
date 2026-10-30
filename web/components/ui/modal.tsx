@@ -76,19 +76,22 @@ export function Modal({
         aria-hidden="true"
       />
 
-      {/* Centering wrapper */}
-      <div className="flex min-h-screen items-center justify-center p-4 sm:p-6 text-center">
+      {/* Centering wrapper on desktop, bottom sheet on mobile */}
+      <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-6 text-center">
         {/* Modal Dialog Card */}
         <div
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "relative z-10 w-full transform rounded-2xl border border-border bg-surface p-6 text-left shadow-2xl transition-all sm:p-7 max-h-[90vh] flex flex-col my-8 animate-in zoom-in-95 duration-150",
+            "relative z-10 w-full transform rounded-t-2xl sm:rounded-xl border-t sm:border border-border bg-surface p-5 sm:p-6 text-left shadow-2xl transition-all max-h-[92vh] flex flex-col animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200",
             maxWidthStyles[maxWidth],
             className
           )}
         >
+          {/* Mobile swipe handle */}
+          <div className="mx-auto -mt-1 mb-3 h-1.5 w-12 rounded-full bg-border/80 sm:hidden" />
+
           {/* Header */}
-          <div className="flex items-start justify-between pb-4 border-b border-border shrink-0">
+          <div className="flex items-start justify-between pb-3 sm:pb-4 border-b border-border shrink-0">
             <div>
               <h3 id="modal-title" className="text-base sm:text-lg font-bold text-foreground">
                 {title}
@@ -99,6 +102,7 @@ export function Modal({
                 </p>
               )}
             </div>
+
             <button
               type="button"
               onClick={onClose}

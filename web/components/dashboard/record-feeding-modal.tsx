@@ -340,21 +340,21 @@ export function RecordFeedingModal({
       title={
         selectedFlock && isFlockLocked
           ? `Nourrir — ${selectedFlock.name}`
-          : "Tournée d'alimentation & abreuvement"
+          : "Nourrir & Abreuver"
       }
       description={
-        selectedFlock && isFlockLocked
-          ? `Distribution d'aliment et abreuvement pour ${selectedFlock.name} (${selectedFlock.breed ? `${selectedFlock.breed} • ` : ""}${formatNumber(selectedFlock.currentQuantity)} sujets vivants).`
-          : "Ration quotidienne de provende pesée et préparation de l'eau de boisson (avec cocktail de soins éventuel)."
+        selectedFlock
+          ? `${formatNumber(selectedFlock.currentQuantity)} sujets vivants`
+          : "Alimentation journalière"
       }
       maxWidth="2xl"
     >
-      <form onSubmit={handleFeedingSubmit} className="space-y-4">
+      <form onSubmit={handleFeedingSubmit} className="space-y-3.5">
         {/* Section 1 : Bande & Moment */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Bande de volailles
+              Bande
             </label>
             {isFlockLocked && selectedFlock ? (
               <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary-soft/30 px-3 py-2 text-xs font-semibold text-foreground h-[38px]">
@@ -518,7 +518,7 @@ export function RecordFeedingModal({
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                Eau claire
+                Claire
               </button>
               <button
                 type="button"
@@ -534,16 +534,13 @@ export function RecordFeedingModal({
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                Eau avec traitement
+                Traitée
               </button>
             </div>
           </div>
 
           {waterMode === "CLEAR" ? (
             <div className="space-y-2">
-              <p className="text-[11px] text-muted italic">
-                Abreuvoirs approvisionnés en eau pure (aucun additif ni médicament ce créneau).
-              </p>
               {primarySuggestedTreatment && (
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 flex items-center justify-between gap-2 text-xs animate-in fade-in">
                   <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
@@ -772,9 +769,7 @@ export function RecordFeedingModal({
             disabled={submittingFeeding}
             className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors"
           >
-            {submittingFeeding
-              ? "Enregistrement de la tournée..."
-              : "Valider la distribution"}
+            {submittingFeeding ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>
       </form>

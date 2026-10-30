@@ -30,18 +30,15 @@ export function RecentEggsWidget({
   return (
     <div className="rounded-2xl border border-border bg-surface p-5 shadow-xs flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between pb-4 border-b border-border">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft text-accent shadow-2xs">
-              <Egg className="h-5 w-5" />
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-accent-soft text-accent shadow-2xs">
+              <Egg className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-foreground">
-                Derniers ramassages d'œufs
+              <h2 className="text-sm sm:text-base font-bold text-foreground">
+                Dernières pontes
               </h2>
-              <p className="text-xs text-muted">
-                Récoltes récentes et alvéoles de ponte
-              </p>
             </div>
           </div>
           <Link

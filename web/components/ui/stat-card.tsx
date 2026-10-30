@@ -46,19 +46,22 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        "group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-surface p-3 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
         hoverBorderStyles[accent],
         className
       )}
     >
       {/* Ligne d'en-tête : Titre & Médaillon d'icône */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-muted truncate">
+          <p
+            title={title}
+            className="text-[11px] sm:text-xs font-semibold leading-tight text-muted line-clamp-2 sm:line-clamp-1"
+          >
             {title}
           </p>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-lg font-bold tracking-tight text-foreground sm:text-xl font-mono">
+            <span className="text-base sm:text-xl font-bold leading-tight tracking-tight text-foreground font-mono break-words">
               {value}
             </span>
           </div>
@@ -67,7 +70,7 @@ export function StatCard({
         {icon && (
           <div
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 [&>svg]:h-4 [&>svg]:w-4",
+              "flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl transition-all duration-200 [&>svg]:h-4 [&>svg]:w-4",
               iconContainerStyles[accent]
             )}
           >
@@ -78,9 +81,9 @@ export function StatCard({
 
       {/* Zone inférieure : Sous-titre et/ou Badge pilule de tendance */}
       {(subtitle || trend) && (
-        <div className="mt-3.5 pt-2.5 border-t border-border/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-2.5 border-t border-border/50 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 text-xs">
           {subtitle && (
-            <p className="text-[11px] text-muted truncate max-w-[75%]">
+            <p title={subtitle} className="min-w-0 flex-1 basis-full sm:basis-auto text-[11px] leading-snug text-muted line-clamp-2 sm:line-clamp-1">
               {subtitle}
             </p>
           )}

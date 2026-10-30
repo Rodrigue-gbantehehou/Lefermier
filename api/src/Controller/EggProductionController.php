@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Repository\EggProductionRepository;
 use App\Security\Voter\EggProductionVoter;
 use App\Service\EggProductionService;
+use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +27,7 @@ class EggProductionController extends AbstractController
     public function __construct(
         private readonly EggProductionService $eggProductionService,
         private readonly EggProductionRepository $eggProductionRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -64,6 +66,28 @@ class EggProductionController extends AbstractController
         Flock $flock,
         #[MapRequestPayload] CreateEggProductionRequestDto $dto,
         #[CurrentUser] ?User $user,
+        Request $request,
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key');
+
+        if ($idempotencyKey !== null && $user !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $flock->getFarm(),
+                fn () => $this->doCreateProduction($flock, $dto, $user)
+            );
+        }
+
+        return $this->doCreateProduction($flock, $dto, $user);
+    }
+
+    private function doCreateProduction(
+        Flock $flock,
+        CreateEggProductionRequestDto $dto,
+        ?User $user,
     ): JsonResponse {
         $production = $this->eggProductionService->recordEggProduction($flock, $dto, $user);
 

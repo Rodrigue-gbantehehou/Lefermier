@@ -70,6 +70,30 @@ class HealthTreatmentRepository extends ServiceEntityRepository
     /**
      * @return HealthTreatment[]
      */
+    public function findUpdatedSince(Farm $farm, ?\DateTimeImmutable $since = null): array
+    {
+        $qb = $this->createQueryBuilder('h')
+            ->andWhere('h.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->leftJoin('h.flock', 'fl')
+            ->addSelect('fl')
+            ->leftJoin('h.inventoryItem', 'i')
+            ->addSelect('i')
+            ->leftJoin('h.recordedBy', 'u')
+            ->addSelect('u')
+            ->orderBy('h.updatedAt', 'ASC');
+
+        if ($since !== null) {
+            $qb->andWhere('h.updatedAt > :since')
+                ->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * @return HealthTreatment[]
+     */
     public function findUpcomingTreatments(Farm $farm, int $limit = 5): array
     {
         $today = new \DateTimeImmutable('today');

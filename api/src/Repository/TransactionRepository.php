@@ -84,6 +84,29 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return Transaction[]
+     */
+    public function findUpdatedSince(Farm $farm, ?\DateTimeImmutable $since = null, int $limit = 500): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->andWhere('t.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->leftJoin('t.contact', 'c')
+            ->leftJoin('t.flock', 'f')
+            ->leftJoin('t.recordedBy', 'u')
+            ->addSelect('c', 'f', 'u')
+            ->orderBy('t.updatedAt', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($since !== null) {
+            $qb->andWhere('t.updatedAt > :since')
+                ->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Calcule la balance financière et la synthèse des recettes/dépenses en FCFA.
      *
      * @return array{

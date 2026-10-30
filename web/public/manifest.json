@@ -1,0 +1,17 @@
+{
+  "name": "Lefermier — Gestion Avicole",
+  "short_name": "Lefermier",
+  "description": "Application professionnelle de gestion avicole ouest-africaine. Suivi des bandes, pontes, stocks et finances.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#245c43",
+  "theme_color": "#245c43",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

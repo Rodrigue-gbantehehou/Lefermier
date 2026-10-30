@@ -51,37 +51,45 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur-md sm:px-6">
-      {/* Left section: Hamburger button & Farm Selector */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="rounded-xl p-2 text-muted hover:bg-surface-hover hover:text-foreground lg:hidden"
+    <header
+      className="sticky top-0 z-30 flex h-14 sm:h-16 w-full items-center justify-between border-b border-white/15 bg-gradient-to-r from-[#1d4d38] via-primary to-[#184431] dark:from-[#1b4331] dark:via-primary dark:to-[#143627] px-3 sm:px-6 backdrop-blur-2xl shadow-[0_4px_20px_-4px_rgba(20,55,38,0.25)] text-white"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
+      {/* Left section: Brand Icon + Farm Selector */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-xl p-1 hover:opacity-90 transition-opacity"
+          title="Lefermier"
         >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Ouvrir le menu</span>
-        </button>
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white shadow-xs border border-white/25">
+            <span className="text-xs font-black tracking-tighter">LF</span>
+          </div>
+          <span className="text-sm font-extrabold tracking-tight text-white hidden xs:inline">
+            Lefermier
+          </span>
+        </Link>
 
         {/* Farm Selector dropdown */}
         <div className="relative" ref={farmRef}>
           <button
             type="button"
             onClick={() => setFarmDropdownOpen(!farmDropdownOpen)}
-            className="flex items-center gap-2 rounded-xl border border-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-surface-hover"
+            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 hover:bg-white/20 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-95 shadow-2xs backdrop-blur-xs cursor-pointer"
           >
-            <Building2 className="h-4 w-4 text-primary" />
-            <span className="max-w-[140px] truncate sm:max-w-[200px]">
-              {activeFarm?.name || "Sélectionner une ferme"}
+            <span className="h-2 w-2 rounded-full bg-accent animate-pulse shrink-0" />
+            <span className="max-w-[110px] xs:max-w-[150px] truncate sm:max-w-[200px]">
+              {activeFarm?.name || "Sélectionner ferme"}
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted" />
+            <ChevronDown className="h-3 w-3 text-white/70 shrink-0" />
           </button>
 
           {/* Dropdown list */}
           {farmDropdownOpen && (
-            <div className="absolute left-0 mt-2 w-64 rounded-2xl border border-border bg-surface p-1.5 shadow-xl z-50">
+            <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-foreground">
               <div className="flex items-center justify-between px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
                 <span>Mes Exploitations</span>
+
                 <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-[10px] font-mono text-muted">
                   {farms.length}
                 </span>
@@ -103,7 +111,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                           setFarmDropdownOpen(false);
                         }}
                         className={cn(
-                          "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors",
+                          "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors cursor-pointer",
                           isSelected
                             ? "bg-primary-soft text-primary font-bold"
                             : "text-foreground hover:bg-surface-hover"
@@ -130,7 +138,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                     setFarmDropdownOpen(false);
                     setCreateModalOpen(true);
                   }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-primary hover:bg-primary-soft transition-colors"
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-primary hover:bg-primary-soft transition-colors cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
                   <span>+ Créer une nouvelle ferme</span>
@@ -148,12 +156,12 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           type="button"
           onClick={toggleTheme}
           aria-label="Basculer le mode sombre"
-          className="rounded-xl border border-border bg-surface p-2 text-muted shadow-2xs transition-colors hover:bg-surface-hover hover:text-foreground"
+          className="rounded-xl border border-white/20 bg-white/15 p-2 text-white/85 shadow-2xs transition-colors hover:bg-white/25 hover:text-white cursor-pointer"
         >
           {theme === "dark" ? (
             <Sun className="h-4 w-4 text-accent" />
           ) : (
-            <Moon className="h-4 w-4 text-primary" />
+            <Moon className="h-4 w-4 text-white" />
           )}
         </button>
 
@@ -162,17 +170,17 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-2 rounded-xl border border-border bg-surface-muted p-1.5 pr-2.5 transition-colors hover:bg-surface-hover"
+            className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/15 p-1.5 pr-2.5 transition-colors hover:bg-white/25 text-white active:scale-95 cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white shadow-2xs">
               {user?.fullName?.charAt(0) || "U"}
             </div>
             <div className="hidden text-left sm:block">
-              <div className="max-w-[120px] truncate text-xs font-semibold text-foreground">
+              <div className="max-w-[120px] truncate text-xs font-semibold text-white">
                 {user?.fullName || "Utilisateur"}
               </div>
             </div>
-            <ChevronDown className="h-3 w-3 text-muted" />
+            <ChevronDown className="h-3 w-3 text-white/70" />
           </button>
 
           {userDropdownOpen && (

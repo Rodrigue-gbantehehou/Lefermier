@@ -86,11 +86,11 @@ export function CreateBuildingModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Ajouter un Poulailler / Bâtiment"
-      description="Créez rapidement un poulailler pour y loger vos bandes de poules ou stocker vos intrants."
+      title="Nouveau bâtiment"
+      description="Logement ou stockage"
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3.5">
         {error && (
           <div className="rounded-xl border border-danger/20 bg-danger-soft p-3 text-xs text-danger">
             {error}
@@ -101,7 +101,7 @@ export function CreateBuildingModal({
         <div>
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted mb-1.5">
             <Sparkles className="h-3 w-3 text-primary" />
-            <span>Suggestions rapides de nom :</span>
+            <span>Suggestions :</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {quickNameSuggestions.map((sug) => (
@@ -129,14 +129,14 @@ export function CreateBuildingModal({
         {/* Nom du bâtiment */}
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Nom ou Numéro du bâtiment *
+            Nom du bâtiment *
           </label>
           <input
             type="text"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="ex. Poulailler 1, Bâtiment B..."
+            placeholder="ex. Poulailler 1"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
           />
         </div>
@@ -271,7 +271,7 @@ export function CreateBuildingModal({
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
-            <span>{submitting ? "Création..." : "Créer le bâtiment"}</span>
+            <span>{submitting ? "Création..." : "Créer"}</span>
           </button>
         </div>
       </form>

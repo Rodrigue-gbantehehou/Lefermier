@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Plus,
   Wallet,
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -31,7 +33,7 @@ import {
   Contact,
   PaymentStatus,
 } from "@/lib/types";
-import { formatFcfa, formatDate } from "@/lib/utils";
+import { formatFcfa, formatDate, cn } from "@/lib/utils";
 import { exportTransactionsToCsv } from "@/lib/export";
 import { SalesReceiptModal } from "@/components/finances/sales-receipt-modal";
 import { ModuleLockedState } from "@/components/ui/module-locked-state";
@@ -73,7 +75,7 @@ export default function FinancesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (activeFarm?.id && hasModule("finance")) {
+    if (activeFarm?.id && hasModule("finance") && (hasPermission("finance:read") || hasPermission("finance:view"))) {
       loadTransactions();
     } else {
       setIsLoading(false);
@@ -158,6 +160,10 @@ export default function FinancesPage() {
       const paid = t.paidAmount ?? 0;
       return sum + Math.max(0, t.amountFcfa - paid);
     }, 0);
+
+  const pendingReceivablesCount = transactions.filter(
+    (t) => t.type === "INCOME" && (t.paymentStatus === "PARTIAL" || t.paymentStatus === "UNPAID")
+  ).length;
 
   const filteredTransactions = transactions.filter((t) => {
     if (filterType === "ALL") return true;
@@ -357,107 +363,105 @@ export default function FinancesPage() {
     );
   }
 
+  if (!hasPermission("finance:read") && !hasPermission("finance:view")) {
+    return (
+      <Shell>
+        <div className="py-16 text-center max-w-md mx-auto">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger mb-4 shadow-xs">
+            <Lock className="h-7 w-7" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Accès réservé</h2>
+          <p className="mt-2 text-xs text-muted leading-relaxed">
+            Vous ne disposez pas des permissions requises pour consulter la trésorerie et la comptabilité de cette exploitation.
+          </p>
+          <Link
+            href="/"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
+          >
+            Retour au tableau de bord
+          </Link>
+        </div>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Trésorerie, Ventes & Dépenses
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Encaissements et décaissements en FCFA (MTN Mobile Money, Moov, Celtiis, Espèces).
-          </p>
-        </div>
+      <PageHeader
+        title="Trésorerie & Ventes"
+        subtitle={`Solde net : ${formatFcfa(netBalance)}`}
+        icon={<Wallet className="h-4 w-4" />}
+        actions={
+          <>
+            {hasModule("reports_accounting") ? (
+              <button
+                type="button"
+                onClick={() => exportTransactionsToCsv(transactions, activeFarm?.name || "ferme")}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover shadow-2xs active:scale-95 transition-all cursor-pointer"
+                title="Exporter CSV"
+              >
+                <Download className="h-3.5 w-3.5 text-muted" />
+                <span className="hidden xs:inline">Export</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => toast.info("L'export comptable complet SYSCOHADA (CSV/PDF) est disponible à partir de la formule Professionnel.")}
+                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-surface-muted/50 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-muted hover:text-foreground transition-all cursor-pointer"
+                title="Disponible à partir de la formule Professionnel"
+              >
+                <Lock className="h-3.5 w-3.5 text-muted" />
+                <span className="hidden xs:inline">Export</span>
+              </button>
+            )}
 
-        <div className="flex items-center gap-2">
-          {hasModule("reports_accounting") ? (
-            <button
-              type="button"
-              onClick={() => exportTransactionsToCsv(transactions, activeFarm?.name || "ferme")}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover transition-colors"
-            >
-              <Download className="h-4 w-4 text-muted" />
-              <span>Exporter CSV</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => toast.info("L'export comptable complet SYSCOHADA (CSV/PDF) est disponible à partir de la formule Professionnel.")}
-              className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-surface-muted/50 px-3 py-2 text-xs font-semibold text-muted hover:text-foreground transition-colors"
-              title="Disponible à partir de la formule Professionnel"
-            >
-              <Lock className="h-3.5 w-3.5 text-muted" />
-              <span>Exporter CSV</span>
-            </button>
-          )}
-
-          {hasPermission("finance:create") && (
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Nouvelle Transaction</span>
-            </button>
-          )}
-        </div>
-      </div>
+            {hasPermission("finance:create") && (
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Opération</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* KPI Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-2 sm:mt-3.5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <StatCard
-          title="Ventes encaissées"
+          title="Recettes"
           value={formatFcfa(totalIncome)}
-          subtitle="Argent reçu des ventes d'œufs et poulets"
           accent="primary"
           icon={<ArrowUpRight className="h-5 w-5 text-success" />}
-          trend={{
-            value: "Entrées d'argent",
-            isPositive: true,
-          }}
         />
         <StatCard
-          title="Dépenses payées"
+          title="Dépenses"
           value={formatFcfa(totalExpense)}
-          subtitle="Achats d'aliments, soins et charges"
           accent="rose"
           icon={<ArrowDownRight className="h-5 w-5 text-danger" />}
-          trend={{
-            value: "Sorties d'argent",
-            isPositive: false,
-          }}
         />
         <StatCard
-          title="Argent restant en caisse"
+          title="Solde de caisse"
           value={formatFcfa(netBalance)}
-          subtitle={netBalance >= 0 ? "Bénéfice net disponible" : "Caisse en déficit"}
           accent={netBalance >= 0 ? "primary" : "rose"}
           icon={<Wallet className="h-5 w-5" />}
-          trend={{
-            value: netBalance >= 0 ? "Caisse positive" : "Caisse dans le rouge",
-            isPositive: netBalance >= 0,
-          }}
         />
         <StatCard
-          title="Créances clients"
+          title="Créances"
           value={formatFcfa(totalReceivables)}
-          subtitle="Solde impayé des ventes à crédit / acompte"
+          subtitle={pendingReceivablesCount > 0 ? `${pendingReceivablesCount} impayé(s)` : undefined}
           accent={totalReceivables > 0 ? "amber" : "zinc"}
           icon={<Clock className="h-5 w-5 text-warning" />}
-          trend={{
-            value: totalReceivables > 0 ? "À encaisser" : "Aucun impayé",
-            isPositive: totalReceivables === 0,
-          }}
         />
       </div>
 
       {/* Transactions Table */}
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <DataTable<Transaction>
-          title="Historique des flux de trésorerie"
-          subtitle="Suivi des encaissements et décaissements en FCFA. Filtrable par Jour, Semaine ou Mois."
+          title="Historique des flux"
           data={filteredTransactions}
           columns={txColumns}
           periodFilter={true}
@@ -468,27 +472,106 @@ export default function FinancesPage() {
           pageSize={15}
           initialSort={{ key: "date", direction: "desc" }}
           isLoading={isLoading}
+          renderMobileCard={(tx) => {
+            const isIncome = tx.type === "INCOME";
+            return (
+              <div
+                key={tx.id}
+                className="rounded-2xl border border-border bg-surface p-4 shadow-xs space-y-2.5 transition-all active:scale-[0.99] hover:border-primary/40"
+              >
+                {/* Header: Date + Category Badge + Payment Status */}
+                <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-foreground">
+                      {formatDate(tx.date)}
+                    </span>
+                    <span className="text-xs font-semibold text-muted truncate max-w-[130px]">
+                      {tx.category}
+                    </span>
+                  </div>
+                  {tx.paymentStatus && tx.paymentStatus !== "PAID" && (
+                    <Badge variant={tx.paymentStatus === "UNPAID" ? "danger" : "warning"} size="sm">
+                      {tx.paymentStatus === "UNPAID" ? "Impayé" : "Acompte"}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Amount Row (Big bold green or red like a banking app) */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-xl",
+                        isIncome ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                      )}
+                    >
+                      {isIncome ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                        {tx.contact?.name || tx.notes || "Opération de caisse"}
+                      </div>
+                      <div className="text-[10px] text-muted">
+                        {tx.paymentMethod ? tx.paymentMethod.replace("_", " ") : "Comptant"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className={cn("text-sm font-extrabold font-mono", isIncome ? "text-success" : "text-danger")}>
+                      {isIncome ? "+" : "-"} {formatFcfa(tx.amountFcfa)}
+                    </div>
+                    {tx.paidAmount !== undefined && tx.paidAmount !== null && tx.paidAmount < tx.amountFcfa && (
+                      <div className="text-[10px] font-mono text-muted">
+                        Reçu: {formatFcfa(tx.paidAmount)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom receipt action if available */}
+                {tx.type === "INCOME" && hasModule("sales_receipts") && (
+                  <div className="pt-2 border-t border-border/50 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTxForReceipt(tx);
+                        setReceiptModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>Reçu de vente</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          }}
           secondaryFilter={
-            <div className="flex items-center gap-1 rounded-xl bg-surface-muted p-1 border border-border/60">
+            <div className="flex items-center gap-1.5 shrink-0">
               {[
                 { label: "Toutes", value: "ALL" },
                 { label: "Recettes", value: "INCOME" },
                 { label: "Dépenses", value: "EXPENSE" },
                 { label: "Créances & Impayés", value: "CREDIT" },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setFilterType(tab.value)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    filterType === tab.value
-                      ? "bg-primary text-white shadow-xs"
-                      : "text-muted hover:text-foreground hover:bg-surface/50"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ].map((tab) => {
+                const isActive = filterType === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setFilterType(tab.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           }
           emptyState={{
@@ -501,14 +584,15 @@ export default function FinancesPage() {
         />
       </div>
 
+
       {/* TRANSACTION MODAL */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Nouvelle transaction de trésorerie"
-        description="Enregistrez une entrée ou sortie de fonds avec le mode de paiement et suivi du règlement."
+        title="Nouvelle opération"
+        description="Recette ou dépense"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -516,13 +600,13 @@ export default function FinancesPage() {
                 setType("INCOME");
                 setCategory("Vente Oeufs");
               }}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${
+              className={`rounded-xl border py-2 text-xs font-bold ${
                 type === "INCOME"
                   ? "border-primary bg-primary text-white"
                   : "border-border bg-surface text-muted"
               }`}
             >
-              + Recette / Vente
+              + Recette
             </button>
             <button
               type="button"
@@ -530,20 +614,20 @@ export default function FinancesPage() {
                 setType("EXPENSE");
                 setCategory("Alimentation");
               }}
-              className={`rounded-xl border py-2.5 text-xs font-bold ${
+              className={`rounded-xl border py-2 text-xs font-bold ${
                 type === "EXPENSE"
                   ? "border-danger bg-danger text-white"
                   : "border-border bg-surface text-muted"
               }`}
             >
-              - Dépense / Achat
+              - Dépense
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                {type === "INCOME" ? "Montant total de la vente" : "Montant en FCFA"}
+                Montant (FCFA) *
               </label>
               <input
                 type="number"
@@ -565,7 +649,7 @@ export default function FinancesPage() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Date de l'opération
+                Date *
               </label>
               <input
                 type="date"
@@ -581,7 +665,7 @@ export default function FinancesPage() {
           {type === "INCOME" && (
             <div className="rounded-xl border border-border/80 bg-surface-muted/50 p-3 space-y-3">
               <label className="block text-xs font-semibold text-foreground">
-                Modalité de règlement client
+                Règlement
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button

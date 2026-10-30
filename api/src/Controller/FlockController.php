@@ -17,6 +17,7 @@ use App\Repository\TransactionRepository;
 use App\Security\Voter\FarmVoter;
 use App\Security\Voter\FlockVoter;
 use App\Service\FlockService;
+use App\Service\IdempotencyService;
 use App\Service\PdfService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,6 +36,7 @@ class FlockController extends AbstractController
         private readonly TransactionRepository $transactionRepository,
         private readonly EggProductionRepository $eggProductionRepository,
         private readonly PdfService $pdfService,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -103,6 +105,28 @@ class FlockController extends AbstractController
         Flock $flock,
         #[MapRequestPayload] CreateFlockMovementRequestDto $dto,
         #[CurrentUser] ?User $user,
+        Request $request,
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key');
+
+        if ($idempotencyKey !== null && $user !== null) {
+            /** @var JsonResponse */
+            return $this->idempotencyService->process(
+                $idempotencyKey,
+                $user,
+                $request,
+                $flock->getFarm(),
+                fn () => $this->doRecordMovement($flock, $dto, $user)
+            );
+        }
+
+        return $this->doRecordMovement($flock, $dto, $user);
+    }
+
+    private function doRecordMovement(
+        Flock $flock,
+        CreateFlockMovementRequestDto $dto,
+        ?User $user,
     ): JsonResponse {
         $movement = $this->flockService->recordMovement($flock, $dto, $user);
 

@@ -29,8 +29,8 @@ export function HealthScheduleWidget({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-foreground">
-                Santé & Vaccinations prévues
+              <h2 className="text-sm sm:text-base font-bold text-foreground">
+                Santé & Soins à venir
               </h2>
               {overdueCount > 0 && (
                 <span className="rounded-md bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">
@@ -38,16 +38,13 @@ export function HealthScheduleWidget({
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted">
-              Calendrier vaccinal et soins programmés dans les 14 prochains jours.
-            </p>
           </div>
         </div>
         <Link
           href="/health"
           className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-hover transition-colors"
         >
-          <span>Gérer tous les soins</span>
+          <span>Voir tout</span>
           <ArrowRight className="h-3.5 w-3.5 text-muted" />
         </Link>
       </div>

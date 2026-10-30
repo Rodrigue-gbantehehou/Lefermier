@@ -44,6 +44,24 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return InventoryItem[]
+     */
+    public function findUpdatedSince(Farm $farm, ?\DateTimeImmutable $since = null): array
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->andWhere('i.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->orderBy('i.updatedAt', 'ASC');
+
+        if ($since !== null) {
+            $qb->andWhere('i.updatedAt > :since')
+               ->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Retourne les articles dont le stock actuel est inférieur ou égal au seuil d'alerte.
      *
      * @return InventoryItem[]

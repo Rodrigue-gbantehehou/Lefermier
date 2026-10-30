@@ -49,6 +49,31 @@ class EggProductionRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /**
+     * @return EggProduction[]
+     */
+    public function findUpdatedSince(\App\Entity\Farm $farm, ?\DateTimeImmutable $since = null, int $limit = 500): array
+    {
+        $qb = $this->createQueryBuilder('p')
+            ->innerJoin('p.flock', 'f')
+            ->andWhere('f.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->leftJoin('p.recordedBy', 'u')
+            ->addSelect('u')
+            ->orderBy('p.updatedAt', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($since !== null) {
+            $qb->andWhere('p.updatedAt > :since')
+                ->setParameter('since', $since);
+        } else {
+            $qb->andWhere('p.productionDate >= :thirtyDaysAgo')
+                ->setParameter('thirtyDaysAgo', (new \DateTimeImmutable('-30 days'))->format('Y-m-d'));
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     public function findOneByFlockDateAndSession(
         Flock $flock,
         \DateTimeImmutable $date,

@@ -63,11 +63,11 @@ export function CreateFarmModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Créer une nouvelle exploitation"
-      description="Ajoutez une nouvelle ferme avicole à votre compte propriétaire."
+      title="Nouvelle exploitation"
+      description="Configuration de base"
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3.5">
         {error && (
           <div className="rounded-xl border border-danger/20 bg-danger-soft p-3 text-xs text-danger">
             {error}
@@ -76,7 +76,7 @@ export function CreateFarmModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Nom de l'exploitation *
+            Nom de la ferme *
           </label>
           <input
             type="text"
@@ -90,7 +90,7 @@ export function CreateFarmModal({
                 if (clean) setFarmCode(`FRM-${clean}`);
               }
             }}
-            placeholder="ex. Ferme Avicole Calavi 2"
+            placeholder="ex. Ferme Calavi 2"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
           />
         </div>
@@ -98,28 +98,28 @@ export function CreateFarmModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Type de production
+              Production
             </label>
             <select
               value={productionType}
               onChange={(e) => setProductionType(e.target.value as any)}
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             >
-              <option value="LAYER">Pondeuses (Œufs de table)</option>
+              <option value="LAYER">Pondeuses</option>
               <option value="BROILER">Poulets de chair</option>
-              <option value="MIXED">Mixte / Polyvalente</option>
+              <option value="MIXED">Mixte</option>
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Ville / Commune
+              Ville
             </label>
             <input
               type="text"
               value={locationCity}
               onChange={(e) => setLocationCity(e.target.value)}
-              placeholder="ex. Calavi, Allada, Parakou"
+              placeholder="ex. Calavi"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
           </div>
@@ -127,7 +127,7 @@ export function CreateFarmModal({
 
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Code identifiant (optionnel)
+            Code (optionnel)
           </label>
           <input
             type="text"
@@ -136,9 +136,6 @@ export function CreateFarmModal({
             placeholder="ex. FRM-CAL2"
             className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-mono text-foreground focus:border-primary focus:outline-hidden"
           />
-          <p className="mt-1 text-[11px] text-muted">
-            Identifiant court unique pour vos rapports et ventilations.
-          </p>
         </div>
 
         <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-border">
@@ -155,7 +152,7 @@ export function CreateFarmModal({
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
-            <span>{submitting ? "Création en cours..." : "Créer l'exploitation"}</span>
+            <span>{submitting ? "Création..." : "Créer"}</span>
           </button>
         </div>
       </form>

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Check, Lock, Save, AlertCircle } from "lucide-react";
+import { Plus, Check, Lock, Save, AlertCircle, Shield } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -146,28 +147,23 @@ export default function RolesMatrixPage() {
 
   return (
     <Shell>
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Rôles & Droits d'Accès
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Choisissez ce que chaque employé a le droit de voir et de faire dans l'application.
-          </p>
-        </div>
-
-        {hasPermission("role:create") && (
-          <button
-            type="button"
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Créer un nouveau rôle</span>
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Rôles & Permissions"
+        subtitle={`${roles.length} rôle(s) configurés`}
+        icon={<Shield className="h-4 w-4" />}
+        actions={
+          hasPermission("role:create") ? (
+            <button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-primary px-3 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Nouveau</span>
+            </button>
+          ) : undefined
+        }
+      />
 
       {successMsg && (
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-success-soft border border-success/20 p-3 text-xs font-semibold text-success">
@@ -220,7 +216,7 @@ export default function RolesMatrixPage() {
         {/* Permissions Matrix */}
         <div className="lg:col-span-8">
           {selectedRole ? (
-            <div className="rounded-2xl border border-border bg-surface p-6 shadow-xs">
+            <div className="rounded-xl border border-border bg-surface p-4 sm:p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-border gap-2">
                 <div>
                   <div className="flex items-center gap-2">
@@ -315,13 +311,13 @@ export default function RolesMatrixPage() {
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Créer un rôle personnalisé pour l'agence"
-        description="Définissez un nouvel intitulé et choisissez ses permissions d'accès initiales."
+        title="Nouveau rôle"
+        description="Intitulé et permissions"
       >
         <form onSubmit={handleCreateCustomRole} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Intitulé du rôle
+              Intitulé *
             </label>
             <input
               type="text"
@@ -335,20 +331,20 @@ export default function RolesMatrixPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Description de la fonction
+              Description
             </label>
             <input
               type="text"
               value={newRoleDesc}
               onChange={(e) => setNewRoleDesc(e.target.value)}
-              placeholder="ex. Gestion opérationnelle des éclosions et des vaccins"
+              placeholder="ex. Gestion opérationnelle des éclosions et vaccins"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-2">
-              Permissions initiales ({newRolePerms.length} sélectionnée(s))
+              Permissions ({newRolePerms.length})
             </label>
             <div className="max-h-60 overflow-y-auto space-y-1.5 border border-border rounded-xl p-3 bg-surface-muted">
               {permissions.map((p) => {
@@ -405,7 +401,7 @@ export default function RolesMatrixPage() {
               disabled={submittingCreate}
               className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover"
             >
-              {submittingCreate ? "Création..." : "Créer le rôle"}
+              {submittingCreate ? "Création..." : "Créer"}
             </button>
           </div>
         </form>

@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
@@ -65,7 +66,7 @@ function FlockDetailContent() {
   const params = useParams();
   const flockId = params?.id as string;
   const router = useRouter();
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule, isOwner } = useAuth();
   const { toast } = useToast();
 
   const [flock, setFlock] = useState<Flock | null>(null);
@@ -142,27 +143,29 @@ function FlockDetailContent() {
       // Données complémentaires
       const promises: Promise<any>[] = [];
 
-      // Œufs si pondeuse ou mixte
-      if (flockData.type === "LAYER" || flockData.type === "MIXED") {
+      // Œufs si pondeuse ou mixte et module eggs inclus dans l'abonnement
+      if ((flockData.type === "LAYER" || flockData.type === "MIXED") && hasModule("eggs")) {
         promises.push(
           api.eggs.list({ flockId }).then((prods) => setEggProductions(prods)).catch(() => {})
         );
       }
 
-      // Santé
-      if (activeFarm?.id) {
+      // Santé si module health inclus dans l'abonnement
+      if (activeFarm?.id && hasModule("health")) {
         promises.push(
           api.health.list(activeFarm.id, { flockId }).then((res) => setTreatments(res.data)).catch(() => {})
         );
       }
 
-      // Finances
-      promises.push(
-        api.flocks.getTransactions(flockId).then((res) => {
-          setTransactions(res.transactions);
-          setFinancialSummary(res.summary);
-        }).catch(() => {})
-      );
+      // Finances uniquement si module finance inclus dans l'abonnement et autorisé
+      if (hasModule("finance") && (hasPermission("finance:read") || hasPermission("finance:view") || isOwner)) {
+        promises.push(
+          api.flocks.getTransactions(flockId).then((res) => {
+            setTransactions(res.transactions);
+            setFinancialSummary(res.summary);
+          }).catch(() => {})
+        );
+      }
 
       await Promise.all(promises);
     } catch (err) {
@@ -530,161 +533,159 @@ function FlockDetailContent() {
   }
 
   const isLayer = flock.type === "LAYER" || flock.type === "MIXED";
+  const canRecordMovement = hasPermission("flock:movement") || hasPermission("flock:create") || isOwner;
+  const canCreateEgg = hasModule("eggs") && isLayer && (hasPermission("egg:create") || isOwner);
+  const canViewEgg = hasModule("eggs") && isLayer && (hasPermission("egg:read") || hasPermission("egg:view") || isOwner);
+  const canViewFinance = hasModule("finance") && (hasPermission("finance:read") || hasPermission("finance:view") || isOwner);
+  const canCreateFinance = hasModule("finance") && (hasPermission("finance:create") || isOwner);
+  const canViewHealth = hasModule("health") && (hasPermission("health:view") || hasPermission("health:read") || isOwner);
+  const canManageHealth = hasModule("health") && (hasPermission("health:manage") || hasPermission("health:create") || isOwner);
+  const canUpdateFlock = hasPermission("flock:update") || isOwner;
 
   return (
     <Shell>
       <div className="space-y-6">
-        {/* Navigation fil d'ariane & En-tête */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <Link
-              href="/flocks"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Bandes de volailles
-            </Link>
-            <span className="text-muted text-xs">/</span>
-            <span className="text-xs text-foreground font-semibold">{flock.name}</span>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-border">
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">{flock.name}</h1>
-                {flock.code && (
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-muted/10 text-muted">
-                    {flock.code}
-                  </span>
-                )}
-                <Badge variant={flock.status === "ACTIVE" ? "success" : "neutral"}>
-                  {flock.status === "ACTIVE" ? "En cours d'élevage" : flock.status === "SOLD" ? "Vendue" : "Clôturée"}
-                </Badge>
-                <Badge variant={flock.type === "LAYER" ? "warning" : flock.type === "BROILER" ? "info" : "neutral"}>
-                  {flock.type === "LAYER" ? "Pondeuses" : flock.type === "BROILER" ? "Poulets de chair" : "Mixte"}
-                </Badge>
-              </div>
-
-              <p className="mt-1 text-xs text-muted flex flex-wrap items-center gap-2">
-                <span>
-                  Souche : <strong className="text-foreground">{flock.strain || flock.breed}</strong>
-                </span>
-                <span>•</span>
-                <span>
-                  Bâtiment : <strong className="text-foreground">{flock.buildingName || "Non affecté"}</strong>
-                </span>
-                <span>•</span>
-                <span>
-                  Arrivée : <strong className="text-foreground">{formatDate(flock.startDate)}</strong>
-                </span>
-                {flock.ageInWeeks !== undefined && (
-                  <>
-                    <span>•</span>
-                    <span>
-                      Âge : <strong className="text-foreground">Semaine {flock.ageInWeeks} ({flock.ageInDays} j)</strong>
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-
-            {/* Boutons d'actions rapides */}
-            <div className="flex flex-wrap items-center gap-2">
-              {flock.status === "ACTIVE" && (
+        <PageHeader
+          backHref="/flocks"
+          title={flock.name}
+          subtitle={
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {flock.code && <span className="font-mono text-[10px] text-muted">{flock.code}</span>}
+              <span>•</span>
+              <span>{flock.strain || flock.breed}</span>
+              {flock.ageInWeeks !== undefined && (
                 <>
-                  <button
-                    onClick={() => setMovementModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg bg-danger-soft text-danger hover:bg-danger/15 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Perte ou Vente
-                  </button>
-
-                  {isLayer && (
-                    <button
-                      onClick={() => setEggModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg bg-accent-soft text-accent hover:bg-accent/15 transition-colors"
-                    >
-                      <Egg className="h-3.5 w-3.5" />
-                      Collecte d'œufs
-                    </button>
-                  )}
+                  <span>•</span>
+                  <span>Sem. {flock.ageInWeeks}</span>
                 </>
               )}
+            </div>
+          }
+          icon={<Bird className="h-4 w-4" />}
+          actions={
+            <div className="flex items-center gap-1.5">
+              {flock.status === "ACTIVE" && canRecordMovement && (
+                <button
+                  type="button"
+                  onClick={() => setMovementModalOpen(true)}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-full bg-danger-soft px-2.5 text-xs font-bold text-danger hover:bg-danger/15 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Mouvement</span>
+                </button>
+              )}
 
-              <button
-                onClick={openEditModal}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-surface border border-border text-foreground hover:bg-surface-hover transition-colors"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-                Modifier
-              </button>
+              {flock.status === "ACTIVE" && canCreateEgg && (
+                <button
+                  type="button"
+                  onClick={() => setEggModalOpen(true)}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2.5 text-xs font-bold hover:bg-amber-500/25 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Egg className="h-3.5 w-3.5" />
+                  <span>Collecte</span>
+                </button>
+              )}
+
+              {canUpdateFlock && (
+                <button
+                  type="button"
+                  onClick={openEditModal}
+                  title="Modifier le lot"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-foreground shadow-xs hover:bg-surface-hover active:scale-95 transition-all cursor-pointer"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => setReportModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-primary-soft text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
-                title="Générer la fiche imprimable et le bilan de fin de bande"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary-soft text-primary shadow-xs hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
+                title="Bilan PDF imprimable"
               >
                 <Printer className="h-3.5 w-3.5" />
-                Bilan imprimable (PDF)
               </button>
             </div>
-          </div>
+          }
+        />
+
+        {/* Badges bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar -mt-3">
+          <Badge variant={flock.status === "ACTIVE" ? "success" : "neutral"} size="sm">
+            {flock.status === "ACTIVE" ? "En cours" : flock.status === "SOLD" ? "Vendue" : "Clôturée"}
+          </Badge>
+          <Badge variant={flock.type === "LAYER" ? "warning" : flock.type === "BROILER" ? "info" : "neutral"} size="sm">
+            {flock.type === "LAYER" ? "Pondeuses" : flock.type === "BROILER" ? "Poulets de chair" : "Mixte"}
+          </Badge>
+          <span className="text-[11px] text-muted font-medium whitespace-nowrap">
+            Bâtiment : <strong className="text-foreground">{flock.buildingName || "Non affecté"}</strong>
+          </span>
+          <span className="text-[11px] text-muted font-medium whitespace-nowrap">
+            • Arrivée : <strong className="text-foreground">{formatDate(flock.startDate)}</strong>
+          </span>
         </div>
 
         {/* 4 Indicateurs Zootechniques & Performances */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
-            title="Cheptel Vivant"
-            value={`${formatNumber(stats.current)} sujets`}
-            subtitle={`Sur ${formatNumber(stats.initial)} introduits (${stats.survivalRate.toFixed(1)} % survie)`}
+            title="Effectif vivant"
+            value={formatNumber(stats.current)}
+            subtitle={`Sur ${formatNumber(stats.initial)} mis en place`}
             icon={<Bird className="h-5 w-5" />}
             accent="primary"
           />
 
           <StatCard
-            title="Pertes Cumulées"
-            value={`${formatNumber(stats.losses)} morts`}
-            subtitle={`Taux de mortalité : ${stats.mortalityRate.toFixed(2)} %`}
+            title="Mortalité"
+            value={formatNumber(stats.losses)}
+            subtitle={stats.losses > 0 ? `${stats.mortalityRate.toFixed(1)}% des sujets` : undefined}
             icon={<AlertTriangle className="h-5 w-5" />}
             accent={stats.mortalityRate > 5 ? "rose" : "zinc"}
           />
 
-          {isLayer ? (
+          {canViewEgg ? (
             <StatCard
-              title="Production Totale"
-              value={`${formatNumber(stats.totalTrays)} plateaux`}
-              subtitle={`${formatNumber(stats.totalEggs)} œufs récoltés au total`}
+              title="Ponte cumulée"
+              value={`${formatNumber(stats.totalTrays)} pl.`}
+              subtitle={`${formatNumber(stats.totalEggs)} œufs`}
               icon={<Egg className="h-5 w-5" />}
               accent="amber"
             />
           ) : (
             <StatCard
-              title="Cycle d'élevage"
+              title="Âge du lot"
               value={`J${flock.ageInDays || 1}`}
-              subtitle={`Semaine ${flock.ageInWeeks || 1} de croissance`}
+              subtitle={`Semaine ${flock.ageInWeeks || 1}`}
               icon={<Clock className="h-5 w-5" />}
               accent="sky"
             />
           )}
 
-          <StatCard
-            title="Marge Brute du Lot"
-            value={formatFcfa(financialSummary.grossMargin)}
-            subtitle={`Recettes: ${formatFcfa(financialSummary.totalIncome)} • Dép: ${formatFcfa(financialSummary.totalExpense)}`}
-            icon={<Wallet className="h-5 w-5" />}
-            accent={financialSummary.grossMargin >= 0 ? "primary" : "rose"}
-          />
+          {canViewFinance ? (
+            <StatCard
+              title="Marge brute"
+              value={formatFcfa(financialSummary.grossMargin)}
+              accent={financialSummary.grossMargin >= 0 ? "primary" : "rose"}
+              icon={<Wallet className="h-5 w-5" />}
+            />
+          ) : (
+            <StatCard
+              title="Taux de survie"
+              value={`${stats.survivalRate.toFixed(1)}%`}
+              subtitle={`${formatNumber(stats.current)} sujets vivants`}
+              accent="primary"
+              icon={<CheckCircle2 className="h-5 w-5" />}
+            />
+          )}
         </div>
 
         {/* Onglets de Consultation Approfondie */}
         <div className="space-y-4">
           <div className="border-b border-border">
-            <nav className="flex space-x-6 overflow-x-auto pb-px">
+            <nav className="flex space-x-6 overflow-x-auto pb-px scrollbar-none">
               <button
                 onClick={() => setActiveTab("movements")}
-                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                   activeTab === "movements"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted hover:text-foreground"
@@ -694,10 +695,10 @@ function FlockDetailContent() {
                 Mouvements d'effectif ({movements.length})
               </button>
 
-              {isLayer && (
+              {canViewEgg && (
                 <button
                   onClick={() => setActiveTab("eggs")}
-                  className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                     activeTab === "eggs"
                       ? "border-primary text-primary"
                       : "border-transparent text-muted hover:text-foreground"
@@ -708,35 +709,39 @@ function FlockDetailContent() {
                 </button>
               )}
 
-              <button
-                onClick={() => setActiveTab("health")}
-                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === "health"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted hover:text-foreground"
-                }`}
-              >
-                <HeartPulse className="h-4 w-4" />
-                Santé & Vaccinations ({treatments.length})
-              </button>
+              {canViewHealth && (
+                <button
+                  onClick={() => setActiveTab("health")}
+                  className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                    activeTab === "health"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  <HeartPulse className="h-4 w-4" />
+                  Santé & Vaccinations ({treatments.length})
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => setActiveTab("finance")}
-                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === "finance"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted hover:text-foreground"
-                }`}
-              >
-                <Wallet className="h-4 w-4" />
-                Finances & Marge ({transactions.length})
-              </button>
+              {canViewFinance && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("finance")}
+                  className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                    activeTab === "finance"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Wallet className="h-4 w-4" />
+                  Finances & Marge ({transactions.length})
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => setActiveTab("details")}
-                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                   activeTab === "details"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted hover:text-foreground"
@@ -756,7 +761,7 @@ function FlockDetailContent() {
                   icon={<Bird className="h-6 w-6" />}
                   title="Aucun mouvement d'effectif"
                   description="Aucune mortalité, vente ou réforme n'a été signalée pour cette bande. L'effectif est à 100% de son niveau initial."
-                  actionLabel="+ Noter une première perte ou vente"
+                  actionLabel={canRecordMovement ? "+ Noter une première perte ou vente" : undefined}
                   onAction={() => setMovementModalOpen(true)}
                 />
               ) : (
@@ -764,13 +769,13 @@ function FlockDetailContent() {
               )
             )}
 
-            {activeTab === "eggs" && isLayer && (
+            {activeTab === "eggs" && canViewEgg && (
               eggProductions.length === 0 ? (
                 <EmptyState
                   icon={<Egg className="h-6 w-6" />}
                   title="Aucune ponte enregistrée"
                   description="Ce lot n'a pas encore de ramassage d'œufs enregistré."
-                  actionLabel="+ Saisir une première collecte"
+                  actionLabel={canCreateEgg ? "+ Saisir une première collecte" : undefined}
                   onAction={() => setEggModalOpen(true)}
                 />
               ) : (
@@ -778,13 +783,13 @@ function FlockDetailContent() {
               )
             )}
 
-            {activeTab === "health" && (
+            {activeTab === "health" && canViewHealth && (
               treatments.length === 0 ? (
                 <EmptyState
                   icon={<HeartPulse className="h-6 w-6" />}
                   title="Aucun soin planifié"
                   description="Aucun vaccin ou traitement n'est encore programmé pour cette bande. Vous pouvez générer automatiquement le programme officiel depuis la page Santé."
-                  actionLabel="Aller au calendrier sanitaire"
+                  actionLabel={canManageHealth ? "Aller au calendrier sanitaire" : undefined}
                   onAction={() => router.push("/health")}
                 />
               ) : (
@@ -792,13 +797,13 @@ function FlockDetailContent() {
               )
             )}
 
-            {activeTab === "finance" && (
+            {activeTab === "finance" && canViewFinance && (
               transactions.length === 0 ? (
                 <EmptyState
                   icon={<Wallet className="h-6 w-6" />}
                   title="Aucune transaction rattachée"
                   description="Aucune vente ni dépense directe n'a encore été rattachée à cette bande."
-                  actionLabel="Enregistrer une transaction"
+                  actionLabel={canCreateFinance ? "Enregistrer une transaction" : undefined}
                   onAction={() => router.push("/finances")}
                 />
               ) : (
@@ -982,30 +987,30 @@ function FlockDetailContent() {
         <Modal
           isOpen={movementModalOpen}
           onClose={() => setMovementModalOpen(false)}
-          title="Mouvement d'effectif de la bande"
-          description={`Lot : ${flock.name} • Effectif vivant actuel : ${formatNumber(flock.currentQuantity)} sujets`}
+          title="Perte ou Vente"
+          description={`${flock.name} • ${formatNumber(flock.currentQuantity)} sujets`}
         >
           <form onSubmit={handleAddMovement} className="space-y-4 pt-2">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Type d'opération <span className="text-danger">*</span>
+                Type *
               </label>
               <select
                 value={moveType}
                 onChange={(e) => setMoveType(e.target.value as MovementType)}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
-                <option value="MORTALITY">Mortalité / Sujet mort</option>
-                <option value="SALE">Vente de poules vivantes</option>
-                <option value="CULL">Réforme / Sujet malade ou blessé éliminé</option>
-                <option value="TRANSFER">Transfert vers un autre bâtiment</option>
+                <option value="MORTALITY">Mortalité</option>
+                <option value="SALE">Vente</option>
+                <option value="CULL">Réforme</option>
+                <option value="TRANSFER">Transfert</option>
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Nombre de sujets <span className="text-danger">*</span>
+                  Quantité *
                 </label>
                 <input
                   type="number"
@@ -1024,7 +1029,7 @@ function FlockDetailContent() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Date de l'opération <span className="text-danger">*</span>
+                  Date *
                 </label>
                 <input
                   type="date"
@@ -1038,11 +1043,11 @@ function FlockDetailContent() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Motif & Cause suspectée
+                Motif
               </label>
               <input
                 type="text"
-                placeholder="Ex: Coccidiose suspectée, Chaleur forte, Vente revendeuse marché"
+                placeholder="Ex: Coccidiose, forte chaleur, vente locale"
                 value={moveReason}
                 onChange={(e) => setMoveReason(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -1073,7 +1078,7 @@ function FlockDetailContent() {
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-danger text-white hover:bg-danger/90 shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {submittingMove && <RefreshCw className="h-4 w-4 animate-spin" />}
-                Valider la sortie
+                Valider
               </button>
             </div>
           </form>
@@ -1084,14 +1089,14 @@ function FlockDetailContent() {
           <Modal
             isOpen={eggModalOpen}
             onClose={() => setEggModalOpen(false)}
-            title="Saisie du ramassage d'œufs"
-            description={`Bande : ${flock.name} • Conversion automatique en plateaux de 30 alvéoles`}
+            title="Collecte d'œufs"
+            description={flock.name}
           >
             <form onSubmit={handleAddEgg} className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    Date du ramassage <span className="text-danger">*</span>
+                    Date *
                   </label>
                   <input
                     type="date"
@@ -1104,7 +1109,7 @@ function FlockDetailContent() {
 
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    Séance <span className="text-danger">*</span>
+                    Séance *
                   </label>
                   <select
                     value={eggSession}
@@ -1120,7 +1125,7 @@ function FlockDetailContent() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Bons œufs (conformes et propres) <span className="text-danger">*</span>
+                  Bons œufs *
                 </label>
                 <input
                   type="number"
@@ -1142,7 +1147,7 @@ function FlockDetailContent() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    Œufs fêlés ou cassés
+                    Cassés
                   </label>
                   <input
                     type="number"
@@ -1159,7 +1164,7 @@ function FlockDetailContent() {
 
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    Œufs anormaux ou sans coquille
+                    Anormaux
                   </label>
                   <input
                     type="number"
@@ -1177,11 +1182,11 @@ function FlockDetailContent() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Observations de ponte
+                  Notes
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Tapis légèrement poussiéreux, ponte régulière"
+                  placeholder="Ex: Ponte régulière, tapis propre"
                   value={eggNotes}
                   onChange={(e) => setEggNotes(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -1212,7 +1217,7 @@ function FlockDetailContent() {
                   className="px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {submittingEgg && <RefreshCw className="h-4 w-4 animate-spin" />}
-                  Enregistrer la ponte
+                  Enregistrer
                 </button>
               </div>
             </form>
@@ -1223,13 +1228,13 @@ function FlockDetailContent() {
         <Modal
           isOpen={editModalOpen}
           onClose={() => setEditModalOpen(false)}
-          title="Modifier les paramètres de la bande"
-          description="Ajustez les informations descriptives et le bâtiment d'affectation."
+          title="Modifier le lot"
+          description={flock.name}
         >
           <form onSubmit={handleEditFlock} className="space-y-4 pt-2">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Nom ou Libellé <span className="text-danger">*</span>
+                Nom *
               </label>
               <input
                 type="text"
@@ -1243,7 +1248,7 @@ function FlockDetailContent() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Bâtiment / Poulailler
+                  Bâtiment
                 </label>
                 <select
                   value={editBuildingId}
@@ -1253,7 +1258,7 @@ function FlockDetailContent() {
                   <option value="">-- Non affecté --</option>
                   {buildings.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} (Capacité: {b.capacity} sujets)
+                      {b.name} ({b.capacity} pl.)
                     </option>
                   ))}
                 </select>
@@ -1261,23 +1266,23 @@ function FlockDetailContent() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Statut de la bande
+                  Statut
                 </label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value as any)}
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
-                  <option value="ACTIVE">En cours d'élevage (Active)</option>
-                  <option value="SOLD">Vendue entièrement</option>
-                  <option value="DEPLETED">Réformée / Clôturée</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="SOLD">Vendue</option>
+                  <option value="DEPLETED">Clôturée</option>
                 </select>
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Date de fin estimée
+                Fin estimée
               </label>
               <input
                 type="date"
@@ -1289,7 +1294,7 @@ function FlockDetailContent() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Remarques & Notes
+                Notes
               </label>
               <textarea
                 rows={2}
@@ -1323,7 +1328,7 @@ function FlockDetailContent() {
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {submittingEdit && <RefreshCw className="h-4 w-4 animate-spin" />}
-                Enregistrer les modifications
+                Enregistrer
               </button>
             </div>
           </form>

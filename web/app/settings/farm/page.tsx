@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
 
@@ -87,27 +88,18 @@ export default function FarmSettingsPage() {
 
   return (
     <Shell>
-      {/* Page Header */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl flex items-center gap-2.5">
-            <Settings className="h-6 w-6 text-primary" />
-            <span>Paramètres de l'exploitation</span>
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Gérez l'identité légale, la localisation et les coordonnées de facturation de votre ferme.
-          </p>
-        </div>
-
-        {activeFarm && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">Ferme active :</span>
-            <span className="rounded-xl bg-primary-soft px-3 py-1 text-xs font-bold text-primary">
+      <PageHeader
+        title="Paramètres de l'exploitation"
+        subtitle={activeFarm ? `Ferme active : ${activeFarm.name}` : undefined}
+        icon={<Settings className="h-4 w-4" />}
+        actions={
+          activeFarm ? (
+            <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-bold text-primary border border-primary/20">
               {activeFarm.name}
             </span>
-          </div>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
 
       {!activeFarm ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center max-w-lg mx-auto">
@@ -126,9 +118,6 @@ export default function FarmSettingsPage() {
                   <Building2 className="h-4 w-4 text-primary" />
                   <span>Identité & Coordonnées</span>
                 </h2>
-                <p className="text-xs text-muted mt-0.5">
-                  Informations principales visibles sur vos reçus de vente, rapports et documents.
-                </p>
               </div>
               <Badge variant="success" size="sm">
                 Exploitation Active

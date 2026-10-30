@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Plus, Bird, Calendar, Warehouse, ArrowRight, Eye, AlertCircle, Utensils } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
@@ -15,14 +15,26 @@ import { api } from "@/lib/api-client";
 import { Flock, FlockType, InventoryItem } from "@/lib/types";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { CreateBuildingModal } from "@/components/farms/create-building-modal";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function FlocksPage() {
-  const { activeFarm, hasPermission } = useAuth();
+  const { activeFarm, hasPermission, hasModule, isOwner } = useAuth();
   const { toast } = useToast();
 
+  const canFeed = (hasModule("inventory") || hasModule("feed_rationing")) && (hasPermission("inventory:movement") || hasPermission("flock:update") || isOwner);
+
   const [flocks, setFlocks] = useState<Flock[]>([]);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "ENDED">("ACTIVE");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [isLoading, setIsLoading] = useState(true);
+
+  const filteredFlocks = useMemo(() => {
+    return flocks.filter((f) => {
+      if (statusFilter === "ACTIVE") return f.status === "ACTIVE";
+      if (statusFilter === "ENDED") return f.status !== "ACTIVE";
+      return true;
+    });
+  }, [flocks, statusFilter]);
 
   // Buildings
   const [buildings, setBuildings] = useState<any[]>([]);
@@ -276,7 +288,7 @@ export default function FlocksPage() {
             <Eye className="h-3 w-3 text-muted" />
             Fiche
           </Link>
-          {flock.status === "ACTIVE" ? (
+          {flock.status === "ACTIVE" && canFeed ? (
             <button
               type="button"
               onClick={(e) => {
@@ -297,48 +309,43 @@ export default function FlocksPage() {
 
   return (
     <Shell>
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Groupes de poules
-          </h1>
-          <p className="mt-1 text-xs text-muted">
-            Suivi des poules pondeuses et poulets de chair, des effectifs vivants, des pertes et des ventes.
-          </p>
-        </div>
+      {/* En-tête mobile natif */}
+      <PageHeader
+        title="Bandes de volailles"
+        subtitle={`${flocks.filter((f) => f.status === "ACTIVE").length} lot(s) actif(s) en élevage`}
+        icon={<Bird className="h-4 w-4" />}
+        actions={
+          <>
+            {hasPermission("farm:update") && (
+              <button
+                type="button"
+                onClick={() => setBuildingModalOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <Warehouse className="h-3.5 w-3.5 text-primary" />
+                <span className="hidden xs:inline">Poulailler</span>
+              </button>
+            )}
 
-        <div className="flex items-center gap-2">
-          {hasPermission("farm:update") && (
-            <button
-              type="button"
-              onClick={() => setBuildingModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-surface-hover shadow-xs transition-colors"
-            >
-              <Warehouse className="h-4 w-4 text-primary" />
-              <span>Nouveau poulailler</span>
-            </button>
-          )}
-
-          {hasPermission("flock:create") && (
-            <button
-              type="button"
-              onClick={() => setCreateModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Nouveau groupe de poules</span>
-            </button>
-          )}
-        </div>
-      </div>
+            {hasPermission("flock:create") && (
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-hover active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Nouveau lot</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* Main Table */}
-      <div className="mt-6">
+      <div className="mt-2 sm:mt-3">
         <DataTable<Flock>
-          title="Vos groupes de volaille en élevage"
-          subtitle="Effectifs vivants, race, pertes constatées et suivi de vos bandes."
-          data={flocks}
+          title="Lots en élevage"
+          data={filteredFlocks}
           columns={flockColumns}
           searchable={true}
           searchPlaceholder="Rechercher par nom, race, code..."
@@ -346,15 +353,37 @@ export default function FlocksPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           isLoading={isLoading}
+          secondaryFilter={
+            <div className="flex items-center gap-1.5 shrink-0">
+              {[
+                { label: `Actifs (${flocks.filter((f) => f.status === "ACTIVE").length})`, value: "ACTIVE" },
+                { label: `Tous (${flocks.length})`, value: "ALL" },
+                { label: `Clôturés (${flocks.filter((f) => f.status !== "ACTIVE").length})`, value: "ENDED" },
+              ].map((tab) => {
+                const isActive = statusFilter === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setStatusFilter(tab.value as any)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                      isActive
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          }
           renderGridItem={(flock) => {
             const losses = flock.initialQuantity - flock.currentQuantity;
-            const mortalityRate =
-              flock.initialQuantity > 0 ? (losses / flock.initialQuantity) * 100 : 0;
-
             return (
               <div
                 key={flock.id}
-                className="flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-xs hover:shadow-md transition-shadow"
+                className="flex flex-col justify-between rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -375,20 +404,22 @@ export default function FlocksPage() {
                       </div>
                     </div>
 
-                    {flock.type === "LAYER"
-                      ? "Pondeuses"
-                      : flock.type === "BROILER"
-                        ? "Chair"
-                        : "Mixte"}
+                    <Badge variant={flock.type === "LAYER" ? "warning" : flock.type === "BROILER" ? "info" : "neutral"} size="sm">
+                      {flock.type === "LAYER"
+                        ? "Pondeuses"
+                        : flock.type === "BROILER"
+                          ? "Chair"
+                          : "Mixte"}
+                    </Badge>
                   </div>
 
                   {/* Quantitative Stats */}
-                  <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-surface-muted p-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-surface-muted p-3">
                     <div>
                       <span className="text-[11px] text-muted">
                         Poules vivantes
                       </span>
-                      <p className="text-lg font-bold font-mono text-primary">
+                      <p className="text-base sm:text-lg font-bold font-mono text-primary">
                         {formatNumber(flock.currentQuantity)}
                       </p>
                     </div>
@@ -396,7 +427,7 @@ export default function FlocksPage() {
                       <span className="text-[11px] text-muted">
                         Pertes (morts)
                       </span>
-                      <p className="text-lg font-bold font-mono text-danger font-semibold">
+                      <p className="text-base sm:text-lg font-bold font-mono text-danger font-semibold">
                         {losses}
                       </p>
                     </div>
@@ -414,14 +445,14 @@ export default function FlocksPage() {
                 </div>
 
                 {/* Card Action */}
-                <div className="mt-5 pt-3 border-t border-border flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
                   <Link
                     href={`/flocks/${flock.id}`}
                     className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                   >
                     Voir la fiche complète →
                   </Link>
-                  {flock.status === "ACTIVE" && (
+                  {flock.status === "ACTIVE" && canFeed && (
                     <button
                       type="button"
                       onClick={() => {
@@ -438,11 +469,97 @@ export default function FlocksPage() {
               </div>
             );
           }}
+          renderMobileCard={(flock) => {
+            const losses = flock.initialQuantity - flock.currentQuantity;
+            return (
+              <div
+                key={flock.id}
+                className="flex flex-col justify-between rounded-2xl border border-border bg-surface p-4 shadow-xs hover:border-primary/40 active:scale-[0.99] transition-all space-y-3"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">
+                        {flock.name}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs text-muted">
+                        <span>{flock.breed}</span>
+                        {flock.buildingName && (
+                          <>
+                            <span>•</span>
+                            <span className="text-primary font-medium">{flock.buildingName}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <Badge variant={flock.type === "LAYER" ? "warning" : flock.type === "BROILER" ? "info" : "neutral"} size="sm">
+                      {flock.type === "LAYER"
+                        ? "Pondeuses"
+                        : flock.type === "BROILER"
+                          ? "Chair"
+                          : "Mixte"}
+                    </Badge>
+                  </div>
+
+                  {/* Quantitative Stats */}
+                  <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-2.5">
+                    <div>
+                      <span className="text-[10px] text-muted">Poules vivantes</span>
+                      <p className="text-base font-bold font-mono text-primary">
+                        {formatNumber(flock.currentQuantity)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted">Pertes</span>
+                      <p className={`text-base font-bold font-mono ${losses > 0 ? "text-danger" : "text-muted"}`}>
+                        {losses}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between text-xs text-muted">
+                    <span className="flex items-center gap-1 text-[11px]">
+                      <Calendar className="h-3 w-3" />
+                      Arrivé le {formatDate(flock.startDate)}
+                    </span>
+                    <Badge variant={flock.status === "ACTIVE" ? "success" : "neutral"} size="sm" dot>
+                      {flock.status === "ACTIVE" ? "Actif" : "Clôturé"}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Card Action */}
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                  <Link
+                    href={`/flocks/${flock.id}`}
+                    className="font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    Fiche bande →
+                  </Link>
+                  {flock.status === "ACTIVE" && canFeed && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFlock(flock);
+                        setFeedingModalOpen(true);
+                      }}
+                      className="rounded-lg bg-amber-600/10 border border-amber-600/20 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-600 hover:text-white transition-colors inline-flex items-center gap-1"
+                    >
+                      <Utensils className="h-3 w-3" />
+                      <span>Nourrir</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }}
+
           emptyState={{
             icon: <Bird className="h-6 w-6 text-primary" />,
-            title: "Aucun groupe de poules trouvé",
-            description: "Ajoutez votre premier groupe de poules pour démarrer le suivi de votre élevage.",
-            actionLabel: hasPermission("flock:create") ? "Ajouter un groupe" : undefined,
+            title: "Aucun lot enregistré",
+            description: "Ajoutez votre première bande pour démarrer le suivi.",
+            actionLabel: hasPermission("flock:create") ? "Nouveau lot" : undefined,
             onAction: () => setCreateModalOpen(true),
           }}
         />
@@ -452,13 +569,13 @@ export default function FlocksPage() {
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        title="Ajouter un nouveau groupe de poules"
-        description="Renseignez les informations de ce groupe (pondeuses ou poulets de chair)."
+        title="Nouveau lot"
+        description="Poussins ou bande"
       >
         <form onSubmit={handleCreateFlock} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Nom du groupe de poules *
+              Nom du lot *
             </label>
             <input
               type="text"
@@ -474,7 +591,7 @@ export default function FlocksPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-foreground">
-                Bâtiment / Poulailler d'accueil
+                Bâtiment
               </label>
               <button
                 type="button"
@@ -482,7 +599,7 @@ export default function FlocksPage() {
                 className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover hover:underline transition-colors"
               >
                 <Plus className="h-3 w-3" />
-                <span>+ Nouveau poulailler</span>
+                <span>+ Nouveau</span>
               </button>
             </div>
             <select
@@ -552,14 +669,14 @@ export default function FlocksPage() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Race des poules
+                Race *
               </label>
               <input
                 type="text"
                 required
                 value={breed}
                 onChange={(e) => setBreed(e.target.value)}
-                placeholder="ex. Goliath, Lohmann Brown, Cobb 500..."
+                placeholder="ex. Goliath, Lohmann, Cobb 500"
                 className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
               />
             </div>
@@ -568,7 +685,7 @@ export default function FlocksPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Nombre de poules au départ
+                Effectif *
               </label>
               <input
                 type="number"
@@ -586,7 +703,7 @@ export default function FlocksPage() {
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Date d'arrivée à la ferme
+                Date d'arrivée *
               </label>
               <input
                 type="date"
@@ -600,7 +717,7 @@ export default function FlocksPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Remarques / Notes
+              Notes
             </label>
             <input
               type="text"
@@ -634,7 +751,7 @@ export default function FlocksPage() {
               disabled={submitting}
               className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover"
             >
-              {submitting ? "Enregistrement..." : "Enregistrer le groupe"}
+              {submitting ? "Enregistrement..." : "Créer"}
             </button>
           </div>
         </form>
@@ -644,8 +761,8 @@ export default function FlocksPage() {
       <Modal
         isOpen={movementModalOpen}
         onClose={() => setMovementModalOpen(false)}
-        title={`Noter une perte ou vente - ${activeFlock?.name || "ce groupe"}`}
-        description="Indiquez les poules mortes, vendues vivantes ou retirées du groupe."
+        title={`Perte ou Vente — ${activeFlock?.name || "Lot"}`}
+        description="Mortalité, vente ou réforme"
       >
         <form onSubmit={handleAddMovement} className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
@@ -657,7 +774,7 @@ export default function FlocksPage() {
                   : "border-border bg-surface text-muted"
                 }`}
             >
-              Morts (Pertes)
+              Mortalité
             </button>
             <button
               type="button"
@@ -667,7 +784,7 @@ export default function FlocksPage() {
                   : "border-border bg-surface text-muted"
                 }`}
             >
-              Poules vendues
+              Vente
             </button>
             <button
               type="button"
@@ -677,13 +794,13 @@ export default function FlocksPage() {
                   : "border-border bg-surface text-muted"
                 }`}
             >
-              Retirées (Réforme)
+              Réforme
             </button>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Nombre de poules
+              Quantité *
             </label>
             <input
               type="number"
@@ -701,13 +818,13 @@ export default function FlocksPage() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Raison ou remarque
+              Motif
             </label>
             <input
               type="text"
               value={moveReason}
               onChange={(e) => setMoveReason(e.target.value)}
-              placeholder="ex. Chaleur, maladie suspectée, vente au marché..."
+              placeholder="ex. Chaleur, maladie suspectée, vente locale..."
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground"
             />
           </div>

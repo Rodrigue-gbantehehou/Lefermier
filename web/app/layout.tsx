@@ -5,19 +5,34 @@ import { ThemeProvider } from "@/context/theme-context";
 import { ToastProvider } from "@/context/toast-context";
 
 export const metadata: Metadata = {
-  title: "Lefermier — Logiciel de Gestion Avicole",
+  title: "Lefermier — Gestion Avicole",
   description:
     "Solution professionnelle de gestion d'exploitations avicoles africaine. Suivi des bandes, ponte, stocks et finances.",
   icons: {
     icon: "/favicon.ico",
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Lefermier",
+  },
+  applicationName: "Lefermier",
+  formatDetection: {
+    telephone: false,
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#245c43" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1713" },
+  ],
 };
+
 
 export default function RootLayout({
   children,

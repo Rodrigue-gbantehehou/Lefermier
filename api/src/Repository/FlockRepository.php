@@ -39,4 +39,24 @@ class FlockRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    /**
+     * @return Flock[]
+     */
+    public function findUpdatedSince(Farm $farm, ?\DateTimeImmutable $since = null): array
+    {
+        $qb = $this->createQueryBuilder('f')
+            ->andWhere('f.farm = :farm')
+            ->setParameter('farm', $farm->getId(), 'ulid')
+            ->leftJoin('f.building', 'b')
+            ->addSelect('b')
+            ->orderBy('f.updatedAt', 'ASC');
+
+        if ($since !== null) {
+            $qb->andWhere('f.updatedAt > :since')
+               ->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

@@ -60,7 +60,7 @@ export function PrintableModal({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      description={description || "Format A4 optimisé pour l'impression ou l'export PDF numérique."}
+      description={description || "Export PDF ou impression A4"}
       maxWidth="4xl"
     >
       <div className="space-y-4">
