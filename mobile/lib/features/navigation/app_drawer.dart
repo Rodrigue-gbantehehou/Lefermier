@@ -7,6 +7,7 @@ import '../auth/farm_selection_sheet.dart';
 import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../buildings/buildings_screen.dart';
+import '../members/members_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -205,6 +206,18 @@ class AppDrawer extends ConsumerWidget {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const BuildingsScreen()),
+                      );
+                    },
+                  ),
+
+                  // Module Équipe & Collaborateurs
+                  _DrawerItem(
+                    icon: Icons.people_alt_rounded,
+                    label: "Équipe & Collaborateurs",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const MembersScreen()),
                       );
                     },
                   ),
