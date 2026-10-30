@@ -20,9 +20,12 @@ class ApiEndpoints {
 
   // Helpers paramétrés par ID d'exploitation ou de bande
   static String farmFlocks(String farmId) => "/api/farms/$farmId/flocks";
+  static String flockDetails(String flockId) => "/api/flocks/$flockId";
+  static String flockMovements(String flockId) => "/api/flocks/$flockId/movements";
   static String farmEggs(String farmId) => "/api/farms/$farmId/egg-productions";
   static String flockEggs(String flockId) => "/api/flocks/$flockId/egg-productions";
   static String farmTransactions(String farmId) => "/api/farms/$farmId/transactions";
+  static String farmDashboard(String farmId) => "/api/farms/$farmId/dashboard";
 
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";
