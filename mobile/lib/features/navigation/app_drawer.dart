@@ -6,6 +6,7 @@ import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
 import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
+import '../buildings/buildings_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -195,6 +196,18 @@ class AppDrawer extends ConsumerWidget {
                         );
                       },
                     ),
+
+                  // Module Bâtiments & Poulaillers
+                  _DrawerItem(
+                    icon: Icons.home_work_rounded,
+                    label: "Bâtiments & Poulaillers",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const BuildingsScreen()),
+                      );
+                    },
+                  ),
 
                   const Divider(height: 24),
 

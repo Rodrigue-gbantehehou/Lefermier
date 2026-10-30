@@ -181,6 +181,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
     required String poultryType,
     String? strain,
     int initialAgeDays = 1,
+    String? buildingId,
     String? notes,
   }) async {
     final activeFarm = _ref.read(authProvider).activeFarm;
@@ -202,6 +203,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
           'poultryType': poultryType,
           if (strain != null && strain.trim().isNotEmpty) 'strain': strain.trim(),
           'initialAgeDays': initialAgeDays,
+          if (buildingId != null && buildingId.trim().isNotEmpty) 'buildingId': buildingId.trim(),
           if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         },
       );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/models/flock.dart';
+import '../buildings/buildings_provider.dart';
 import 'flock_provider.dart';
 
 class FlocksScreen extends ConsumerStatefulWidget {
@@ -305,6 +306,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
     final qtyController = TextEditingController();
     String poultryType = "LAYER";
     DateTime startDate = DateTime.now();
+    String? selectedBuildingId;
 
     showModalBottomSheet(
       context: context,
@@ -476,7 +478,45 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
+
+                  // Bâtiment d'accueil
+                  Consumer(
+                    builder: (ctx, ref, _) {
+                      final buildings = ref.watch(buildingsProvider).buildings.where((b) => b.isActive).toList();
+                      if (buildings.isEmpty) return const SizedBox.shrink();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedBuildingId,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: "Bâtiment d'accueil",
+                              prefixIcon: const Icon(Icons.home_work_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            hint: const Text("Sélectionner un bâtiment (optionnel)"),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text("Aucun bâtiment spécifique"),
+                              ),
+                              ...buildings.map((b) => DropdownMenuItem<String>(
+                                    value: b.id,
+                                    child: Text("${b.name} (${b.capacity} pl. - ${b.type.label})"),
+                                  )),
+                            ],
+                            onChanged: (val) => setModalState(() => selectedBuildingId = val),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
 
                   // Boutons d'action
                   Row(
@@ -520,6 +560,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                     startDate: startDate,
                                     poultryType: poultryType,
                                     strain: strainController.text.trim(),
+                                    buildingId: selectedBuildingId,
                                   );
 
                                   if (ctx.mounted) {

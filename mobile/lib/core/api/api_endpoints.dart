@@ -30,6 +30,8 @@ class ApiEndpoints {
   static String inventoryMovements(String itemId) => "/api/inventory/$itemId/movements";
   static String farmHealth(String farmId) => "/api/farms/$farmId/health-treatments";
   static String completeHealthTreatment(String treatmentId) => "/api/health-treatments/$treatmentId/complete";
+  static String farmBuildings(String farmId) => "/api/farms/$farmId/buildings";
+  static String farmBuilding(String farmId, String buildingId) => "/api/farms/$farmId/buildings/$buildingId";
 
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";
