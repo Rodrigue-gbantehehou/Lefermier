@@ -51,12 +51,7 @@ const navigationItems = [
     icon: CreditCard,
     permission: "admin:subscriptions:view",
   },
-  {
-    label: "Demandes d'offres",
-    href: "/subscriptions?tab=requests",
-    icon: ArrowUpRight,
-    permission: "admin:subscriptions:view",
-  },
+ 
   {
     label: "Journal d'audit",
     href: "/audit",
