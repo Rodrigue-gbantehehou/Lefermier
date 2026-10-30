@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../auth/auth_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../dashboard/quick_action_sheet.dart';
 import '../flocks/flocks_screen.dart';
 import '../eggs/eggs_screen.dart';
 import '../finances/finances_screen.dart';
+import 'app_drawer.dart';
 
-class BottomNavScaffold extends StatefulWidget {
+class BottomNavScaffold extends ConsumerStatefulWidget {
   const BottomNavScaffold({super.key});
 
   @override
-  State<BottomNavScaffold> createState() => _BottomNavScaffoldState();
+  ConsumerState<BottomNavScaffold> createState() => _BottomNavScaffoldState();
 }
 
-class _BottomNavScaffoldState extends State<BottomNavScaffold> {
+class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
 
   void _onTabSelected(int index) {
+    if (index == 4) {
+      // 5e onglet : Ouvrir le Menu Drawer
+      _scaffoldKey.currentState?.openDrawer();
+      return;
+    }
+
     if (index != _currentIndex) {
       setState(() {
         _currentIndex = index;
@@ -28,12 +38,10 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
     QuickActionSheet.show(
       context,
       onRecordEgg: () {
-        Navigator.of(context).pop();
-        setState(() => _currentIndex = 2); // Switch to Eggs tab
+        setState(() => _currentIndex = 2);
       },
       onRecordFeeding: () {
-        Navigator.of(context).pop();
-        setState(() => _currentIndex = 1); // Switch to Flocks
+        setState(() => _currentIndex = 1);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Enregistrement de la distribution d'aliment..."),
@@ -42,18 +50,16 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
         );
       },
       onRecordMovement: () {
-        Navigator.of(context).pop();
         setState(() => _currentIndex = 1);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Enregistrement mortalité / pesée..."),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.danger,
           ),
         );
       },
       onRecordIncome: () {
-        Navigator.of(context).pop();
-        setState(() => _currentIndex = 3); // Switch to Finances
+        setState(() => _currentIndex = 3);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Nouvelle recette de vente enregistrée"),
@@ -62,7 +68,6 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
         );
       },
       onRecordExpense: () {
-        Navigator.of(context).pop();
         setState(() => _currentIndex = 3);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -76,9 +81,32 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final farm = authState.activeFarm;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navBgColor = isDark ? AppColors.surfaceDark : Colors.white;
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+
+    // Détermination adaptative du 4e onglet selon l'offre et les droits
+    final bool showFinance = farm == null || farm.canViewFinance;
+    final bool showEggs = !showFinance && (farm.canViewEggs);
+
+    final String dynamicTabLabel = showFinance
+        ? "Caisse"
+        : (showEggs ? "Ponte" : "Bâtiments");
+
+    final IconData dynamicTabIcon = showFinance
+        ? Icons.account_balance_wallet_outlined
+        : (showEggs ? Icons.egg_outlined : Icons.warehouse_outlined);
+
+    final IconData dynamicTabActiveIcon = showFinance
+        ? Icons.account_balance_wallet_rounded
+        : (showEggs ? Icons.egg_rounded : Icons.warehouse_rounded);
+
+    final Widget dynamicTabScreen = showFinance
+        ? const FinancesScreen()
+        : (showEggs ? const EggsScreen() : const FlocksScreen());
 
     final screens = [
       DashboardScreen(
@@ -89,20 +117,31 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
       ),
       const FlocksScreen(),
       const EggsScreen(),
-      const FinancesScreen(),
+      dynamicTabScreen,
     ];
 
+    // Sécurité d'index
+    final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
+
     return Scaffold(
-      extendBody: false, // Ensures bottom content does not bleed under the bottom nav bar
+      key: _scaffoldKey,
+      drawer: AppDrawer(
+        onSelectTab: (idx) {
+          if (idx < screens.length) {
+            setState(() => _currentIndex = idx);
+          }
+        },
+      ),
+      extendBody: false, // Fond protecteur : le contenu ne passe pas sous la barre
       body: IndexedStack(
-        index: _currentIndex,
+        index: safeIndex,
         children: screens,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openQuickActions,
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 6,
         shape: const CircleBorder(),
         child: const Icon(Icons.add_rounded, size: 28),
       ),
@@ -126,37 +165,45 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
           child: BottomAppBar(
             elevation: 0,
             color: Colors.transparent,
-            notchMargin: 8,
+            notchMargin: 6,
             shape: const CircularNotchedRectangle(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                // 1. Accueil
                 _buildNavItem(
                   index: 0,
                   icon: Icons.dashboard_outlined,
                   activeIcon: Icons.dashboard_rounded,
                   label: "Accueil",
                 ),
+                // 2. Bandes
                 _buildNavItem(
                   index: 1,
                   icon: Icons.grid_view_outlined,
                   activeIcon: Icons.grid_view_rounded,
                   label: "Bandes",
                 ),
-                const SizedBox(width: 48), // Gap for docked center FAB
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.egg_outlined,
-                  activeIcon: Icons.egg_rounded,
-                  label: "Ponte",
-                ),
+
+                // Espace pour le FAB central
+                const SizedBox(width: 44),
+
+                // 4. Onglet adaptatif selon le rôle & abonnement (Caisse ou Ponte)
                 _buildNavItem(
                   index: 3,
-                  icon: Icons.account_balance_wallet_outlined,
-                  activeIcon: Icons.account_balance_wallet_rounded,
-                  label: "Caisse",
+                  icon: dynamicTabIcon,
+                  activeIcon: dynamicTabActiveIcon,
+                  label: dynamicTabLabel,
+                ),
+
+                // 5. Menu Complet
+                _buildNavItem(
+                  index: 4,
+                  icon: Icons.menu_rounded,
+                  activeIcon: Icons.menu_open_rounded,
+                  label: "Menu",
                 ),
               ],
             ),
@@ -179,7 +226,7 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
       onTap: () => _onTabSelected(index),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -192,11 +239,21 @@ class _BottomNavScaffoldState extends State<BottomNavScaffold> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: color,
               ),
             ),
+            if (isSelected)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                width: 4,
+                height: 4,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
           ],
         ),
       ),

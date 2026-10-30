@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/models/transaction.dart';
 
@@ -32,6 +34,22 @@ class FinancesScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Caisse & Finances"),
+        actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return IconButton(
+                icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: isDark ? Colors.amber : null,
+                  size: 20,
+                ),
+                tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
+                onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
+              );
+            },
+          ),
+        ],
       ),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),

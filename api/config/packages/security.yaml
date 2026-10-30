@@ -15,6 +15,10 @@ security:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
+        cors:
+            pattern: ^/api
+            methods: [OPTIONS]
+            security: false
         login:
             pattern: ^/api/auth/login
             stateless: true

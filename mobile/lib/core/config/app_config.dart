@@ -29,8 +29,8 @@ class AppConfig {
 
     // Détection dynamique selon la plateforme d'exécution en mode développement
     if (kIsWeb) {
-      // Sur navigateur Web : même hôte ou port 8000
-      return "http://localhost:8000";
+      // Sur navigateur Web : 127.0.0.1:8000 pour liaison IPv4 directe
+      return "http://127.0.0.1:8000";
     }
 
     // Sur émulateur Android (boucle locale spéciale 10.0.2.2)

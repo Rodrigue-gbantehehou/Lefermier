@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/utils/egg_calculator.dart';
 import '../../core/models/egg_production.dart';
 
@@ -279,6 +281,20 @@ class _EggsScreenState extends State<EggsScreen> {
       appBar: AppBar(
         title: const Text("Ramassage d'œufs"),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return IconButton(
+                icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: isDark ? Colors.amber : null,
+                  size: 20,
+                ),
+                tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
+                onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add_rounded),
             onPressed: _openRecordEggDialog,

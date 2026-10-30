@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
 
@@ -80,6 +81,16 @@ class DashboardScreen extends ConsumerWidget {
                 );
               }
             },
+          ),
+          // Bouton du mode (Light / Dark)
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: isDark ? Colors.amber : null,
+              size: 20,
+            ),
+            tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
+            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
           ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, size: 20),

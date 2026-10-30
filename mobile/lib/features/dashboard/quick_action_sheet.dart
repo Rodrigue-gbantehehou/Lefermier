@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../auth/auth_provider.dart';
 
-class QuickActionSheet extends StatelessWidget {
+class QuickActionSheet extends ConsumerWidget {
   final VoidCallback onRecordEgg;
   final VoidCallback onRecordFeeding;
   final VoidCallback onRecordMovement;
   final VoidCallback onRecordIncome;
   final VoidCallback onRecordExpense;
+  final VoidCallback? onRecordHealth;
 
   const QuickActionSheet({
     super.key,
@@ -15,6 +18,7 @@ class QuickActionSheet extends StatelessWidget {
     required this.onRecordMovement,
     required this.onRecordIncome,
     required this.onRecordExpense,
+    this.onRecordHealth,
   });
 
   static void show(
@@ -24,6 +28,7 @@ class QuickActionSheet extends StatelessWidget {
     required VoidCallback onRecordMovement,
     required VoidCallback onRecordIncome,
     required VoidCallback onRecordExpense,
+    VoidCallback? onRecordHealth,
   }) {
     showModalBottomSheet(
       context: context,
@@ -35,14 +40,23 @@ class QuickActionSheet extends StatelessWidget {
         onRecordMovement: onRecordMovement,
         onRecordIncome: onRecordIncome,
         onRecordExpense: onRecordExpense,
+        onRecordHealth: onRecordHealth,
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final farm = authState.activeFarm;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+
+    // Filtres d'actions selon l'abonnement de la ferme et le rôle utilisateur
+    final canEgg = farm == null || farm.canCreateEggs;
+    final canFinance = farm == null || farm.canCreateFinance;
+    final canHealth = farm == null || farm.canManageHealth;
 
     return Container(
       decoration: BoxDecoration(
@@ -58,7 +72,7 @@ class QuickActionSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
+          // Poignée de glissement
           Center(
             child: Container(
               width: 36,
@@ -70,20 +84,36 @@ class QuickActionSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Title
-          const Row(
+
+          // En-tête
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Actions rapides",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Actions rapides",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "Opérations autorisées pour votre compte",
+                    style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 20),
+                onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          // Grid of quick actions
+
+          // Grille d'actions filtrées
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -92,16 +122,20 @@ class QuickActionSheet extends StatelessWidget {
             mainAxisSpacing: 12,
             childAspectRatio: 2.2,
             children: [
-              _ActionButton(
-                icon: Icons.egg_outlined,
-                label: "Ramassage",
-                subtitle: "Collecte d'œufs",
-                color: AppColors.accent,
-                onTap: () {
-                  Navigator.pop(context);
-                  onRecordEgg();
-                },
-              ),
+              // 1. Ramassage d'œufs (Uniquement si ponte autorisée & non-chair)
+              if (canEgg)
+                _ActionButton(
+                  icon: Icons.egg_outlined,
+                  label: "Ponte d'œufs",
+                  subtitle: "Ramassage du lot",
+                  color: AppColors.accent,
+                  onTap: () {
+                    Navigator.pop(context);
+                    onRecordEgg();
+                  },
+                ),
+
+              // 2. Nourrir / Distribution d'aliment
               _ActionButton(
                 icon: Icons.restaurant_outlined,
                 label: "Nourrir",
@@ -112,30 +146,56 @@ class QuickActionSheet extends StatelessWidget {
                   onRecordFeeding();
                 },
               ),
-              _ActionButton(
-                icon: Icons.trending_up,
-                label: "Recette",
-                subtitle: "Vente d'œufs / poules",
-                color: AppColors.success,
-                onTap: () {
-                  Navigator.pop(context);
-                  onRecordIncome();
-                },
-              ),
-              _ActionButton(
-                icon: Icons.trending_down,
-                label: "Dépense",
-                subtitle: "Achat d'aliment",
-                color: AppColors.danger,
-                onTap: () {
-                  Navigator.pop(context);
-                  onRecordExpense();
-                },
-              ),
+
+              // 3. Vente / Encaissement (Conditionné par rôle financier)
+              if (canFinance)
+                _ActionButton(
+                  icon: Icons.trending_up,
+                  label: "Recette",
+                  subtitle: "Vente d'œufs / poules",
+                  color: AppColors.success,
+                  onTap: () {
+                    Navigator.pop(context);
+                    onRecordIncome();
+                  },
+                ),
+
+              // 4. Dépense / Achat (Conditionné par rôle financier)
+              if (canFinance)
+                _ActionButton(
+                  icon: Icons.trending_down,
+                  label: "Dépense",
+                  subtitle: "Achat ou charge",
+                  color: AppColors.danger,
+                  onTap: () {
+                    Navigator.pop(context);
+                    onRecordExpense();
+                  },
+                ),
+
+              // 5. Soin / Traitement sanitaire (Conditionné par rôle sanitaire)
+              if (canHealth)
+                _ActionButton(
+                  icon: Icons.medical_services_outlined,
+                  label: "Soin / Vaccin",
+                  subtitle: "Suivi vétérinaire",
+                  color: Colors.teal,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (onRecordHealth != null) {
+                      onRecordHealth!();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Enregistrement soin / vaccin sanitaire...")),
+                      );
+                    }
+                  },
+                ),
             ],
           ),
           const SizedBox(height: 12),
-          // Perte / Mortalite row button
+
+          // Perte / Mortalité
           InkWell(
             onTap: () {
               Navigator.pop(context);
@@ -154,7 +214,7 @@ class QuickActionSheet extends StatelessWidget {
                   Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 20),
                   SizedBox(width: 10),
                   Text(
-                    "Perte / Mortalité ou Réforme",
+                    "Perte / Mortalité ou Sortie",
                     style: TextStyle(
                       color: AppColors.danger,
                       fontWeight: FontWeight.bold,
@@ -213,25 +273,25 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(width: 9),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: color,
+                      fontSize: 12,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                     ),
                   ),
                   Text(
                     subtitle,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textMutedLight,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
                   ),
                 ],
               ),
