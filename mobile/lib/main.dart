@@ -9,6 +9,8 @@ import 'features/navigation/bottom_nav_scaffold.dart';
 import 'features/welcome/splash_screen.dart';
 import 'features/welcome/welcome_screen.dart';
 
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiClient().init();
@@ -27,6 +29,16 @@ class LeFermierApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final currentThemeMode = ref.watch(themeModeProvider);
 
+    // Écoute les déconnexions globales ou expirations de session
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.isAuthenticated == true && !next.isAuthenticated) {
+        appNavigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    });
+
     Widget homeWidget;
     if (authState.isLoading) {
       homeWidget = const SplashScreen();
@@ -39,6 +51,7 @@ class LeFermierApp extends ConsumerWidget {
     }
 
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'Le Fermier',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/brand_loader.dart';
+import '../navigation/bottom_nav_scaffold.dart';
 import 'auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -87,6 +88,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           duration: Duration(seconds: 2),
         ),
       );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const BottomNavScaffold()),
+        (route) => false,
+      );
     }
   }
 
@@ -115,6 +120,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           backgroundColor: AppColors.success,
           duration: const Duration(seconds: 3),
         ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const BottomNavScaffold()),
+        (route) => false,
       );
     }
   }

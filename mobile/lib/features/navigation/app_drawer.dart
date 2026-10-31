@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
+import '../auth/login_screen.dart';
 import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../buildings/buildings_screen.dart';
@@ -336,9 +337,15 @@ class AppDrawer extends ConsumerWidget {
                   style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 subtitle: const Text("Fermer la session sur cet appareil", style: TextStyle(fontSize: 11)),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(context).pop();
-                  ref.read(authProvider.notifier).logout();
+                  await ref.read(authProvider.notifier).logout();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
                 },
               ),
             ),
