@@ -1,30 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lefermier/main.dart';
+import 'package:lefermier/features/welcome/welcome_screen.dart';
+import 'package:lefermier/features/auth/login_screen.dart';
 import 'package:lefermier/features/navigation/bottom_nav_scaffold.dart';
 
 void main() {
-  testWidgets('LeFermierApp smoke test - shows LoginScreen when unauthenticated', (WidgetTester tester) async {
+  testWidgets('WelcomeScreen smoke test - renders hero and action buttons', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: LeFermierApp(),
+        child: MaterialApp(
+          home: WelcomeScreen(),
+        ),
       ),
     );
 
-    // Verify LoginScreen renders
+    expect(find.text('LE FERMIER'), findsOneWidget);
+    expect(find.text('Créer mon exploitation'), findsOneWidget);
+    expect(find.text("J'ai déjà un compte"), findsOneWidget);
+  });
+
+  testWidgets('LoginScreen smoke test - renders directly with auth tabs', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: LoginScreen(),
+        ),
+      ),
+    );
+
     expect(find.text('Le Fermier'), findsOneWidget);
     expect(find.text('Connexion'), findsOneWidget);
+    expect(find.text('Créer un compte'), findsOneWidget);
   });
 
   testWidgets('BottomNavScaffold smoke test - displays main navigation tabs', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: LeFermierApp(),
-      ),
-    );
-
-    // Verify navigation tabs in BottomNavScaffold directly
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(

@@ -12,9 +12,11 @@ class ApiClient {
   static const String _tokenKey = "lefermier_jwt_token";
   static const String _deviceRefreshKey = "lefermier_device_refresh_token";
   static const String _activeFarmKey = "lefermier_active_farm_id";
+  static const String _hasSeenWelcomeKey = "lefermier_has_seen_welcome";
 
   String? _jwtToken;
   String? _activeFarmId;
+  bool _hasSeenWelcome = false;
 
   ApiClient._internal() {
     dio = Dio(
@@ -81,6 +83,7 @@ class ApiClient {
     final prefs = await SharedPreferences.getInstance();
     _jwtToken = prefs.getString(_tokenKey);
     _activeFarmId = prefs.getString(_activeFarmKey);
+    _hasSeenWelcome = prefs.getBool(_hasSeenWelcomeKey) ?? false;
     dio.options.baseUrl = await AppConfig.resolveApiBaseUrl();
   }
 
@@ -108,6 +111,13 @@ class ApiClient {
     }
   }
 
+  Future<void> setHasSeenWelcome(bool seen) async {
+    _hasSeenWelcome = seen;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hasSeenWelcomeKey, seen);
+  }
+
+  bool get hasSeenWelcome => _hasSeenWelcome;
   String? get activeFarmId => _activeFarmId;
   bool get isAuthenticated => _jwtToken != null;
 

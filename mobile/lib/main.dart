@@ -6,6 +6,8 @@ import 'core/theme/theme_provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/navigation/bottom_nav_scaffold.dart';
+import 'features/welcome/splash_screen.dart';
+import 'features/welcome/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,15 +27,24 @@ class LeFermierApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final currentThemeMode = ref.watch(themeModeProvider);
 
+    Widget homeWidget;
+    if (authState.isLoading) {
+      homeWidget = const SplashScreen();
+    } else if (authState.isAuthenticated) {
+      homeWidget = const BottomNavScaffold();
+    } else if (!ApiClient().hasSeenWelcome) {
+      homeWidget = const WelcomeScreen();
+    } else {
+      homeWidget = const LoginScreen();
+    }
+
     return MaterialApp(
       title: 'Le Fermier',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: currentThemeMode,
-      home: authState.isAuthenticated
-          ? const BottomNavScaffold()
-          : const LoginScreen(),
+      home: homeWidget,
     );
   }
 }

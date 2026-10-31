@@ -6,7 +6,8 @@ import '../../core/widgets/brand_loader.dart';
 import 'auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  final int initialTab;
+  const LoginScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -14,7 +15,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   // Mode : 0 = Connexion, 1 = Inscription
-  int _tabIndex = 0;
+  late int _tabIndex;
 
   // Formulaires
   final _loginFormKey = GlobalKey<FormState>();
@@ -42,6 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _tabIndex = widget.initialTab;
     _loadCurrentServerUrl();
   }
 
@@ -133,47 +135,89 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo & En-tête de marque
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        width: 2,
+                // Bannière Hero de marque avec vraie photographie de ferme avicole
+                Container(
+                  height: 125,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
                       ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          'assets/images/poultry_farm_hero.jpg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.35),
+                                Colors.black.withValues(alpha: 0.78),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.egg_alt_rounded,
+                                  size: 24,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                "Le Fermier",
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              Text(
+                                "Gestion d'exploitations avicoles",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.egg_alt_rounded,
-                      size: 44,
-                      color: AppColors.primary,
-                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                const Text(
-                  "Le Fermier",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primary,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  "Gestion d'exploitations avicoles",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMutedLight,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 24),
 
                 // Carte Principale avec Onglets Connexion / Inscription
                 Container(
