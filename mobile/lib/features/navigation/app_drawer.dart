@@ -177,7 +177,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Ponte (Conditionné par le type d'élevage et le rôle)
-                  if (farm == null || farm.canViewEggs)
+                  if (farm?.canViewEggs == true)
                     _DrawerItem(
                       icon: Icons.egg_rounded,
                       label: "Pontes d'œufs",
@@ -186,7 +186,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Caisse (Conditionné par le rôle : Propriétaire, Gérant, Comptable)
-                  if (farm == null || farm.canViewFinance)
+                  if (farm?.canViewFinance == true)
                     _DrawerItem(
                       icon: Icons.account_balance_wallet_rounded,
                       label: "Trésorerie & Ventes",
@@ -195,7 +195,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Santé & Traitements (Vétérinaire / Gérant)
-                  if (farm == null || farm.canViewHealth)
+                  if (farm?.canViewHealth == true)
                     _DrawerItem(
                       icon: Icons.medical_services_rounded,
                       label: "Santé & Traitements",
@@ -203,7 +203,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Stocks & Alimentation (Magasinier / Gérant)
-                  if (farm == null || farm.canViewInventory)
+                  if (farm?.canViewInventory == true)
                     _DrawerItem(
                       icon: Icons.inventory_2_rounded,
                       label: "Stocks & Intrants",
@@ -211,7 +211,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Bâtiments & Poulaillers (Gérant / Propriétaire)
-                  if (farm == null || farm.canManageBuildings)
+                  if (farm?.canManageBuildings == true)
                     _DrawerItem(
                       icon: Icons.home_work_rounded,
                       label: "Bâtiments & Poulaillers",
@@ -219,7 +219,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Équipe & Collaborateurs (Propriétaire / Gérant)
-                  if (farm == null || farm.canManageMembers)
+                  if (farm?.canManageMembers == true)
                     _DrawerItem(
                       icon: Icons.people_alt_rounded,
                       label: "Équipe & Collaborateurs",
@@ -239,8 +239,8 @@ class AppDrawer extends ConsumerWidget {
                     onTap: () => _navigateTo(context, 'sync', const SyncScreen()),
                   ),
 
-                  // Module Abonnement & Licences (Propriétaire / Admin uniquement)
-                  if (farm == null || farm.canManageSubscription)
+                  // Module Abonnement & Licences (Propriétaire uniquement)
+                  if (farm?.canManageSubscription == true)
                     _DrawerItem(
                       icon: Icons.workspace_premium_rounded,
                       label: "Abonnement & Formules",
@@ -249,7 +249,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
 
                   // Module Rapports & Partage WhatsApp / SMS
-                  if (farm == null || farm.canViewReports)
+                  if (farm?.canViewReports == true)
                     _DrawerItem(
                       icon: Icons.share_rounded,
                       label: "Rapports & Partage",

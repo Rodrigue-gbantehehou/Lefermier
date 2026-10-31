@@ -94,7 +94,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     }
 
     final candidates = <String, _NavDestination>{
-      if (farm == null || farm.canViewFinance)
+      if (farm?.canViewFinance == true)
         'finance': _NavDestination(
           key: 'finance',
           label: "Caisse",
@@ -102,7 +102,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.account_balance_wallet_rounded,
           screenBuilder: (openMenu) => FinancesScreen(onOpenMenu: openMenu),
         ),
-      if (farm == null || farm.canViewInventory)
+      if (farm?.canViewInventory == true)
         'inventory': _NavDestination(
           key: 'inventory',
           label: "Stocks",
@@ -110,7 +110,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.inventory_2_rounded,
           screenBuilder: (openMenu) => InventoryScreen(onOpenMenu: openMenu),
         ),
-      if (farm == null || farm.canViewHealth)
+      if (farm?.canViewHealth == true)
         'health': _NavDestination(
           key: 'health',
           label: "Santé",
@@ -118,7 +118,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.medical_services_rounded,
           screenBuilder: (openMenu) => HealthScreen(onOpenMenu: openMenu),
         ),
-      if (farm == null || farm.canViewReports)
+      if (farm?.canViewReports == true)
         'reports': _NavDestination(
           key: 'reports',
           label: "Rapports",
@@ -126,7 +126,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.bar_chart_rounded,
           screenBuilder: (openMenu) => ReportsScreen(onOpenMenu: openMenu),
         ),
-      if (farm == null || farm.canViewEggs)
+      if (farm?.canViewEggs == true)
         'eggs': _NavDestination(
           key: 'eggs',
           label: "Ponte",
