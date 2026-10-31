@@ -5,6 +5,7 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
+import '../sync/sync_status_badge.dart';
 import 'dashboard_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -111,12 +112,12 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Salutation mobile personnalisée
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14, top: 4),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 14, top: 4),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Column(
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -133,23 +134,7 @@ class DashboardScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.success.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
-                                SizedBox(width: 4),
-                                Text(
-                                  "En ligne",
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.success),
-                                ),
-                              ],
-                            ),
-                          ),
+                          SyncStatusBadge(),
                         ],
                       ),
                     ),

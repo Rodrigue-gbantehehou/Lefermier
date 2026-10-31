@@ -8,6 +8,8 @@ import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../buildings/buildings_screen.dart';
 import '../members/members_screen.dart';
+import '../sync/sync_provider.dart';
+import '../sync/sync_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -218,6 +220,24 @@ class AppDrawer extends ConsumerWidget {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const MembersScreen()),
+                      );
+                    },
+                  ),
+
+                  // Module Synchronisation & Hors-ligne
+                  _DrawerItem(
+                    icon: Icons.sync_rounded,
+                    label: "Synchronisation",
+                    badge: ref.watch(syncProvider).pendingCount > 0
+                        ? "${ref.watch(syncProvider).pendingCount} en attente"
+                        : null,
+                    color: ref.watch(syncProvider).pendingCount > 0
+                        ? AppColors.accent
+                        : null,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SyncScreen()),
                       );
                     },
                   ),
