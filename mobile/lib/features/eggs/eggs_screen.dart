@@ -460,6 +460,7 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_eggs',
         onPressed: () => _openRecordEggDialog(eggState.layerFlocks, eggState.selectedFlockId),
         backgroundColor: AppColors.accent,
         icon: const Icon(Icons.add, color: Colors.white),

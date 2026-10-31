@@ -688,6 +688,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_inventory',
         onPressed: () => _openStockMovementDialog(invState.items),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.swap_horiz_rounded, color: Colors.white),

@@ -126,6 +126,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         children: screens,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_nav_center',
         onPressed: _openQuickActions,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

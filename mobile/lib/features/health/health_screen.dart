@@ -863,6 +863,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_health',
         onPressed: _openCreateTreatmentDialog,
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),

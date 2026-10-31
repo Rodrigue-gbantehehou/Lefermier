@@ -416,6 +416,7 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_finances',
         onPressed: () => _openRecordTransactionDialog("INCOME"),
         backgroundColor: AppColors.success,
         icon: const Icon(Icons.add_rounded, color: Colors.white),

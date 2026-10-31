@@ -51,6 +51,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_members',
         onPressed: () => _openAddMemberDialog(context),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.person_add_rounded, color: Colors.white),

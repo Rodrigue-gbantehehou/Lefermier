@@ -51,6 +51,7 @@ class _BuildingsScreenState extends ConsumerState<BuildingsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_buildings',
         onPressed: () => _openBuildingDialog(context, null),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),

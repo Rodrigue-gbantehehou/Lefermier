@@ -636,6 +636,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_flocks',
         onPressed: () => _openRecordMovementDialog(flockState.flocks),
         backgroundColor: AppColors.danger,
         icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
