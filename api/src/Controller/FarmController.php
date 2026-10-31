@@ -10,6 +10,7 @@ use App\Dto\Farm\CreateFarmRequestDto;
 use App\Dto\Farm\UpdateFarmRequestDto;
 use App\Entity\Farm;
 use App\Entity\User;
+use App\Repository\FarmMembershipRepository;
 use App\Security\Voter\FarmVoter;
 use App\Service\FarmService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,6 +27,7 @@ class FarmController extends AbstractController
 {
     public function __construct(
         private readonly FarmService $farmService,
+        private readonly FarmMembershipRepository $membershipRepository,
     ) {
     }
 
@@ -83,8 +85,25 @@ class FarmController extends AbstractController
             ? $request->query->getBoolean('onlyActive')
             : false;
 
+        $buildings = $this->farmService->getBuildingsForFarm($farm, $onlyActive);
+
+        $currentUser = $this->getUser();
+        if ($currentUser instanceof User) {
+            $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser]);
+            if ($membership !== null && $membership->hasBuildingRestrictions()) {
+                $allowedIds = array_map(
+                    fn ($ab) => $ab->getId()?->toBase32(),
+                    $membership->getAssignedBuildings()->toArray()
+                );
+                $buildings = array_values(array_filter(
+                    $buildings,
+                    fn (array $b) => in_array($b['id'], $allowedIds, true)
+                ));
+            }
+        }
+
         return $this->json([
-            'data' => $this->farmService->getBuildingsForFarm($farm, $onlyActive),
+            'data' => $buildings,
         ]);
     }
 

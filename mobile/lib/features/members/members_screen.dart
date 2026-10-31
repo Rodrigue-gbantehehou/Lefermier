@@ -4,6 +4,7 @@ import '../../core/models/member.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/brand_loader.dart';
+import '../buildings/buildings_provider.dart';
 import 'members_provider.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
@@ -481,6 +482,40 @@ class _MemberCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (!member.isOwner) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Icon(
+                        member.assignedBuildingNames.isNotEmpty
+                            ? Icons.home_work_rounded
+                            : Icons.all_inclusive_rounded,
+                        size: 11,
+                        color: member.assignedBuildingNames.isNotEmpty
+                            ? AppColors.accent
+                            : AppColors.textMutedLight,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          member.assignedBuildingNames.isNotEmpty
+                              ? member.assignedBuildingNames.join(', ')
+                              : "Tous les bâtiments",
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: member.assignedBuildingNames.isNotEmpty
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: member.assignedBuildingNames.isNotEmpty
+                                ? AppColors.accent
+                                : AppColors.textMutedLight,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -538,6 +573,7 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final Set<String> _selectedBuildingIds = {};
   String _selectedRole = 'MANAGER';
 
   @override
@@ -563,6 +599,7 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
           phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
           role: _selectedRole,
           password: _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : null,
+          buildingIds: _selectedBuildingIds.isEmpty ? null : _selectedBuildingIds.toList(),
         );
 
     if (success && mounted) {
@@ -580,6 +617,7 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = ref.watch(membersProvider);
+    final buildingsState = ref.watch(buildingsProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -650,6 +688,86 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
                   if (val != null) setState(() => _selectedRole = val);
                 },
               ),
+              const SizedBox(height: 14),
+
+              // Poulaillers / Bâtiments assignés
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Poulaillers assignés", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(
+                    _selectedBuildingIds.isEmpty ? "Tous les bâtiments" : "${_selectedBuildingIds.length} assigné(s)",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _selectedBuildingIds.isEmpty ? AppColors.textMutedLight : AppColors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "L'ouvrier n'aura accès qu'aux bandes et saisies de ces poulaillers.",
+                style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+              ),
+              const SizedBox(height: 8),
+              if (buildingsState.buildings.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : AppColors.backgroundLight,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                  ),
+                  child: const Text(
+                    "Aucun poulailler enregistré. Le membre aura accès à tous les futurs poulaillers.",
+                    style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    FilterChip(
+                      label: const Text("Tous"),
+                      selected: _selectedBuildingIds.isEmpty,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _selectedBuildingIds.clear());
+                      },
+                      selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                      labelStyle: TextStyle(
+                        color: _selectedBuildingIds.isEmpty ? AppColors.primary : null,
+                        fontWeight: _selectedBuildingIds.isEmpty ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    ...buildingsState.buildings.map((b) {
+                      final isSelected = _selectedBuildingIds.contains(b.id);
+                      return FilterChip(
+                        avatar: Icon(b.type.icon, size: 13, color: isSelected ? AppColors.primary : AppColors.textMutedLight),
+                        label: Text(b.name),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedBuildingIds.add(b.id);
+                            } else {
+                              _selectedBuildingIds.remove(b.id);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                        labelStyle: TextStyle(
+                          color: isSelected ? AppColors.primary : null,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 11.5,
+                        ),
+                      );
+                    }),
+                  ],
+                ),
               const SizedBox(height: 14),
 
               // Prénom & Nom
@@ -776,12 +894,14 @@ class _EditMemberModal extends ConsumerStatefulWidget {
 class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
   late String _role;
   late bool _isActive;
+  late Set<String> _selectedBuildingIds;
 
   @override
   void initState() {
     super.initState();
     _role = widget.member.role.code;
     _isActive = widget.member.isActive;
+    _selectedBuildingIds = widget.member.assignedBuildingIds.toSet();
   }
 
   Future<void> _submit() async {
@@ -792,6 +912,7 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
           membershipId: widget.member.id,
           role: _role,
           isActive: _isActive,
+          buildingIds: _selectedBuildingIds.toList(),
         );
 
     if (success && mounted) {
@@ -809,6 +930,7 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = ref.watch(membersProvider);
+    final buildingsState = ref.watch(buildingsProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -875,6 +997,86 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
               if (val != null) setState(() => _role = val);
             },
           ),
+          const SizedBox(height: 14),
+
+          // Poulaillers / Bâtiments assignés
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Poulaillers assignés", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                _selectedBuildingIds.isEmpty ? "Tous les bâtiments" : "${_selectedBuildingIds.length} assigné(s)",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _selectedBuildingIds.isEmpty ? AppColors.textMutedLight : AppColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "L'ouvrier n'aura accès qu'aux bandes et saisies de ces poulaillers.",
+            style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+          ),
+          const SizedBox(height: 8),
+          if (buildingsState.buildings.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.backgroundLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+              ),
+              child: const Text(
+                "Aucun poulailler enregistré. Le membre a accès à tous les futurs poulaillers.",
+                style: TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                FilterChip(
+                  label: const Text("Tous"),
+                  selected: _selectedBuildingIds.isEmpty,
+                  onSelected: (selected) {
+                    if (selected) setState(() => _selectedBuildingIds.clear());
+                  },
+                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                  labelStyle: TextStyle(
+                    color: _selectedBuildingIds.isEmpty ? AppColors.primary : null,
+                    fontWeight: _selectedBuildingIds.isEmpty ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 11.5,
+                  ),
+                ),
+                ...buildingsState.buildings.map((b) {
+                  final isSelected = _selectedBuildingIds.contains(b.id);
+                  return FilterChip(
+                    avatar: Icon(b.type.icon, size: 13, color: isSelected ? AppColors.primary : AppColors.textMutedLight),
+                    label: Text(b.name),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedBuildingIds.add(b.id);
+                        } else {
+                          _selectedBuildingIds.remove(b.id);
+                        }
+                      });
+                    },
+                    selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                    labelStyle: TextStyle(
+                      color: isSelected ? AppColors.primary : null,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 11.5,
+                    ),
+                  );
+                }),
+              ],
+            ),
           const SizedBox(height: 14),
 
           // Statut Actif

@@ -82,9 +82,13 @@ class FlockNotifier extends StateNotifier<FlockState> {
       );
 
       final rawList = response.data['data'] as List<dynamic>? ?? [];
-      final flocks = rawList
+      final allFlocks = rawList
           .map((item) => Flock.fromJson(item as Map<String, dynamic>))
           .toList();
+
+      final flocks = activeFarm.hasBuildingRestrictions
+          ? allFlocks.where((f) => activeFarm.isBuildingAssigned(f.buildingId)).toList()
+          : allFlocks;
 
       int totalBirds = 0;
       int totalInitial = 0;

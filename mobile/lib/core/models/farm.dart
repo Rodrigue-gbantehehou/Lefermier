@@ -31,6 +31,10 @@ class Farm {
   /// `null` si l'API n'a pas transmis la matrice (ancienne réponse) → repli sur les règles de rôle.
   final List<String>? permissions;
 
+  /// IDs des bâtiments/poulaillers assignés au membre connecté.
+  /// `null` ou vide signifie qu'aucune restriction n'est appliquée (accès à tous les bâtiments).
+  final List<String>? assignedBuildingIds;
+
   const Farm({
     required this.id,
     required this.name,
@@ -43,6 +47,7 @@ class Farm {
     this.planName,
     this.modules = const [],
     this.permissions,
+    this.assignedBuildingIds,
   });
 
   factory Farm.fromJson(Map<String, dynamic> json) {
@@ -54,6 +59,14 @@ class Farm {
 
     final rawPermissions = json['permissions'];
     final parsedPermissions = rawPermissions is List ? rawPermissions.map((p) => p.toString()).toList() : null;
+
+    final rawAssignedBuildings = json['assignedBuildingIds'] ?? json['assignedBuildings'];
+    final parsedAssignedBuildings = rawAssignedBuildings is List
+        ? rawAssignedBuildings
+            .map((b) => b is Map ? (b['id'] ?? '').toString() : b.toString())
+            .where((s) => s.isNotEmpty)
+            .toList()
+        : null;
 
     return Farm(
       id: json['id'] as String,
@@ -67,6 +80,7 @@ class Farm {
       planName: subscription['planName'] as String?,
       modules: parsedModules,
       permissions: parsedPermissions,
+      assignedBuildingIds: parsedAssignedBuildings,
     );
   }
 
@@ -79,6 +93,7 @@ class Farm {
     'currency': currency,
     'role': role,
     'permissions': permissions,
+    'assignedBuildingIds': assignedBuildingIds,
     'subscription': {
       'plan': plan,
       'planName': planName,
@@ -98,6 +113,18 @@ class Farm {
 
   /// Propriétaire ou Administrateur avec pleins pouvoirs
   bool get isOwner => _role == 'OWNER' || _role == 'ADMIN';
+
+  /// Indique si l'utilisateur connecté a des restrictions sur des bâtiments spécifiques
+  bool get hasBuildingRestrictions =>
+      !isOwner && assignedBuildingIds != null && assignedBuildingIds!.isNotEmpty;
+
+  /// Vérifie si un bâtiment / poulailler est accessible pour l'utilisateur connecté dans cette ferme.
+  /// Si l'utilisateur est propriétaire ou si aucune restriction n'est définie, tous les bâtiments sont accessibles.
+  bool isBuildingAssigned(String? buildingId) {
+    if (!hasBuildingRestrictions) return true;
+    if (buildingId == null) return false;
+    return assignedBuildingIds!.contains(buildingId);
+  }
 
   /// Vérifie un droit : matrice serveur (rôle ∩ abonnement) si disponible, sinon règles de rôle par défaut.
   bool hasPermission(String permission) {

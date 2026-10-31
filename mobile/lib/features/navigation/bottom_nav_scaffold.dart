@@ -93,8 +93,14 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       priorityOrder = ['finance', 'inventory', 'health', 'reports', 'eggs'];
     }
 
+    final canFinance = farm == null ? true : farm.canViewFinance;
+    final canInventory = farm == null ? true : farm.canViewInventory;
+    final canHealth = farm == null ? true : farm.canViewHealth;
+    final canReports = farm == null ? true : farm.canViewReports;
+    final canEggs = farm == null ? true : farm.canViewEggs;
+
     final candidates = <String, _NavDestination>{
-      if (farm?.canViewFinance == true)
+      if (canFinance)
         'finance': _NavDestination(
           key: 'finance',
           label: "Caisse",
@@ -102,7 +108,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.account_balance_wallet_rounded,
           screenBuilder: (openMenu) => FinancesScreen(onOpenMenu: openMenu),
         ),
-      if (farm?.canViewInventory == true)
+      if (canInventory)
         'inventory': _NavDestination(
           key: 'inventory',
           label: "Stocks",
@@ -110,7 +116,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.inventory_2_rounded,
           screenBuilder: (openMenu) => InventoryScreen(onOpenMenu: openMenu),
         ),
-      if (farm?.canViewHealth == true)
+      if (canHealth)
         'health': _NavDestination(
           key: 'health',
           label: "Santé",
@@ -118,7 +124,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.medical_services_rounded,
           screenBuilder: (openMenu) => HealthScreen(onOpenMenu: openMenu),
         ),
-      if (farm?.canViewReports == true)
+      if (canReports)
         'reports': _NavDestination(
           key: 'reports',
           label: "Rapports",
@@ -126,7 +132,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           activeIcon: Icons.bar_chart_rounded,
           screenBuilder: (openMenu) => ReportsScreen(onOpenMenu: openMenu),
         ),
-      if (farm?.canViewEggs == true)
+      if (canEggs)
         'eggs': _NavDestination(
           key: 'eggs',
           label: "Ponte",

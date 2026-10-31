@@ -79,9 +79,13 @@ class BuildingsNotifier extends StateNotifier<BuildingsState> {
       );
 
       final rawList = response.data['data'] as List<dynamic>? ?? [];
-      final buildings = rawList
+      final allBuildings = rawList
           .map((item) => Building.fromJson(item as Map<String, dynamic>))
           .toList();
+
+      final buildings = activeFarm.hasBuildingRestrictions
+          ? allBuildings.where((b) => activeFarm.isBuildingAssigned(b.id)).toList()
+          : allBuildings;
 
       state = state.copyWith(
         isLoading: false,

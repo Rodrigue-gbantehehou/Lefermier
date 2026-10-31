@@ -7,6 +7,8 @@ namespace App\Entity;
 use App\Enum\FarmRole;
 use App\Repository\FarmMembershipRepository;
 use App\Security\Permission;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UlidType;
@@ -37,6 +39,15 @@ class FarmMembership
     #[ORM\JoinColumn(name: 'role_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?Role $roleDefinition = null;
 
+    /**
+     * @var Collection<int, Building>
+     */
+    #[ORM\ManyToMany(targetEntity: Building::class)]
+    #[ORM\JoinTable(name: 'farm_membership_buildings')]
+    #[ORM\JoinColumn(name: 'farm_membership_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'building_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Collection $assignedBuildings;
+
     #[ORM\Column(type: Types::BOOLEAN)]
     private bool $isActive = true;
 
@@ -57,6 +68,7 @@ class FarmMembership
         $this->user = $user;
         $this->role = $role;
         $this->roleDefinition = $roleDefinition;
+        $this->assignedBuildings = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -108,6 +120,63 @@ class FarmMembership
     {
         $this->roleDefinition = $roleDefinition;
         return $this;
+    }
+
+    /**
+     * @return Collection<int, Building>
+     */
+    public function getAssignedBuildings(): Collection
+    {
+        return $this->assignedBuildings;
+    }
+
+    public function addAssignedBuilding(Building $building): self
+    {
+        if (!$this->assignedBuildings->contains($building)) {
+            $this->assignedBuildings->add($building);
+        }
+
+        return $this;
+    }
+
+    public function removeAssignedBuilding(Building $building): self
+    {
+        $this->assignedBuildings->removeElement($building);
+
+        return $this;
+    }
+
+    public function clearAssignedBuildings(): self
+    {
+        $this->assignedBuildings->clear();
+
+        return $this;
+    }
+
+    public function isBuildingAssigned(?Building $building): bool
+    {
+        if ($this->role === FarmRole::OWNER || $this->role === FarmRole::ADMIN || $this->role === FarmRole::MANAGER) {
+            return true;
+        }
+
+        if ($this->assignedBuildings->isEmpty()) {
+            return true;
+        }
+
+        if ($building === null) {
+            return false;
+        }
+
+        return $this->assignedBuildings->contains($building);
+    }
+
+    public function hasBuildingRestrictions(): bool
+    {
+        if ($this->role === FarmRole::OWNER || $this->role === FarmRole::ADMIN || $this->role === FarmRole::MANAGER) {
+            return false;
+        }
+
+        return !$this->assignedBuildings->isEmpty();
     }
 
     public function hasPermission(string $permission): bool

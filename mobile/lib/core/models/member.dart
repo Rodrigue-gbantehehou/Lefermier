@@ -35,6 +35,8 @@ class FarmMember {
   final String? phone;
   final MemberRole role;
   final List<String> permissions;
+  final List<String> assignedBuildingIds;
+  final List<String> assignedBuildingNames;
   final bool isActive;
   final bool isOwner;
   final DateTime? createdAt;
@@ -49,6 +51,8 @@ class FarmMember {
     this.phone,
     required this.role,
     this.permissions = const [],
+    this.assignedBuildingIds = const [],
+    this.assignedBuildingNames = const [],
     this.isActive = true,
     this.isOwner = false,
     this.createdAt,
@@ -56,6 +60,21 @@ class FarmMember {
 
   factory FarmMember.fromJson(Map<String, dynamic> json) {
     final permissionsRaw = json['permissions'] as List<dynamic>? ?? [];
+    final assignedRaw = json['assignedBuildings'] as List<dynamic>? ?? [];
+    final assignedIdsRaw = json['assignedBuildingIds'] as List<dynamic>? ?? [];
+
+    final parsedNames = assignedRaw
+        .map((b) => b is Map ? (b['name'] ?? '').toString() : '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+
+    final parsedIds = assignedIdsRaw.isNotEmpty
+        ? assignedIdsRaw.map((id) => id.toString()).toList()
+        : assignedRaw
+            .map((b) => b is Map ? (b['id'] ?? '').toString() : b.toString())
+            .where((id) => id.isNotEmpty)
+            .toList();
+
     return FarmMember(
       id: json['id'] as String? ?? '',
       userId: json['userId'] as String?,
@@ -67,6 +86,8 @@ class FarmMember {
       phone: json['phone'] as String?,
       role: MemberRole.fromCode(json['role'] as String?),
       permissions: permissionsRaw.map((p) => p.toString()).toList(),
+      assignedBuildingIds: parsedIds,
+      assignedBuildingNames: parsedNames,
       isActive: json['isActive'] as bool? ?? true,
       isOwner: json['isOwner'] as bool? ?? (json['role'] == 'OWNER'),
       createdAt: json['createdAt'] != null

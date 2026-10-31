@@ -141,6 +141,10 @@ class AuthService
                     'role' => $membership->getRole()->value,
                     'roleName' => $membership->getRoleDefinition()?->getName() ?? $membership->getRole()->value,
                     'permissions' => $effectivePermissions,
+                    'assignedBuildingIds' => array_values(array_map(
+                        fn($b) => $b->getId()?->toBase32(),
+                        $membership->getAssignedBuildings()->toArray()
+                    )),
                     'subscription' => [
                         'plan' => $planSku,
                         'planName' => $plan['name'] ?? $planSku,

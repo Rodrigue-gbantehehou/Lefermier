@@ -54,11 +54,11 @@ class QuickActionSheet extends ConsumerWidget {
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
 
     // Filtres d'actions selon l'abonnement de la ferme et le rôle utilisateur
-    final canEgg = farm == null || farm.canCreateEggs;
-    final canFeed = farm == null || farm.canFeed;
-    final canFinance = farm == null || farm.canCreateFinance;
-    final canHealth = farm == null || farm.canManageHealth;
-    final canMovement = farm == null || farm.canRecordFlockMovement;
+    final canEgg = farm != null && farm.canCreateEggs;
+    final canFeed = farm != null && farm.canFeed;
+    final canFinance = farm != null && farm.canCreateFinance;
+    final canHealth = farm != null && farm.canManageHealth;
+    final canMovement = farm != null && farm.canRecordFlockMovement;
 
     final hasAnyAction = canEgg || canFeed || canFinance || canHealth || canMovement;
 

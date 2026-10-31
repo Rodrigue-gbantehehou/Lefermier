@@ -105,6 +105,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
     String? phone,
     required String role,
     String? password,
+    List<String>? buildingIds,
   }) async {
     final activeFarm = _ref.read(authProvider).activeFarm;
     if (activeFarm == null) return false;
@@ -119,6 +120,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
         if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
         'role': role,
         if (password != null && password.trim().isNotEmpty) 'password': password.trim(),
+        if (buildingIds != null) 'buildingIds': buildingIds,
       };
 
       await _apiClient.dio.post(
@@ -146,6 +148,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
     required String membershipId,
     required String role,
     required bool isActive,
+    List<String>? buildingIds,
   }) async {
     final activeFarm = _ref.read(authProvider).activeFarm;
     if (activeFarm == null) return false;
@@ -156,6 +159,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
       final payload = {
         'role': role,
         'isActive': isActive,
+        if (buildingIds != null) 'buildingIds': buildingIds,
       };
 
       await _apiClient.dio.put(

@@ -20,4 +20,10 @@ class UpdateMemberRequestDto
      * Statut actif/inactif du membre sur l'exploitation.
      */
     public ?bool $isActive = null;
+
+    /**
+     * Identifiants des poulaillers / bâtiments assignés (null = inchangé, vide = tous les bâtiments).
+     * @var array<string>|null
+     */
+    public ?array $buildingIds = null;
 }

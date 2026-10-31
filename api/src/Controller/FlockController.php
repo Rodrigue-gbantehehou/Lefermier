@@ -22,6 +22,7 @@ use App\Service\PdfService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use App\Repository\FarmMembershipRepository;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -33,6 +34,7 @@ class FlockController extends AbstractController
     public function __construct(
         private readonly FlockService $flockService,
         private readonly FlockRepository $flockRepository,
+        private readonly FarmMembershipRepository $membershipRepository,
         private readonly TransactionRepository $transactionRepository,
         private readonly EggProductionRepository $eggProductionRepository,
         private readonly PdfService $pdfService,
@@ -53,6 +55,15 @@ class FlockController extends AbstractController
         }
 
         $flocks = $this->flockRepository->findByFarm($farm, $status);
+
+        $currentUser = $this->getUser();
+        if ($currentUser instanceof User) {
+            $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser]);
+            if ($membership !== null && $membership->hasBuildingRestrictions()) {
+                $flocks = array_values(array_filter($flocks, fn (Flock $f) => $membership->isBuildingAssigned($f->getBuilding())));
+            }
+        }
+
         $serialized = array_map(fn (Flock $f) => $this->flockService->serializeFlock($f), $flocks);
 
         return $this->json([

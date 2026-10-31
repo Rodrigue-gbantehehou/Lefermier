@@ -38,4 +38,10 @@ class CreateMemberRequestDto
      */
     #[Assert\Length(min: 6, minMessage: 'Le mot de passe doit comporter au moins 6 caractères.')]
     public ?string $password = null;
+
+    /**
+     * Identifiants des poulaillers / bâtiments assignés (null ou vide = tous les bâtiments).
+     * @var array<string>|null
+     */
+    public ?array $buildingIds = null;
 }

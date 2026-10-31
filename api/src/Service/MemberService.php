@@ -11,12 +11,15 @@ use App\Entity\FarmMembership;
 use App\Entity\Role;
 use App\Entity\User;
 use App\Enum\FarmRole;
+use App\Entity\Building;
+use App\Repository\BuildingRepository;
 use App\Repository\FarmMembershipRepository;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Uid\Ulid;
 
 class MemberService
 {
@@ -25,6 +28,7 @@ class MemberService
         private readonly FarmMembershipRepository $membershipRepository,
         private readonly UserRepository $userRepository,
         private readonly RoleRepository $roleRepository,
+        private readonly BuildingRepository $buildingRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
     ) {
     }
@@ -90,6 +94,21 @@ class MemberService
 
         // 4. Créer l'association FarmMembership
         $membership = new FarmMembership($farm, $user, $roleEnum, $roleDefinition);
+
+        if (!empty($dto->buildingIds)) {
+            foreach ($dto->buildingIds as $bId) {
+                try {
+                    $ulid = Ulid::fromString((string) $bId);
+                    $building = $this->buildingRepository->find($ulid);
+                } catch (\Throwable) {
+                    $building = $this->buildingRepository->find($bId);
+                }
+                if ($building instanceof Building && $building->getFarm()->getId()?->toRfc4122() === $farm->getId()?->toRfc4122()) {
+                    $membership->addAssignedBuilding($building);
+                }
+            }
+        }
+
         $this->entityManager->persist($membership);
         $this->entityManager->flush();
 
@@ -120,6 +139,21 @@ class MemberService
             $membership->setIsActive($dto->isActive);
         }
 
+        if ($dto->buildingIds !== null) {
+            $membership->clearAssignedBuildings();
+            foreach ($dto->buildingIds as $bId) {
+                try {
+                    $ulid = Ulid::fromString((string) $bId);
+                    $building = $this->buildingRepository->find($ulid);
+                } catch (\Throwable) {
+                    $building = $this->buildingRepository->find($bId);
+                }
+                if ($building instanceof Building && $building->getFarm()->getId()?->toRfc4122() === $membership->getFarm()->getId()?->toRfc4122()) {
+                    $membership->addAssignedBuilding($building);
+                }
+            }
+        }
+
         $this->entityManager->flush();
 
         return $membership;
@@ -143,6 +177,16 @@ class MemberService
         $user = $membership->getUser();
         $roleDef = $membership->getRoleDefinition();
 
+        $assignedBuildings = [];
+        foreach ($membership->getAssignedBuildings() as $b) {
+            $assignedBuildings[] = [
+                'id' => $b->getId()?->toBase32(),
+                'name' => $b->getName(),
+                'type' => $b->getType()->value,
+                'capacity' => $b->getCapacity(),
+            ];
+        }
+
         return [
             'id' => $membership->getId()?->toRfc4122(),
             'userId' => $user->getId()?->toRfc4122(),
@@ -159,6 +203,8 @@ class MemberService
                 'isSystem' => $roleDef->isSystem(),
                 'permissions' => $roleDef->getPermissions(),
             ] : null,
+            'assignedBuildings' => $assignedBuildings,
+            'assignedBuildingIds' => array_map(fn($ab) => $ab['id'], $assignedBuildings),
             'permissions' => $membership->getPermissions(),
             'isActive' => $membership->isActive(),
             'isOwner' => $membership->getRole() === FarmRole::OWNER,
