@@ -4,6 +4,7 @@ import 'core/api/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/auth/auth_provider.dart';
+import 'features/auth/farm_onboarding_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/navigation/bottom_nav_scaffold.dart';
 import 'features/welcome/splash_screen.dart';
@@ -43,7 +44,11 @@ class LeFermierApp extends ConsumerWidget {
     if (authState.isLoading) {
       homeWidget = const SplashScreen();
     } else if (authState.isAuthenticated) {
-      homeWidget = const BottomNavScaffold();
+      if (authState.farms.isEmpty) {
+        homeWidget = const FarmOnboardingScreen();
+      } else {
+        homeWidget = const BottomNavScaffold();
+      }
     } else if (!ApiClient().hasSeenWelcome) {
       homeWidget = const WelcomeScreen();
     } else {

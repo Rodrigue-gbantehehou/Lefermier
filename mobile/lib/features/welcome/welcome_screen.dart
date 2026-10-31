@@ -2,16 +2,28 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/login_screen.dart';
+import '../auth/register_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
-  Future<void> _continueTo(BuildContext context, int initialTab) async {
+  Future<void> _continueToLogin(BuildContext context) async {
     await ApiClient().setHasSeenWelcome(true);
     if (context.mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => LoginScreen(initialTab: initialTab),
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _continueToRegister(BuildContext context) async {
+    await ApiClient().setHasSeenWelcome(true);
+    if (context.mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const RegisterScreen(),
         ),
       );
     }
@@ -93,7 +105,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => _continueTo(context, 0),
+                        onPressed: () => _continueToLogin(context),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white.withValues(alpha: 0.8),
                           textStyle: const TextStyle(
@@ -164,7 +176,7 @@ class WelcomeScreen extends StatelessWidget {
 
                   // Bouton Principal : Créer mon exploitation
                   ElevatedButton(
-                    onPressed: () => _continueTo(context, 1),
+                    onPressed: () => _continueToRegister(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -196,7 +208,7 @@ class WelcomeScreen extends StatelessWidget {
 
                   // Bouton Secondaire : J'ai déjà un compte
                   OutlinedButton(
-                    onPressed: () => _continueTo(context, 0),
+                    onPressed: () => _continueToLogin(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: BorderSide(
