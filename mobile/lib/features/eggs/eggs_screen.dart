@@ -4,12 +4,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/egg_calculator.dart';
 import '../../core/models/flock.dart';
-import '../reports/reports_screen.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'egg_provider.dart';
 
 class EggsScreen extends ConsumerStatefulWidget {
-  const EggsScreen({super.key});
+  final VoidCallback? onOpenMenu;
+  const EggsScreen({super.key, this.onOpenMenu});
 
   @override
   ConsumerState<EggsScreen> createState() => _EggsScreenState();
@@ -436,12 +436,10 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: "Menu",
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: "Menu",
+          onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
         ),
         title: const Text("Ramassage d'œufs"),
         actions: [
@@ -453,17 +451,6 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: "Partager le rapport de ponte",
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ReportsScreen(initialType: ReportType.dailyEgg),
-                ),
-              );
-            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

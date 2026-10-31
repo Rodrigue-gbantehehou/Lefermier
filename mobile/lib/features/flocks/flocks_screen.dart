@@ -4,12 +4,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/models/flock.dart';
 import '../buildings/buildings_provider.dart';
-import '../reports/reports_screen.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'flock_provider.dart';
 
 class FlocksScreen extends ConsumerStatefulWidget {
-  const FlocksScreen({super.key});
+  final VoidCallback? onOpenMenu;
+  const FlocksScreen({super.key, this.onOpenMenu});
 
   @override
   ConsumerState<FlocksScreen> createState() => _FlocksScreenState();
@@ -612,12 +612,10 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: "Menu",
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: "Menu",
+          onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
         ),
         title: const Text("Bandes & Lots"),
         actions: [
@@ -629,17 +627,6 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: "Partager une synthèse",
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ReportsScreen(initialType: ReportType.flockSummary),
-                ),
-              );
-            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -958,29 +945,6 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                             ),
                                           ),
                                         ],
-                                      ),
-                                      InkWell(
-                                        onTap: () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => ReportsScreen(
-                                                initialType: ReportType.flockSummary,
-                                                initialFlockId: flock.id,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(6),
-                                          margin: const EdgeInsets.only(right: 6),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                                          ),
-                                          child: const Icon(Icons.share_rounded, size: 14, color: AppColors.primary),
-                                        ),
                                       ),
                                       InkWell(
                                         onTap: () => _openRecordMovementDialog(flockState.flocks, flock.id),

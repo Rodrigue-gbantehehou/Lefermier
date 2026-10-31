@@ -5,7 +5,6 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/models/inventory_item.dart';
 import '../flocks/flock_provider.dart';
-import '../reports/reports_screen.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'inventory_provider.dart';
 
@@ -680,17 +679,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: "Partager l'état des stocks",
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ReportsScreen(initialType: ReportType.inventoryAlerts),
-                ),
-              );
-            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

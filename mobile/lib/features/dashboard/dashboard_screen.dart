@@ -14,6 +14,7 @@ class DashboardScreen extends ConsumerWidget {
   final VoidCallback onNavigateToEggs;
   final VoidCallback onNavigateToFlocks;
   final VoidCallback onNavigateToFinances;
+  final VoidCallback? onOpenMenu;
 
   const DashboardScreen({
     super.key,
@@ -21,6 +22,7 @@ class DashboardScreen extends ConsumerWidget {
     required this.onNavigateToEggs,
     required this.onNavigateToFlocks,
     required this.onNavigateToFinances,
+    this.onOpenMenu,
   });
 
   @override
@@ -34,12 +36,10 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: "Menu",
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: "Menu",
+          onPressed: onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
         ),
         title: InkWell(
           onTap: () => FarmSelectionSheet.show(context),

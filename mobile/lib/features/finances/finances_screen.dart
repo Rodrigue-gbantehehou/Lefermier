@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
-import '../reports/reports_screen.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'finance_provider.dart';
 
 class FinancesScreen extends ConsumerStatefulWidget {
-  const FinancesScreen({super.key});
+  final VoidCallback? onOpenMenu;
+  const FinancesScreen({super.key, this.onOpenMenu});
 
   @override
   ConsumerState<FinancesScreen> createState() => _FinancesScreenState();
@@ -392,12 +392,10 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: "Menu",
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: "Menu",
+          onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
         ),
         title: const Text("Caisse & Finances"),
         actions: [
@@ -409,17 +407,6 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: "Partager le bilan financier",
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ReportsScreen(initialType: ReportType.financeBalance),
-                ),
-              );
-            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

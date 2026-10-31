@@ -47,5 +47,6 @@ void main() {
     expect(find.text('Bandes'), findsOneWidget);
     expect(find.text('Ponte'), findsOneWidget);
     expect(find.text('Caisse'), findsOneWidget);
+    expect(find.text('Menu'), findsOneWidget);
   });
 }

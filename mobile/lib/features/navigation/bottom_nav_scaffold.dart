@@ -20,10 +20,14 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
 
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
+
   void _onTabSelected(int index) {
     if (index == 4) {
       // 5e onglet : Ouvrir le Menu Drawer
-      _scaffoldKey.currentState?.openDrawer();
+      _openDrawer();
       return;
     }
 
@@ -97,10 +101,11 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         onNavigateToEggs: () => setState(() => _currentIndex = 2),
         onNavigateToFlocks: () => setState(() => _currentIndex = 1),
         onNavigateToFinances: () => setState(() => _currentIndex = 3),
+        onOpenMenu: _openDrawer,
       ),
-      const FlocksScreen(),
-      const EggsScreen(),
-      const FinancesScreen(),
+      FlocksScreen(onOpenMenu: _openDrawer),
+      EggsScreen(onOpenMenu: _openDrawer),
+      FinancesScreen(onOpenMenu: _openDrawer),
     ];
 
     // Sécurité d'index
@@ -188,6 +193,14 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                   activeIcon: Icons.account_balance_wallet_rounded,
                   label: "Caisse",
                 ),
+
+                // 5. Menu
+                _buildNavItem(
+                  index: 4,
+                  icon: Icons.menu_rounded,
+                  activeIcon: Icons.menu_rounded,
+                  label: "Menu",
+                ),
               ],
             ),
           ),
@@ -209,7 +222,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       onTap: () => _onTabSelected(index),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
