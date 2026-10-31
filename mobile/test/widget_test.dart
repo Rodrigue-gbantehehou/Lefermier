@@ -22,7 +22,7 @@ void main() {
     expect(find.text("J'ai déjà un compte"), findsOneWidget);
   });
 
-  testWidgets('LoginScreen smoke test - renders login and register link', (WidgetTester tester) async {
+  testWidgets('LoginScreen smoke test - renders login form', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
@@ -33,7 +33,7 @@ void main() {
 
     expect(find.text('Le Fermier'), findsOneWidget);
     expect(find.text('Connexion'), findsOneWidget);
-    expect(find.text('Créer un compte'), findsOneWidget);
+    expect(find.text('Se connecter'), findsOneWidget);
   });
 
   testWidgets('RegisterScreen smoke test - renders step 1 account form', (WidgetTester tester) async {
