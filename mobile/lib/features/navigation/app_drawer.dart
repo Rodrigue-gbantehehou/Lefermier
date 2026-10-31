@@ -11,6 +11,7 @@ import '../members/members_screen.dart';
 import '../sync/sync_provider.dart';
 import '../sync/sync_screen.dart';
 import '../subscriptions/subscription_screen.dart';
+import '../reports/reports_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -252,6 +253,18 @@ class AppDrawer extends ConsumerWidget {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                      );
+                    },
+                  ),
+
+                  // Module Rapports & Partage WhatsApp / SMS
+                  _DrawerItem(
+                    icon: Icons.share_rounded,
+                    label: "Rapports & Partage",
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ReportsScreen()),
                       );
                     },
                   ),

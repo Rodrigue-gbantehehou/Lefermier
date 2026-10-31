@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/egg_calculator.dart';
 import '../../core/models/flock.dart';
+import '../reports/reports_screen.dart';
 import 'egg_provider.dart';
 
 class EggsScreen extends ConsumerStatefulWidget {
@@ -455,6 +456,17 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: "Partager le rapport de ponte",
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ReportsScreen(initialType: ReportType.dailyEgg),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

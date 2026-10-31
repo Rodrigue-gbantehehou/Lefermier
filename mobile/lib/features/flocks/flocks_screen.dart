@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/models/flock.dart';
 import '../buildings/buildings_provider.dart';
+import '../reports/reports_screen.dart';
 import 'flock_provider.dart';
 
 class FlocksScreen extends ConsumerStatefulWidget {
@@ -637,6 +638,17 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
           ),
           IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: "Partager une synthèse",
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ReportsScreen(initialType: ReportType.flockSummary),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: "Actualiser",
             onPressed: () => ref.read(flockProvider.notifier).loadFlocks(),
@@ -953,6 +965,29 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                             ),
                                           ),
                                         ],
+                                      ),
+                                      InkWell(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => ReportsScreen(
+                                                initialType: ReportType.flockSummary,
+                                                initialFlockId: flock.id,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          margin: const EdgeInsets.only(right: 6),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                          ),
+                                          child: const Icon(Icons.share_rounded, size: 14, color: AppColors.primary),
+                                        ),
                                       ),
                                       InkWell(
                                         onTap: () => _openRecordMovementDialog(flockState.flocks, flock.id),
