@@ -4,9 +4,13 @@ import '../../core/theme/app_theme.dart';
 import '../auth/auth_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../dashboard/quick_action_sheet.dart';
-import '../flocks/flocks_screen.dart';
 import '../eggs/eggs_screen.dart';
+import '../eggs/record_egg_modal.dart';
 import '../finances/finances_screen.dart';
+import '../finances/record_transaction_modal.dart';
+import '../flocks/flocks_screen.dart';
+import '../flocks/record_movement_modal.dart';
+import '../inventory/record_feeding_modal.dart';
 import 'app_drawer.dart';
 
 class BottomNavScaffold extends ConsumerStatefulWidget {
@@ -41,45 +45,11 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   void _openQuickActions() {
     QuickActionSheet.show(
       context,
-      onRecordEgg: () {
-        setState(() => _currentIndex = 2);
-      },
-      onRecordFeeding: () {
-        setState(() => _currentIndex = 1);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Enregistrement de la distribution d'aliment..."),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      },
-      onRecordMovement: () {
-        setState(() => _currentIndex = 1);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Enregistrement mortalité / pesée..."),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      },
-      onRecordIncome: () {
-        setState(() => _currentIndex = 3);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Nouvelle recette de vente enregistrée"),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      },
-      onRecordExpense: () {
-        setState(() => _currentIndex = 3);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Nouvelle dépense enregistrée"),
-            backgroundColor: AppColors.accent,
-          ),
-        );
-      },
+      onRecordEgg: () => RecordEggModal.show(context),
+      onRecordFeeding: () => RecordFeedingModal.show(context),
+      onRecordMovement: () => RecordMovementModal.show(context),
+      onRecordIncome: () => RecordTransactionModal.show(context, initialType: "INCOME"),
+      onRecordExpense: () => RecordTransactionModal.show(context, initialType: "EXPENSE"),
     );
   }
 

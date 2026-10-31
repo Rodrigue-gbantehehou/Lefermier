@@ -5,8 +5,11 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
-import '../sync/sync_status_badge.dart';
 import '../../core/widgets/brand_loader.dart';
+import '../sync/sync_status_badge.dart';
+import '../eggs/record_egg_modal.dart';
+import '../inventory/record_feeding_modal.dart';
+import '../flocks/record_movement_modal.dart';
 import 'dashboard_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -112,115 +115,35 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Bannière Hero de bienvenue chaleureuse
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: isDark
-                              ? [
-                                  AppColors.surfaceDark,
-                                  const Color(0xFF132A20),
-                                ]
-                              : [
-                                  const Color(0xFF047857),
-                                  const Color(0xFF059669),
-                                  const Color(0xFF10B981),
-                                ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.25),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.18),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.agriculture_rounded,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        "Bonjour 👋",
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: -0.3,
-                                        ),
-                                      ),
-                                      Text(
-                                        authState.activeFarm?.name ?? "Mon exploitation avicole",
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white.withValues(alpha: 0.88),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                    // En-tête sobre et épuré : Date du jour et synchronisation
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
                               ),
-                              const SyncStatusBadge(),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(12),
+                              child: const Icon(Icons.today_rounded, size: 16, color: AppColors.primary),
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.egg_alt_rounded,
-                                  size: 16,
-                                  color: AppColors.accentLight,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    kpi.todayGoodEggs > 0
-                                        ? "${kpi.todayGoodEggs} œufs ramassés aujourd'hui (${kpi.todayTraysCount} plateaux)"
-                                        : "Prêt pour les enregistrements du jour",
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatCurrentDate(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SyncStatusBadge(),
+                      ],
                     ),
+                    const SizedBox(height: 12),
 
                     // KPI 2x2 Grid dynamique aux teintes chaleureuses
                     GridView.count(
@@ -402,18 +325,63 @@ class DashboardScreen extends ConsumerWidget {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    "Mortalité: ${flock.calculatedMortalityRate.toStringAsFixed(1)}% (${flock.deathsCount} perte(s))",
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                                  ),
-                                  OutlinedButton.icon(
-                                    onPressed: flock.isLayer ? onNavigateToEggs : onNavigateToFlocks,
-                                    icon: Icon(flock.isLayer ? Icons.egg_outlined : Icons.remove_circle_outline, size: 14),
-                                    label: Text(flock.isLayer ? "Collecte" : "Mouvement"),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                  Expanded(
+                                    child: Text(
+                                      "Mortalité : ${flock.calculatedMortalityRate.toStringAsFixed(1)}% (${flock.deathsCount} perte)",
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (flock.isLayer) ...[
+                                        // Bouton Collecter (ouvre directement la modale de ponte)
+                                        OutlinedButton.icon(
+                                          onPressed: () => RecordEggModal.show(context, defaultFlockId: flock.id),
+                                          icon: const Icon(Icons.egg_rounded, size: 14, color: AppColors.accent),
+                                          label: const Text("Collecte"),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.accent,
+                                            side: BorderSide(color: AppColors.accent.withValues(alpha: 0.5)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                            visualDensity: VisualDensity.compact,
+                                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      // Bouton Nourrir (ouvre directement la modale de distribution d'aliment)
+                                      ElevatedButton.icon(
+                                        onPressed: () => RecordFeedingModal.show(context, defaultFlockId: flock.id),
+                                        icon: const Icon(Icons.restaurant_rounded, size: 14, color: Colors.white),
+                                        label: const Text("Nourrir"),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          foregroundColor: Colors.white,
+                                          elevation: 1,
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                          visualDensity: VisualDensity.compact,
+                                          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      if (!flock.isLayer) ...[
+                                        const SizedBox(width: 6),
+                                        OutlinedButton.icon(
+                                          onPressed: () => RecordMovementModal.show(context, defaultFlockId: flock.id),
+                                          icon: const Icon(Icons.remove_circle_outline, size: 14, color: AppColors.danger),
+                                          label: const Text("Perte"),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.danger,
+                                            side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                            visualDensity: VisualDensity.compact,
+                                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
@@ -428,6 +396,17 @@ class DashboardScreen extends ConsumerWidget {
               ),
       ),
     );
+  }
+
+  String _formatCurrentDate() {
+    final now = DateTime.now();
+    const months = [
+      "janvier", "février", "mars", "avril", "mai", "juin",
+      "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ];
+    const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+    final dayName = days[now.weekday - 1];
+    return "$dayName ${now.day} ${months[now.month - 1]} ${now.year}";
   }
 }
 
