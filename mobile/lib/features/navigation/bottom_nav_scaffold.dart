@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../auth/auth_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../dashboard/quick_action_sheet.dart';
 import '../eggs/eggs_screen.dart';
@@ -29,8 +28,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   }
 
   void _onTabSelected(int index) {
-    if (index == 4) {
-      // 5e onglet : Ouvrir le Menu Drawer
+    if (index == 3) {
+      // 4e élément : Ouvrir le Menu Drawer
       _openDrawer();
       return;
     }
@@ -55,26 +54,24 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final farm = authState.activeFarm;
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final navBgColor = isDark ? AppColors.surfaceDark : Colors.white;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-
-    // Détermination adaptative des onglets selon l'offre et les droits
-    final bool canEgg = farm == null || farm.canViewEggs;
+    final navBgColor = isDark ? AppColors.navBarDark : AppColors.navBarLight;
 
     final screens = [
       DashboardScreen(
         onOpenQuickActions: _openQuickActions,
-        onNavigateToEggs: () => setState(() => _currentIndex = 2),
+        onNavigateToEggs: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const EggsScreen(),
+            ),
+          );
+        },
         onNavigateToFlocks: () => setState(() => _currentIndex = 1),
-        onNavigateToFinances: () => setState(() => _currentIndex = 3),
+        onNavigateToFinances: () => setState(() => _currentIndex = 2),
         onOpenMenu: _openDrawer,
       ),
       FlocksScreen(onOpenMenu: _openDrawer),
-      EggsScreen(onOpenMenu: _openDrawer),
       FinancesScreen(onOpenMenu: _openDrawer),
     ];
 
@@ -98,82 +95,72 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       floatingActionButton: FloatingActionButton(
         heroTag: 'fab_nav_center',
         onPressed: _openQuickActions,
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.accentLight,
         foregroundColor: Colors.white,
         elevation: 6,
         shape: const CircleBorder(),
+        tooltip: "Actions rapides",
         child: const Icon(Icons.add_rounded, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: navBgColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
-          ],
-          border: Border(
-            top: BorderSide(color: borderColor, width: 1),
-          ),
-        ),
+      bottomNavigationBar: BottomAppBar(
+        elevation: 10,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
+        color: navBgColor,
+        notchMargin: 6,
+        shape: const CircularNotchedRectangle(),
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        height: 64,
         child: SafeArea(
           top: false,
-          child: BottomAppBar(
-            elevation: 0,
-            color: Colors.transparent,
-            notchMargin: 6,
-            shape: const CircularNotchedRectangle(),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            height: 64,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                // 1. Accueil
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard_rounded,
-                  label: "Accueil",
+          child: Row(
+            children: [
+              // Bloc gauche : 2 onglets parfaitement espacés
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(
+                      index: 0,
+                      icon: Icons.dashboard_outlined,
+                      activeIcon: Icons.dashboard_rounded,
+                      label: "Accueil",
+                    ),
+                    _buildNavItem(
+                      index: 1,
+                      icon: Icons.pets_outlined,
+                      activeIcon: Icons.pets_rounded,
+                      label: "Bandes",
+                    ),
+                  ],
                 ),
-                // 2. Bandes
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.pets_outlined,
-                  activeIcon: Icons.pets_rounded,
-                  label: "Bandes",
-                ),
+              ),
 
-                // Espace pour le FAB central
-                const SizedBox(width: 48),
+              // Espace central pour le FAB encastré
+              const SizedBox(width: 56),
 
-                // 3. Ponte
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.egg_outlined,
-                  activeIcon: Icons.egg_rounded,
-                  label: canEgg ? "Ponte" : "Soins",
+              // Bloc droit : 2 onglets parfaitement espacés
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(
+                      index: 2,
+                      icon: Icons.account_balance_wallet_outlined,
+                      activeIcon: Icons.account_balance_wallet_rounded,
+                      label: "Caisse",
+                    ),
+                    _buildNavItem(
+                      index: 3,
+                      icon: Icons.menu_rounded,
+                      activeIcon: Icons.menu_rounded,
+                      label: "Menu",
+                    ),
+                  ],
                 ),
-
-                // 4. Caisse & Ventes
-                _buildNavItem(
-                  index: 3,
-                  icon: Icons.account_balance_wallet_outlined,
-                  activeIcon: Icons.account_balance_wallet_rounded,
-                  label: "Caisse",
-                ),
-
-                // 5. Menu
-                _buildNavItem(
-                  index: 4,
-                  icon: Icons.menu_rounded,
-                  activeIcon: Icons.menu_rounded,
-                  label: "Menu",
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -187,40 +174,45 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     required String label,
   }) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? AppColors.primary : AppColors.textMutedLight;
+    final color = isSelected ? Colors.white : Colors.white.withValues(alpha: 0.70);
+    const activeIndicatorColor = AppColors.accentGold;
 
     return InkWell(
       onTap: () => _onTabSelected(index),
       borderRadius: BorderRadius.circular(12),
+      splashColor: Colors.white.withValues(alpha: 0.15),
+      highlightColor: Colors.white.withValues(alpha: 0.1),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               isSelected ? activeIcon : icon,
-              color: color,
+              color: isSelected ? AppColors.accentWarm : color,
               size: 22,
             ),
             const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                color: isSelected ? Colors.white : color,
+                letterSpacing: isSelected ? 0.2 : 0,
               ),
             ),
-            if (isSelected)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
+            const SizedBox(height: 2),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: isSelected ? 16 : 0,
+              height: 2.5,
+              decoration: BoxDecoration(
+                color: activeIndicatorColor,
+                borderRadius: BorderRadius.circular(2),
               ),
+            ),
           ],
         ),
       ),

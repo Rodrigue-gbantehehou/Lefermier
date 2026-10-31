@@ -436,11 +436,17 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          tooltip: "Menu",
-          onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
-        ),
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: "Menu",
+                onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
+              ),
         title: const Text("Ramassage d'œufs"),
         actions: [
           IconButton(

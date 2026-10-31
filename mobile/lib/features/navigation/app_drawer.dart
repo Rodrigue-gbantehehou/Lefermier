@@ -5,6 +5,7 @@ import '../../core/theme/theme_provider.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
 import '../auth/login_screen.dart';
+import '../eggs/eggs_screen.dart';
 import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../buildings/buildings_screen.dart';
@@ -161,7 +162,9 @@ class AppDrawer extends ConsumerWidget {
                       color: AppColors.accent,
                       onTap: () {
                         Navigator.of(context).pop();
-                        onSelectTab?.call(2);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const EggsScreen()),
+                        );
                       },
                     ),
 
@@ -173,7 +176,7 @@ class AppDrawer extends ConsumerWidget {
                       color: AppColors.primary,
                       onTap: () {
                         Navigator.of(context).pop();
-                        onSelectTab?.call(3);
+                        onSelectTab?.call(2);
                       },
                     ),
 

@@ -6,11 +6,18 @@ class AppColors {
   static const Color primaryHover = Color(0xFF047857);
   static const Color primaryLight = Color(0xFF10B981);
   static const Color primarySoft = Color(0xFFECFDF5);
+  static const Color primaryDark = Color(0xFF064E3B);
 
   // Amber / Egg Accent
   static const Color accent = Color(0xFFD97706);
   static const Color accentLight = Color(0xFFF59E0B);
   static const Color accentSoft = Color(0xFFFFFBEB);
+  static const Color accentGold = Color(0xFFFBBF24);
+  static const Color accentWarm = Color(0xFFFDE68A);
+
+  // Bottom Navigation Bar Brand Colors
+  static const Color navBarLight = Color(0xFF047857);
+  static const Color navBarDark = Color(0xFF064E3B);
 
   // Status & Utility
   static const Color success = Color(0xFF16A34A);
@@ -98,6 +105,10 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
+      bottomAppBarTheme: const BottomAppBarThemeData(
+        color: AppColors.navBarLight,
+        elevation: 8,
+      ),
     );
   }
 
@@ -162,6 +173,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
+      ),
+      bottomAppBarTheme: const BottomAppBarThemeData(
+        color: AppColors.navBarDark,
+        elevation: 8,
       ),
     );
   }
