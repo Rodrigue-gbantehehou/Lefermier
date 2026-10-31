@@ -5,7 +5,8 @@ import 'sync_provider.dart';
 import 'sync_screen.dart';
 
 class SyncStatusBadge extends ConsumerWidget {
-  const SyncStatusBadge({super.key});
+  final VoidCallback? onTap;
+  const SyncStatusBadge({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,7 +35,7 @@ class SyncStatusBadge extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: () {
+      onTap: onTap ?? () {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const SyncScreen()),
         );

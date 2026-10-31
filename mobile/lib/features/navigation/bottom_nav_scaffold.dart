@@ -15,6 +15,10 @@ import '../health/health_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../inventory/record_feeding_modal.dart';
 import '../reports/reports_screen.dart';
+import '../buildings/buildings_screen.dart';
+import '../members/members_screen.dart';
+import '../sync/sync_screen.dart';
+import '../subscriptions/subscription_screen.dart';
 import 'app_drawer.dart';
 
 class _NavDestination {
@@ -43,17 +47,23 @@ class BottomNavScaffold extends ConsumerStatefulWidget {
 class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
+  String? _activeSecondaryKey;
 
   void _openDrawer() {
     _scaffoldKey.currentState?.openDrawer();
   }
 
-  void _onTabSelected(int index) {
-    if (index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
+  void _closeSecondaryModule() {
+    if (_activeSecondaryKey != null) {
+      setState(() => _activeSecondaryKey = null);
     }
+  }
+
+  void _onTabSelected(int index) {
+    setState(() {
+      _activeSecondaryKey = null;
+      _currentIndex = index;
+    });
   }
 
   void _openQuickActions() {
@@ -145,42 +155,86 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   void _navigateToModule(String key, List<_NavDestination> rightDestinations) {
     if (key == 'dashboard') {
-      setState(() => _currentIndex = 0);
+      setState(() {
+        _activeSecondaryKey = null;
+        _currentIndex = 0;
+      });
       return;
     }
     if (key == 'flocks') {
-      setState(() => _currentIndex = 1);
+      setState(() {
+        _activeSecondaryKey = null;
+        _currentIndex = 1;
+      });
       return;
     }
 
     final rightIdx = rightDestinations.indexWhere((d) => d.key == key);
     if (rightIdx != -1) {
-      setState(() => _currentIndex = 2 + rightIdx);
+      setState(() {
+        _activeSecondaryKey = null;
+        _currentIndex = 2 + rightIdx;
+      });
       return;
     }
 
-    // Le module n'est pas dans les 4 onglets de la barre du bas : l'ouvrir avec bouton retour
-    Widget target;
+    // Le module n'est pas dans les 4 onglets : l'afficher à l'intérieur du scaffold
+    // afin de conserver la barre du bas et le FAB (+) en permanence
+    setState(() {
+      _activeSecondaryKey = key;
+    });
+  }
+
+  Widget _buildSecondaryScreen(String key) {
     switch (key) {
       case 'eggs':
-        target = const EggsScreen();
-        break;
+        return EggsScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       case 'finance':
-        target = const FinancesScreen();
-        break;
+        return FinancesScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       case 'inventory':
-        target = const InventoryScreen();
-        break;
+        return InventoryScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       case 'health':
-        target = const HealthScreen();
-        break;
+        return HealthScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       case 'reports':
-        target = const ReportsScreen();
-        break;
+        return ReportsScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
+      case 'buildings':
+        return BuildingsScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
+      case 'members':
+        return MembersScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
+      case 'sync':
+        return SyncScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
+      case 'subscription':
+        return SubscriptionScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       default:
-        return;
+        return const SizedBox.shrink();
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => target));
   }
 
   @override
@@ -200,6 +254,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         onNavigateToEggs: () => _navigateToModule('eggs', rightDestinations),
         onNavigateToFlocks: () => _navigateToModule('flocks', rightDestinations),
         onNavigateToFinances: () => _navigateToModule('finance', rightDestinations),
+        onNavigateToSync: () => _navigateToModule('sync', rightDestinations),
         onOpenMenu: _openDrawer,
       ),
       FlocksScreen(onOpenMenu: _openDrawer),
@@ -209,21 +264,34 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     // Sécurité d'index
     final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: AppDrawer(
-        onSelectModule: (modKey) => _navigateToModule(modKey, rightDestinations),
-        onSelectTab: (idx) {
-          if (idx < screens.length) {
-            setState(() => _currentIndex = idx);
-          }
-        },
-      ),
-      extendBody: false,
-      body: IndexedStack(
-        index: safeIndex,
-        children: screens,
-      ),
+    return PopScope(
+      canPop: _activeSecondaryKey == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_activeSecondaryKey != null) {
+          setState(() => _activeSecondaryKey = null);
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: AppDrawer(
+          onSelectModule: (modKey) => _navigateToModule(modKey, rightDestinations),
+          onSelectTab: (idx) {
+            if (idx < screens.length) {
+              setState(() {
+                _activeSecondaryKey = null;
+                _currentIndex = idx;
+              });
+            }
+          },
+        ),
+        extendBody: false,
+        body: _activeSecondaryKey != null
+            ? _buildSecondaryScreen(_activeSecondaryKey!)
+            : IndexedStack(
+                index: safeIndex,
+                children: screens,
+              ),
       floatingActionButton: (farm == null || farm.hasAnyQuickAction)
           ? FloatingActionButton(
               heroTag: 'fab_nav_center',
@@ -300,7 +368,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildNavItem({
@@ -309,7 +378,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     required IconData activeIcon,
     required String label,
   }) {
-    final isSelected = _currentIndex == index;
+    final isSelected = _activeSecondaryKey == null && _currentIndex == index;
     final color = isSelected ? Colors.white : Colors.white.withValues(alpha: 0.70);
     const activeIndicatorColor = AppColors.accentGold;
 

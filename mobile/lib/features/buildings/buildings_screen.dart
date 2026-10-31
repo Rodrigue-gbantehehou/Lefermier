@@ -7,7 +7,9 @@ import '../../core/widgets/brand_loader.dart';
 import 'buildings_provider.dart';
 
 class BuildingsScreen extends ConsumerStatefulWidget {
-  const BuildingsScreen({super.key});
+  final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
+  const BuildingsScreen({super.key, this.onBack, this.onOpenMenu});
 
   @override
   ConsumerState<BuildingsScreen> createState() => _BuildingsScreenState();
@@ -32,6 +34,19 @@ class _BuildingsScreenState extends ConsumerState<BuildingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: widget.onBack,
+              )
+            : (widget.onOpenMenu != null
+                ? IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    tooltip: "Menu",
+                    onPressed: widget.onOpenMenu,
+                  )
+                : null),
         title: const Text("Bâtiments & Poulaillers"),
         actions: [
           IconButton(

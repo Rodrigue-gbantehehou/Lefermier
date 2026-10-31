@@ -8,7 +8,9 @@ import '../../core/widgets/brand_loader.dart';
 import 'subscription_provider.dart';
 
 class SubscriptionScreen extends ConsumerWidget {
-  const SubscriptionScreen({super.key});
+  final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
+  const SubscriptionScreen({super.key, this.onBack, this.onOpenMenu});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,6 +34,19 @@ class SubscriptionScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: onBack,
+              )
+            : (onOpenMenu != null
+                ? IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    tooltip: "Menu",
+                    onPressed: onOpenMenu,
+                  )
+                : null),
         title: const Text("Abonnement & Licences"),
         actions: [
           IconButton(

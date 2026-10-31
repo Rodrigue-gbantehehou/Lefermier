@@ -215,12 +215,7 @@ class AppDrawer extends ConsumerWidget {
                     _DrawerItem(
                       icon: Icons.home_work_rounded,
                       label: "Bâtiments & Poulaillers",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const BuildingsScreen()),
-                        );
-                      },
+                      onTap: () => _navigateTo(context, 'buildings', const BuildingsScreen()),
                     ),
 
                   // Module Équipe & Collaborateurs (Propriétaire / Gérant)
@@ -228,12 +223,7 @@ class AppDrawer extends ConsumerWidget {
                     _DrawerItem(
                       icon: Icons.people_alt_rounded,
                       label: "Équipe & Collaborateurs",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const MembersScreen()),
-                        );
-                      },
+                      onTap: () => _navigateTo(context, 'members', const MembersScreen()),
                     ),
 
                   // Module Synchronisation & Hors-ligne (Toujours accessible à toute l'équipe)
@@ -246,12 +236,7 @@ class AppDrawer extends ConsumerWidget {
                     color: ref.watch(syncProvider).pendingCount > 0
                         ? AppColors.accent
                         : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SyncScreen()),
-                      );
-                    },
+                    onTap: () => _navigateTo(context, 'sync', const SyncScreen()),
                   ),
 
                   // Module Abonnement & Licences (Propriétaire / Admin uniquement)
@@ -260,12 +245,7 @@ class AppDrawer extends ConsumerWidget {
                       icon: Icons.workspace_premium_rounded,
                       label: "Abonnement & Formules",
                       color: AppColors.accent,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                        );
-                      },
+                      onTap: () => _navigateTo(context, 'subscription', const SubscriptionScreen()),
                     ),
 
                   // Module Rapports & Partage WhatsApp / SMS

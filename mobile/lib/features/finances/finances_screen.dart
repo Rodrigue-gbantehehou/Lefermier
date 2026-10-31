@@ -7,8 +7,9 @@ import '../../core/widgets/brand_loader.dart';
 import 'finance_provider.dart';
 
 class FinancesScreen extends ConsumerStatefulWidget {
+  final VoidCallback? onBack;
   final VoidCallback? onOpenMenu;
-  const FinancesScreen({super.key, this.onOpenMenu});
+  const FinancesScreen({super.key, this.onBack, this.onOpenMenu});
 
   @override
   ConsumerState<FinancesScreen> createState() => _FinancesScreenState();
@@ -392,11 +393,17 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          tooltip: "Menu",
-          onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
-        ),
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: widget.onBack,
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: "Menu",
+                onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
+              ),
         title: const Text("Caisse & Finances"),
         actions: [
           IconButton(

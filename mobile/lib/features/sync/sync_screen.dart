@@ -7,7 +7,9 @@ import '../../core/widgets/brand_loader.dart';
 import 'sync_provider.dart';
 
 class SyncScreen extends ConsumerWidget {
-  const SyncScreen({super.key});
+  final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
+  const SyncScreen({super.key, this.onBack, this.onOpenMenu});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,6 +18,19 @@ class SyncScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: onBack,
+              )
+            : (onOpenMenu != null
+                ? IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    tooltip: "Menu",
+                    onPressed: onOpenMenu,
+                  )
+                : null),
         title: const Text("Synchronisation & Hors-ligne"),
         actions: [
           IconButton(

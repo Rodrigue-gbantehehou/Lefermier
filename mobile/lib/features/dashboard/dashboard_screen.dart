@@ -17,6 +17,7 @@ class DashboardScreen extends ConsumerWidget {
   final VoidCallback onNavigateToEggs;
   final VoidCallback onNavigateToFlocks;
   final VoidCallback onNavigateToFinances;
+  final VoidCallback? onNavigateToSync;
   final VoidCallback? onOpenMenu;
 
   const DashboardScreen({
@@ -25,6 +26,7 @@ class DashboardScreen extends ConsumerWidget {
     required this.onNavigateToEggs,
     required this.onNavigateToFlocks,
     required this.onNavigateToFinances,
+    this.onNavigateToSync,
     this.onOpenMenu,
   });
 
@@ -145,7 +147,7 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        const SyncStatusBadge(),
+                        SyncStatusBadge(onTap: onNavigateToSync),
                       ],
                     ),
                     const SizedBox(height: 12),

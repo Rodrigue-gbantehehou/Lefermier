@@ -7,7 +7,9 @@ import '../../core/widgets/brand_loader.dart';
 import 'members_provider.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
-  const MembersScreen({super.key});
+  final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
+  const MembersScreen({super.key, this.onBack, this.onOpenMenu});
 
   @override
   ConsumerState<MembersScreen> createState() => _MembersScreenState();
@@ -32,6 +34,19 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: widget.onBack,
+              )
+            : (widget.onOpenMenu != null
+                ? IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    tooltip: "Menu",
+                    onPressed: widget.onOpenMenu,
+                  )
+                : null),
         title: const Text("Équipe & Collaborateurs"),
         actions: [
           IconButton(
