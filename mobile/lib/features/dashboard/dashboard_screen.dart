@@ -37,7 +37,7 @@ class DashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
+          icon: const Icon(Icons.menu_rounded, color: Colors.white),
           tooltip: "Menu",
           onPressed: onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
         ),
@@ -47,14 +47,14 @@ class DashboardScreen extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppColors.primarySoft,
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.agriculture_rounded, size: 16, color: AppColors.primary),
+                const Icon(Icons.agriculture_rounded, size: 16, color: AppColors.accentLight),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
@@ -64,12 +64,12 @@ class DashboardScreen extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: Colors.white,
                     ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.primary),
+                const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Colors.white),
               ],
             ),
           ),
@@ -78,14 +78,14 @@ class DashboardScreen extends ConsumerWidget {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? AppColors.accent : null,
+              color: isDark ? AppColors.accent : Colors.white,
               size: 20,
             ),
             tooltip: isDark ? "Mode clair" : "Mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
           ),
           IconButton(
-            icon: const Icon(Icons.sync_rounded),
+            icon: const Icon(Icons.sync_rounded, color: Colors.white),
             tooltip: "Actualiser",
             onPressed: () async {
               await ref.read(dashboardProvider.notifier).loadDashboard();
@@ -112,41 +112,124 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Salutation mobile personnalisée
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 14, top: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Bannière Hero de bienvenue chaleureuse
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDark
+                              ? [
+                                  AppColors.surfaceDark,
+                                  const Color(0xFF132A20),
+                                ]
+                              : [
+                                  const Color(0xFF047857),
+                                  const Color(0xFF059669),
+                                  const Color(0xFF10B981),
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                "Bonjour 👋",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.18),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.agriculture_rounded,
+                                      size: 20,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Bonjour 👋",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                      Text(
+                                        authState.activeFarm?.name ?? "Mon exploitation avicole",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white.withValues(alpha: 0.88),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              SizedBox(height: 2),
-                              Text(
-                                "Point de situation de votre élevage",
-                                style: TextStyle(fontSize: 12, color: AppColors.textMutedLight),
-                              ),
+                              const SyncStatusBadge(),
                             ],
                           ),
-                          SyncStatusBadge(),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.egg_alt_rounded,
+                                  size: 16,
+                                  color: AppColors.accentLight,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    kpi.todayGoodEggs > 0
+                                        ? "${kpi.todayGoodEggs} œufs ramassés aujourd'hui (${kpi.todayTraysCount} plateaux)"
+                                        : "Prêt pour les enregistrements du jour",
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    // KPI 2x2 Grid dynamique
+
+                    // KPI 2x2 Grid dynamique aux teintes chaleureuses
                     GridView.count(
                       crossAxisCount: 2,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
-                      childAspectRatio: 1.4,
+                      childAspectRatio: 1.35,
                       children: [
                         _KpiCard(
                           title: "Ponte du jour",
@@ -155,6 +238,8 @@ class DashboardScreen extends ConsumerWidget {
                           badgeText: "${kpi.todayTraysCount} plateaux",
                           badgeColor: AppColors.accent,
                           icon: Icons.egg_rounded,
+                          customBgColor: isDark ? const Color(0xFF282115) : const Color(0xFFFFFBEB),
+                          customBorderColor: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
                           onTap: onNavigateToEggs,
                         ),
                         _KpiCard(
@@ -164,6 +249,8 @@ class DashboardScreen extends ConsumerWidget {
                           badgeText: "${kpi.activeFlocksCount} lot(s) actif(s)",
                           badgeColor: AppColors.primary,
                           icon: Icons.pets_rounded,
+                          customBgColor: isDark ? const Color(0xFF132A1F) : const Color(0xFFF0FDF4),
+                          customBorderColor: isDark ? const Color(0xFF065F46) : const Color(0xFFBBF7D0),
                           onTap: onNavigateToFlocks,
                         ),
                         _KpiCard(
@@ -173,6 +260,12 @@ class DashboardScreen extends ConsumerWidget {
                           badgeText: kpi.currentMonthNetBalance >= 0 ? "Solde positif" : "Solde négatif",
                           badgeColor: kpi.currentMonthNetBalance >= 0 ? AppColors.success : AppColors.danger,
                           icon: Icons.account_balance_wallet_rounded,
+                          customBgColor: isDark
+                              ? const Color(0xFF172D24)
+                              : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
+                          customBorderColor: isDark
+                              ? const Color(0xFF047857)
+                              : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
                           onTap: onNavigateToFinances,
                         ),
                         _KpiCard(
@@ -180,8 +273,10 @@ class DashboardScreen extends ConsumerWidget {
                           value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
                           unit: "journalier",
                           badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
-                          badgeColor: AppColors.primary,
+                          badgeColor: const Color(0xFF0284C7),
                           icon: Icons.show_chart_rounded,
+                          customBgColor: isDark ? const Color(0xFF172535) : const Color(0xFFF0F9FF),
+                          customBorderColor: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD),
                           onTap: onNavigateToEggs,
                         ),
                       ],
@@ -344,6 +439,8 @@ class _KpiCard extends StatelessWidget {
   final Color badgeColor;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? customBgColor;
+  final Color? customBorderColor;
 
   const _KpiCard({
     required this.title,
@@ -353,6 +450,8 @@ class _KpiCard extends StatelessWidget {
     required this.badgeColor,
     required this.icon,
     required this.onTap,
+    this.customBgColor,
+    this.customBorderColor,
   });
 
   @override
@@ -366,9 +465,21 @@ class _KpiCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: surfaceColor,
+          color: customBgColor ?? surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
+          border: Border.all(
+            color: customBorderColor ?? borderColor,
+            width: 1.2,
+          ),
+          boxShadow: isDark
+              ? []
+              : [
+                  BoxShadow(
+                    color: (customBorderColor ?? Colors.black).withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -383,7 +494,7 @@ class _KpiCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                    color: isDark ? AppColors.textMutedDark : const Color(0xFF334155),
                   ),
                 ),
                 Icon(icon, size: 16, color: badgeColor),
@@ -396,10 +507,11 @@ class _KpiCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
                       fontFamily: 'monospace',
+                      color: isDark ? Colors.white : AppColors.textMainLight,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -417,7 +529,7 @@ class _KpiCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: badgeColor.withValues(alpha: 0.12),
+                color: badgeColor.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(

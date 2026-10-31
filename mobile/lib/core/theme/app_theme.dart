@@ -18,10 +18,10 @@ class AppColors {
   static const Color error = Color(0xFFDC2626);
   static const Color warning = Color(0xFFEAB308);
 
-  // Light Theme Neutrals
-  static const Color backgroundLight = Color(0xFFF8FAFC);
+  // Light Theme Neutrals - Warm, organic agricultural linen tone (not clinical white)
+  static const Color backgroundLight = Color(0xFFF6F5EE);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color borderLight = Color(0xFFE2E8F0);
+  static const Color borderLight = Color(0xFFE6E3D7);
   static const Color textMainLight = Color(0xFF0F172A);
   static const Color textMutedLight = Color(0xFF64748B);
 
@@ -50,15 +50,17 @@ class AppTheme {
         onSurface: AppColors.textMainLight,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surfaceLight,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 2,
         centerTitle: false,
-        iconTheme: IconThemeData(color: AppColors.textMainLight),
+        iconTheme: IconThemeData(color: Colors.white),
         titleTextStyle: TextStyle(
-          color: AppColors.textMainLight,
+          color: Colors.white,
           fontSize: 18,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(

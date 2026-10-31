@@ -446,14 +446,14 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: isDark ? AppColors.accent : null,
+              color: isDark ? AppColors.accent : Colors.white,
               size: 20,
             ),
             tooltip: isDark ? "Activer le mode clair" : "Activer le mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: "Actualiser",
             onPressed: () => ref.read(eggProvider.notifier).loadData(),
           ),
