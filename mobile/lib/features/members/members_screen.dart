@@ -713,6 +713,7 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
                 decoration: InputDecoration(
                   labelText: "Mot de passe initial (optionnel)",
                   hintText: "Défaut: Lefermier@2026",
+                  helperText: "Si le compte existe déjà, son mot de passe existant est conservé",
                   prefixIcon: const Icon(Icons.lock_outline, size: 20),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
