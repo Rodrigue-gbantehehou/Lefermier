@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/models/health_treatment.dart';
 import '../flocks/flock_provider.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'health_provider.dart';
 
 class HealthScreen extends ConsumerStatefulWidget {
@@ -218,11 +219,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: healthState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Confirmer"),
                         ),
                       ),
@@ -565,11 +562,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: healthState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Planifier"),
                         ),
                       ),
@@ -822,11 +815,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                           foregroundColor: Colors.white,
                         ),
                         child: healthState.isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
+                            ? const BrandLoader.button()
                             : const Text("Générer"),
                       ),
                     ),
@@ -882,7 +871,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(healthProvider.notifier).loadTreatments(showLoading: false),
         child: healthState.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement des soins sanitaires..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),

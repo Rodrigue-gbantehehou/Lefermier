@@ -6,6 +6,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/models/inventory_item.dart';
 import '../flocks/flock_provider.dart';
 import '../reports/reports_screen.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'inventory_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
@@ -364,11 +365,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: invState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Enregistrer"),
                         ),
                       ),
@@ -645,11 +642,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: invState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Créer l'article"),
                         ),
                       ),
@@ -715,7 +708,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(inventoryProvider.notifier).loadItems(showLoading: false),
         child: invState.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement des stocks..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),

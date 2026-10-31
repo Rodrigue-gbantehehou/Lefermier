@@ -4,6 +4,7 @@ import '../../core/models/subscription_plan.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'subscription_provider.dart';
 
 class SubscriptionScreen extends ConsumerWidget {
@@ -52,7 +53,7 @@ class SubscriptionScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => ref.read(subscriptionProvider.notifier).loadSubscription(showLoading: false),
         child: state.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement des formules..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
@@ -569,11 +570,7 @@ class _UpgradeModalState extends ConsumerState<_UpgradeModal> {
             child: ElevatedButton.icon(
               onPressed: state.isSubmitting ? null : _submit,
               icon: state.isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                  ? const BrandLoader.button(size: 18)
                   : const Icon(Icons.send_rounded, size: 18),
               label: Text(
                 state.isSubmitting ? "Envoi de la demande..." : "Confirmer la demande d'évolution",

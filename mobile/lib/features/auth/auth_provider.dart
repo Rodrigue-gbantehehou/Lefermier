@@ -154,6 +154,109 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(activeFarm: farm);
   }
 
+  Future<bool> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    String? phone,
+    String? farmName,
+    String? productionType,
+    String? locationCity,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final payload = {
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (farmName != null && farmName.trim().isNotEmpty) 'farmName': farmName.trim(),
+        if (productionType != null) 'productionType': productionType,
+        if (locationCity != null && locationCity.trim().isNotEmpty) 'locationCity': locationCity.trim(),
+      };
+
+      final response = await _apiClient.dio.post(
+        ApiEndpoints.register,
+        data: payload,
+      );
+
+      final data = response.data['data'] as Map<String, dynamic>?;
+      final token = data?['token'] as String?;
+      if (token == null || token.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Jeton manquant après inscription.",
+        );
+        return false;
+      }
+
+      await _apiClient.setAuthToken(token);
+      state = state.copyWith(
+        isAuthenticated: true,
+        token: token,
+        isLoading: false,
+      );
+
+      await loadFarms();
+      return true;
+    } on DioException catch (e) {
+      String message = "Erreur lors de l'inscription.";
+      if (e.response?.data != null && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        message = data['message'] ?? data['error'] ?? message;
+      } else if (e.type == DioExceptionType.connectionError ||
+                 e.type == DioExceptionType.connectionTimeout) {
+        message = "Impossible de joindre le serveur. Vérifiez la connexion.";
+      }
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: "Une erreur est survenue: $e",
+      );
+      return false;
+    }
+  }
+
+  Future<bool> createFarm({
+    required String name,
+    String? code,
+    String productionType = 'LAYER',
+    String? locationCity,
+    String? phone,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _apiClient.dio.post(
+        ApiEndpoints.farms,
+        data: {
+          'name': name.trim(),
+          if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+          'productionType': productionType,
+          if (locationCity != null && locationCity.trim().isNotEmpty) 'locationCity': locationCity.trim(),
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        },
+      );
+
+      await loadFarms();
+      return true;
+    } on DioException catch (e) {
+      String message = "Erreur lors de la création de la ferme.";
+      if (e.response?.data != null && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        message = data['message'] ?? data['error'] ?? message;
+      }
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: "Erreur: $e");
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _apiClient.setAuthToken(null);
     await _apiClient.setActiveFarmId(null);

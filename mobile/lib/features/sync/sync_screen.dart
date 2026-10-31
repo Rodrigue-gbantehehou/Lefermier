@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'sync_provider.dart';
 
 class SyncScreen extends ConsumerWidget {
@@ -93,11 +94,7 @@ class SyncScreen extends ConsumerWidget {
                   ElevatedButton.icon(
                     onPressed: state.isSyncing ? null : () => ref.read(syncProvider.notifier).triggerSync(),
                     icon: state.isSyncing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
+                        ? const BrandLoader.button(size: 16)
                         : const Icon(Icons.sync_rounded, size: 18),
                     label: Text(state.isSyncing ? "En cours..." : "Synchroniser"),
                     style: ElevatedButton.styleFrom(

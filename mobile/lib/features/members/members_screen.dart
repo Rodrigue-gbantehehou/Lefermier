@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/member.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'members_provider.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
@@ -61,7 +62,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(membersProvider.notifier).loadMembers(showLoading: false),
         child: state.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement de l'équipe..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
@@ -724,11 +725,7 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
                 child: ElevatedButton.icon(
                   onPressed: state.isSubmitting ? null : _submit,
                   icon: state.isSubmitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                      ? const BrandLoader.button(size: 18)
                       : const Icon(Icons.check_circle_rounded, size: 18),
                   label: Text(
                     state.isSubmitting ? "Invitation en cours..." : "Inviter dans l'exploitation",
@@ -880,11 +877,7 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
             child: ElevatedButton.icon(
               onPressed: state.isSubmitting ? null : _submit,
               icon: state.isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                  ? const BrandLoader.button(size: 18)
                   : const Icon(Icons.check_circle_rounded, size: 18),
               label: Text(
                 state.isSubmitting ? "Mise à jour..." : "Appliquer les modifications",

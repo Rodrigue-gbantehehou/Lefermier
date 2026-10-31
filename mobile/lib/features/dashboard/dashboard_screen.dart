@@ -6,6 +6,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
 import '../sync/sync_status_badge.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'dashboard_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -104,7 +105,7 @@ class DashboardScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false),
         child: dashState.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement du tableau de bord..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

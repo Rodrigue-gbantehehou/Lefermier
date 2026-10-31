@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/building.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'buildings_provider.dart';
 
 class BuildingsScreen extends ConsumerStatefulWidget {
@@ -61,7 +62,7 @@ class _BuildingsScreenState extends ConsumerState<BuildingsScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(buildingsProvider.notifier).loadBuildings(showLoading: false),
         child: state.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement des bâtiments..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
@@ -732,11 +733,7 @@ class _BuildingFormModalState extends ConsumerState<_BuildingFormModal> {
                 child: ElevatedButton.icon(
                   onPressed: state.isSubmitting ? null : _submit,
                   icon: state.isSubmitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                      ? const BrandLoader.button(size: 18)
                       : const Icon(Icons.check_circle_rounded, size: 18),
                   label: Text(
                     state.isSubmitting ? "Enregistrement..." : "Valider le bâtiment",

@@ -5,6 +5,7 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/models/flock.dart';
 import '../buildings/buildings_provider.dart';
 import '../reports/reports_screen.dart';
+import '../../core/widgets/brand_loader.dart';
 import 'flock_provider.dart';
 
 class FlocksScreen extends ConsumerStatefulWidget {
@@ -281,11 +282,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: flockState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Valider"),
                         ),
                       ),
@@ -587,11 +584,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: flockState.isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
+                              ? const BrandLoader.button()
                               : const Text("Créer la bande"),
                         ),
                       ),
@@ -664,7 +657,7 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
         child: flockState.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: BrandLoader(message: "Chargement des bandes..."))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
