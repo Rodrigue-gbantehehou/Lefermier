@@ -38,4 +38,9 @@ class ApiEndpoints {
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";
   static String farmSyncPull(String farmId) => "/api/farms/$farmId/sync/pull";
+
+  // Abonnements & Formules
+  static const String subscriptionPlans = "/api/subscriptions/plans";
+  static String farmSubscription(String farmId) => "/api/subscriptions/farm/$farmId";
+  static const String subscriptionRequestUpgrade = "/api/subscriptions/request-upgrade";
 }

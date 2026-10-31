@@ -10,6 +10,7 @@ import '../buildings/buildings_screen.dart';
 import '../members/members_screen.dart';
 import '../sync/sync_provider.dart';
 import '../sync/sync_screen.dart';
+import '../subscriptions/subscription_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   final Function(int tabIndex)? onSelectTab;
@@ -238,6 +239,19 @@ class AppDrawer extends ConsumerWidget {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const SyncScreen()),
+                      );
+                    },
+                  ),
+
+                  // Module Abonnement & Licences
+                  _DrawerItem(
+                    icon: Icons.workspace_premium_rounded,
+                    label: "Abonnement & Formules",
+                    color: AppColors.accent,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
                       );
                     },
                   ),
