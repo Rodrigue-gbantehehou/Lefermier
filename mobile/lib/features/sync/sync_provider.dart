@@ -71,6 +71,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final queue = await _syncService.getQueue();
     final online = await _syncService.checkConnectivity();
 
+    if (!mounted) return;
     state = state.copyWith(
       isOnline: online,
       lastSyncTime: lastSync,
@@ -92,6 +93,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
     );
 
     final queue = await _syncService.getQueue();
+    if (!mounted) return true;
     state = state.copyWith(pendingActions: queue);
 
     // Si on est en ligne, tenter de synchroniser immédiatement
@@ -105,11 +107,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final activeFarm = _ref.read(authProvider).activeFarm;
     if (activeFarm == null || state.isSyncing) return;
 
+    if (!mounted) return;
     state = state.copyWith(isSyncing: true, clearError: true);
 
     try {
       final online = await _syncService.checkConnectivity();
       if (!online) {
+        if (!mounted) return;
         state = state.copyWith(
           isSyncing: false,
           isOnline: false,
@@ -135,6 +139,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final queue = await _syncService.getQueue();
       final lastSync = await _syncService.getLastSyncTime(activeFarm.id);
 
+      if (!mounted) return;
       state = state.copyWith(
         isSyncing: false,
         isOnline: true,
@@ -143,6 +148,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         lastSyncSuccessCount: flushedCount,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isSyncing: false,
         lastError: "Erreur pendant la synchronisation: $e",
@@ -152,6 +158,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
 
   Future<void> clearQueue() async {
     await _syncService.clearQueue();
+    if (!mounted) return;
     state = state.copyWith(pendingActions: []);
   }
 }

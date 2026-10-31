@@ -69,9 +69,10 @@ class QuickActionSheet extends ConsumerWidget {
         20,
         MediaQuery.of(context).padding.bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           // Poignée de glissement
           Center(
             child: Container(
@@ -229,7 +230,8 @@ class QuickActionSheet extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 
