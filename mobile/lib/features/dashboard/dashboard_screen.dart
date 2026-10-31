@@ -37,6 +37,11 @@ class DashboardScreen extends ConsumerWidget {
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
 
+    final farm = authState.activeFarm;
+    final canViewEggs = farm == null || farm.canViewEggs;
+    final canViewFlocks = farm == null || farm.canViewFlocks;
+    final canViewFinance = farm == null || farm.canViewFinance;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -145,66 +150,71 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
 
-                    // KPI 2x2 Grid dynamique aux teintes chaleureuses
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 1.35,
-                      children: [
-                        _KpiCard(
-                          title: "Ponte du jour",
-                          value: "${kpi.todayGoodEggs}",
-                          unit: "œufs",
-                          badgeText: "${kpi.todayTraysCount} plateaux",
-                          badgeColor: AppColors.accent,
-                          icon: Icons.egg_rounded,
-                          customBgColor: isDark ? const Color(0xFF282115) : const Color(0xFFFFFBEB),
-                          customBorderColor: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
-                          onTap: onNavigateToEggs,
-                        ),
-                        _KpiCard(
-                          title: "Cheptel vivant",
-                          value: "${kpi.totalBirds}",
-                          unit: "sujets",
-                          badgeText: "${kpi.activeFlocksCount} lot(s) actif(s)",
-                          badgeColor: AppColors.primary,
-                          icon: Icons.pets_rounded,
-                          customBgColor: isDark ? const Color(0xFF132A1F) : const Color(0xFFF0FDF4),
-                          customBorderColor: isDark ? const Color(0xFF065F46) : const Color(0xFFBBF7D0),
-                          onTap: onNavigateToFlocks,
-                        ),
-                        _KpiCard(
-                          title: "Caisse du mois",
-                          value: CurrencyFormatter.formatFcfa(kpi.currentMonthNetBalance),
-                          unit: "FCFA",
-                          badgeText: kpi.currentMonthNetBalance >= 0 ? "Solde positif" : "Solde négatif",
-                          badgeColor: kpi.currentMonthNetBalance >= 0 ? AppColors.success : AppColors.danger,
-                          icon: Icons.account_balance_wallet_rounded,
-                          customBgColor: isDark
-                              ? const Color(0xFF172D24)
-                              : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
-                          customBorderColor: isDark
-                              ? const Color(0xFF047857)
-                              : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
-                          onTap: onNavigateToFinances,
-                        ),
-                        _KpiCard(
-                          title: "Taux de ponte",
-                          value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
-                          unit: "journalier",
-                          badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
-                          badgeColor: const Color(0xFF0284C7),
-                          icon: Icons.show_chart_rounded,
-                          customBgColor: isDark ? const Color(0xFF172535) : const Color(0xFFF0F9FF),
-                          customBorderColor: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD),
-                          onTap: onNavigateToEggs,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+                    if (canViewEggs || canViewFlocks || canViewFinance) ...[
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1.35,
+                        children: [
+                          if (canViewEggs)
+                            _KpiCard(
+                              title: "Ponte du jour",
+                              value: "${kpi.todayGoodEggs}",
+                              unit: "œufs",
+                              badgeText: "${kpi.todayTraysCount} plateaux",
+                              badgeColor: AppColors.accent,
+                              icon: Icons.egg_rounded,
+                              customBgColor: isDark ? const Color(0xFF282115) : const Color(0xFFFFFBEB),
+                              customBorderColor: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
+                              onTap: onNavigateToEggs,
+                            ),
+                          if (canViewFlocks)
+                            _KpiCard(
+                              title: "Cheptel vivant",
+                              value: "${kpi.totalBirds}",
+                              unit: "sujets",
+                              badgeText: "${kpi.activeFlocksCount} lot(s) actif(s)",
+                              badgeColor: AppColors.primary,
+                              icon: Icons.pets_rounded,
+                              customBgColor: isDark ? const Color(0xFF132A1F) : const Color(0xFFF0FDF4),
+                              customBorderColor: isDark ? const Color(0xFF065F46) : const Color(0xFFBBF7D0),
+                              onTap: onNavigateToFlocks,
+                            ),
+                          if (canViewFinance)
+                            _KpiCard(
+                              title: "Caisse du mois",
+                              value: CurrencyFormatter.formatFcfa(kpi.currentMonthNetBalance),
+                              unit: "FCFA",
+                              badgeText: kpi.currentMonthNetBalance >= 0 ? "Solde positif" : "Solde négatif",
+                              badgeColor: kpi.currentMonthNetBalance >= 0 ? AppColors.success : AppColors.danger,
+                              icon: Icons.account_balance_wallet_rounded,
+                              customBgColor: isDark
+                                  ? const Color(0xFF172D24)
+                                  : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
+                              customBorderColor: isDark
+                                  ? const Color(0xFF047857)
+                                  : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
+                              onTap: onNavigateToFinances,
+                            ),
+                          if (canViewEggs)
+                            _KpiCard(
+                              title: "Taux de ponte",
+                              value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
+                              unit: "journalier",
+                              badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
+                              badgeColor: const Color(0xFF0284C7),
+                              icon: Icons.show_chart_rounded,
+                              customBgColor: isDark ? const Color(0xFF172535) : const Color(0xFFF0F9FF),
+                              customBorderColor: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD),
+                              onTap: onNavigateToEggs,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Lots en élevage réels
                     Row(
@@ -217,17 +227,18 @@ class DashboardScreen extends ConsumerWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        TextButton(
-                          onPressed: onNavigateToFlocks,
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(50, 30),
+                        if (canViewFlocks)
+                          TextButton(
+                            onPressed: onNavigateToFlocks,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(50, 30),
+                            ),
+                            child: const Text(
+                              "Gérer les bandes →",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
                           ),
-                          child: const Text(
-                            "Gérer les bandes →",
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -336,7 +347,7 @@ class DashboardScreen extends ConsumerWidget {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (flock.isLayer) ...[
+                                      if (flock.isLayer && (farm == null || farm.canCreateEggs)) ...[
                                         // Bouton Collecter (ouvre directement la modale de ponte)
                                         OutlinedButton.icon(
                                           onPressed: () => RecordEggModal.show(context, defaultFlockId: flock.id),
@@ -352,21 +363,23 @@ class DashboardScreen extends ConsumerWidget {
                                         ),
                                         const SizedBox(width: 6),
                                       ],
-                                      // Bouton Nourrir (ouvre directement la modale de distribution d'aliment)
-                                      ElevatedButton.icon(
-                                        onPressed: () => RecordFeedingModal.show(context, defaultFlockId: flock.id),
-                                        icon: const Icon(Icons.restaurant_rounded, size: 14, color: Colors.white),
-                                        label: const Text("Nourrir"),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
-                                          elevation: 1,
-                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                          visualDensity: VisualDensity.compact,
-                                          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                      if (farm == null || farm.canFeed) ...[
+                                        // Bouton Nourrir (ouvre directement la modale de distribution d'aliment)
+                                        ElevatedButton.icon(
+                                          onPressed: () => RecordFeedingModal.show(context, defaultFlockId: flock.id),
+                                          icon: const Icon(Icons.restaurant_rounded, size: 14, color: Colors.white),
+                                          label: const Text("Nourrir"),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            elevation: 1,
+                                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                            visualDensity: VisualDensity.compact,
+                                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
                                         ),
-                                      ),
-                                      if (!flock.isLayer) ...[
+                                      ],
+                                      if (!flock.isLayer && (farm == null || farm.canRecordFlockMovement)) ...[
                                         const SizedBox(width: 6),
                                         OutlinedButton.icon(
                                           onPressed: () => RecordMovementModal.show(context, defaultFlockId: flock.id),

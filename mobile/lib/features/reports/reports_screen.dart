@@ -28,11 +28,13 @@ enum ReportType {
 class ReportsScreen extends ConsumerStatefulWidget {
   final ReportType initialType;
   final String? initialFlockId;
+  final VoidCallback? onOpenMenu;
 
   const ReportsScreen({
     super.key,
     this.initialType = ReportType.dailyEgg,
     this.initialFlockId,
+    this.onOpenMenu,
   });
 
   @override
@@ -131,6 +133,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: "Menu",
+                onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
+              ),
         title: const Text("Partage & Rapports"),
         actions: [
           IconButton(

@@ -8,7 +8,8 @@ import '../../core/widgets/brand_loader.dart';
 import 'health_provider.dart';
 
 class HealthScreen extends ConsumerStatefulWidget {
-  const HealthScreen({super.key});
+  final VoidCallback? onOpenMenu;
+  const HealthScreen({super.key, this.onOpenMenu});
 
   @override
   ConsumerState<HealthScreen> createState() => _HealthScreenState();
@@ -844,6 +845,17 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: "Menu",
+                onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
+              ),
         title: const Text("Santé & Traitements"),
         actions: [
           IconButton(

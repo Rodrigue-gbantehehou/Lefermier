@@ -14,11 +14,22 @@ import '../sync/sync_provider.dart';
 import '../sync/sync_screen.dart';
 import '../subscriptions/subscription_screen.dart';
 import '../reports/reports_screen.dart';
+import '../finances/finances_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
+  final Function(String moduleKey)? onSelectModule;
   final Function(int tabIndex)? onSelectTab;
 
-  const AppDrawer({super.key, this.onSelectTab});
+  const AppDrawer({super.key, this.onSelectModule, this.onSelectTab});
+
+  void _navigateTo(BuildContext context, String key, Widget screen) {
+    Navigator.of(context).pop();
+    if (onSelectModule != null) {
+      onSelectModule!(key);
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -141,31 +152,37 @@ class AppDrawer extends ConsumerWidget {
                     label: "Tableau de bord",
                     onTap: () {
                       Navigator.of(context).pop();
-                      onSelectTab?.call(0);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.grid_view_rounded,
-                    label: "Bandes de volailles",
-                    badge: farm?.productionType,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      onSelectTab?.call(1);
+                      if (onSelectModule != null) {
+                        onSelectModule!('dashboard');
+                      } else {
+                        onSelectTab?.call(0);
+                      }
                     },
                   ),
 
-                  // Module Ponte (Conditionné par le type d'élevage : exclu si Chair 100%)
+                  // Module Bandes de volailles
+                  if (farm == null || farm.canViewFlocks)
+                    _DrawerItem(
+                      icon: Icons.grid_view_rounded,
+                      label: "Bandes de volailles",
+                      badge: farm?.productionType,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        if (onSelectModule != null) {
+                          onSelectModule!('flocks');
+                        } else {
+                          onSelectTab?.call(1);
+                        }
+                      },
+                    ),
+
+                  // Module Ponte (Conditionné par le type d'élevage et le rôle)
                   if (farm == null || farm.canViewEggs)
                     _DrawerItem(
                       icon: Icons.egg_rounded,
                       label: "Pontes d'œufs",
                       color: AppColors.accent,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EggsScreen()),
-                        );
-                      },
+                      onTap: () => _navigateTo(context, 'eggs', const EggsScreen()),
                     ),
 
                   // Module Caisse (Conditionné par le rôle : Propriétaire, Gérant, Comptable)
@@ -174,10 +191,7 @@ class AppDrawer extends ConsumerWidget {
                       icon: Icons.account_balance_wallet_rounded,
                       label: "Trésorerie & Ventes",
                       color: AppColors.primary,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onSelectTab?.call(2);
-                      },
+                      onTap: () => _navigateTo(context, 'finance', const FinancesScreen()),
                     ),
 
                   // Module Santé & Traitements (Vétérinaire / Gérant)
@@ -185,52 +199,44 @@ class AppDrawer extends ConsumerWidget {
                     _DrawerItem(
                       icon: Icons.medical_services_rounded,
                       label: "Santé & Traitements",
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const HealthScreen()),
-                        );
-                      },
+                      onTap: () => _navigateTo(context, 'health', const HealthScreen()),
                     ),
 
-                  // Module Stocks & Alimentation
+                  // Module Stocks & Alimentation (Magasinier / Gérant)
                   if (farm == null || farm.canViewInventory)
                     _DrawerItem(
                       icon: Icons.inventory_2_rounded,
                       label: "Stocks & Intrants",
+                      onTap: () => _navigateTo(context, 'inventory', const InventoryScreen()),
+                    ),
+
+                  // Module Bâtiments & Poulaillers (Gérant / Propriétaire)
+                  if (farm == null || farm.canManageBuildings)
+                    _DrawerItem(
+                      icon: Icons.home_work_rounded,
+                      label: "Bâtiments & Poulaillers",
                       onTap: () {
                         Navigator.of(context).pop();
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                          MaterialPageRoute(builder: (_) => const BuildingsScreen()),
                         );
                       },
                     ),
 
-                  // Module Bâtiments & Poulaillers
-                  _DrawerItem(
-                    icon: Icons.home_work_rounded,
-                    label: "Bâtiments & Poulaillers",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const BuildingsScreen()),
-                      );
-                    },
-                  ),
+                  // Module Équipe & Collaborateurs (Propriétaire / Gérant)
+                  if (farm == null || farm.canManageMembers)
+                    _DrawerItem(
+                      icon: Icons.people_alt_rounded,
+                      label: "Équipe & Collaborateurs",
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const MembersScreen()),
+                        );
+                      },
+                    ),
 
-                  // Module Équipe & Collaborateurs
-                  _DrawerItem(
-                    icon: Icons.people_alt_rounded,
-                    label: "Équipe & Collaborateurs",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const MembersScreen()),
-                      );
-                    },
-                  ),
-
-                  // Module Synchronisation & Hors-ligne
+                  // Module Synchronisation & Hors-ligne (Toujours accessible à toute l'équipe)
                   _DrawerItem(
                     icon: Icons.sync_rounded,
                     label: "Synchronisation",
@@ -248,30 +254,27 @@ class AppDrawer extends ConsumerWidget {
                     },
                   ),
 
-                  // Module Abonnement & Licences
-                  _DrawerItem(
-                    icon: Icons.workspace_premium_rounded,
-                    label: "Abonnement & Formules",
-                    color: AppColors.accent,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                      );
-                    },
-                  ),
+                  // Module Abonnement & Licences (Propriétaire / Admin uniquement)
+                  if (farm == null || farm.canManageSubscription)
+                    _DrawerItem(
+                      icon: Icons.workspace_premium_rounded,
+                      label: "Abonnement & Formules",
+                      color: AppColors.accent,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                        );
+                      },
+                    ),
 
                   // Module Rapports & Partage WhatsApp / SMS
-                  _DrawerItem(
-                    icon: Icons.share_rounded,
-                    label: "Rapports & Partage",
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ReportsScreen()),
-                      );
-                    },
-                  ),
+                  if (farm == null || farm.canViewReports)
+                    _DrawerItem(
+                      icon: Icons.share_rounded,
+                      label: "Rapports & Partage",
+                      onTap: () => _navigateTo(context, 'reports', const ReportsScreen()),
+                    ),
 
                   const Divider(height: 24),
 

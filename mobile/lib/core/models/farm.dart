@@ -1,3 +1,20 @@
+/// Clés de permissions métier exposées par l'API (miroir de `App\Security\Permission`).
+class FarmPermission {
+  static const String flockView = 'flock:view';
+  static const String flockCreate = 'flock:create';
+  static const String flockMovement = 'flock:movement';
+  static const String eggView = 'egg:view';
+  static const String eggCreate = 'egg:create';
+  static const String inventoryView = 'inventory:view';
+  static const String inventoryMovement = 'inventory:movement';
+  static const String financeView = 'finance:view';
+  static const String financeCreate = 'finance:create';
+  static const String healthView = 'health:view';
+  static const String healthManage = 'health:manage';
+  static const String buildingManage = 'building:manage';
+  static const String memberManage = 'member:manage';
+}
+
 class Farm {
   final String id;
   final String name;
@@ -7,7 +24,12 @@ class Farm {
   final String? currency;
   final String? role;
   final String? plan;
+  final String? planName;
   final List<String> modules;
+
+  /// Permissions effectives calculées par le serveur : droits du rôle ∩ modules de l'abonnement.
+  /// `null` si l'API n'a pas transmis la matrice (ancienne réponse) → repli sur les règles de rôle.
+  final List<String>? permissions;
 
   const Farm({
     required this.id,
@@ -18,14 +40,20 @@ class Farm {
     this.currency = "XOF",
     this.role,
     this.plan,
+    this.planName,
     this.modules = const [],
+    this.permissions,
   });
 
   factory Farm.fromJson(Map<String, dynamic> json) {
-    List<String> parsedModules = [];
-    if (json['modules'] is List) {
-      parsedModules = (json['modules'] as List).map((m) => m.toString()).toList();
-    }
+    // L'abonnement est imbriqué dans `subscription` (profil /api/auth/me)
+    final subscription = json['subscription'] is Map ? json['subscription'] as Map : const {};
+
+    final rawModules = subscription['modules'] ?? json['modules'];
+    final parsedModules = rawModules is List ? rawModules.map((m) => m.toString()).toList() : <String>[];
+
+    final rawPermissions = json['permissions'];
+    final parsedPermissions = rawPermissions is List ? rawPermissions.map((p) => p.toString()).toList() : null;
 
     return Farm(
       id: json['id'] as String,
@@ -35,8 +63,10 @@ class Farm {
       city: (json['locationCity'] ?? json['city']) as String?,
       currency: json['currency'] as String? ?? "XOF",
       role: json['role'] as String?,
-      plan: json['plan'] as String? ?? json['subscriptionPlan'] as String?,
+      plan: (subscription['plan'] ?? json['plan'] ?? json['subscriptionPlan']) as String?,
+      planName: subscription['planName'] as String?,
       modules: parsedModules,
+      permissions: parsedPermissions,
     );
   }
 
@@ -48,8 +78,12 @@ class Farm {
     'city': city,
     'currency': currency,
     'role': role,
-    'plan': plan,
-    'modules': modules,
+    'permissions': permissions,
+    'subscription': {
+      'plan': plan,
+      'planName': planName,
+      'modules': modules,
+    },
   };
 
   // --- Règles d'accès métier (Abonnement propriétaire & Rôles membre) ---
@@ -60,47 +94,86 @@ class Farm {
     return type == 'BROILER' || type == 'BROILERS';
   }
 
+  String get _role => (role ?? '').toUpperCase();
+
   /// Propriétaire ou Administrateur avec pleins pouvoirs
-  bool get isOwner {
-    final r = (role ?? '').toUpperCase();
-    return r == 'OWNER' || r == 'ADMIN';
+  bool get isOwner => _role == 'OWNER' || _role == 'ADMIN';
+
+  /// Vérifie un droit : matrice serveur (rôle ∩ abonnement) si disponible, sinon règles de rôle par défaut.
+  bool hasPermission(String permission) {
+    final perms = permissions;
+    if (perms != null) {
+      return perms.contains('*') || perms.contains(permission);
+    }
+    return _legacyRoleAllows(permission);
   }
 
-  /// Droit d'accès au module Caisse / Trésorerie
-  bool get canViewFinance {
-    if (isOwner) return true;
-    final r = (role ?? '').toUpperCase();
-    return r == 'MANAGER' || r == 'ACCOUNTANT';
+  /// Repli hors-ligne / ancienne API : reflète `FarmMembership::getPermissions()` côté Symfony.
+  bool _legacyRoleAllows(String permission) {
+    switch (_role) {
+      case 'OWNER':
+      case 'ADMIN':
+      case 'MANAGER':
+        return true;
+      case 'PRODUCTION_LEAD':
+        return const [
+          FarmPermission.flockView,
+          FarmPermission.flockCreate,
+          FarmPermission.flockMovement,
+          FarmPermission.eggView,
+          FarmPermission.eggCreate,
+          FarmPermission.inventoryView,
+          FarmPermission.inventoryMovement,
+        ].contains(permission);
+      case 'STOCK_KEEPER':
+        return const [
+          FarmPermission.inventoryView,
+          FarmPermission.inventoryMovement,
+        ].contains(permission);
+      case 'ACCOUNTANT':
+        return const [
+          FarmPermission.financeView,
+          FarmPermission.financeCreate,
+        ].contains(permission);
+      case 'VET_CONSULTANT':
+        return const [
+          FarmPermission.healthView,
+          FarmPermission.healthManage,
+          FarmPermission.flockView,
+          FarmPermission.inventoryView,
+        ].contains(permission);
+      default:
+        return false;
+    }
   }
 
-  /// Droit d'enregistrement de flux financiers (recettes / dépenses)
-  bool get canCreateFinance => canViewFinance;
+  /// Bandes & effectifs
+  bool get canViewFlocks => hasPermission(FarmPermission.flockView);
+  bool get canRecordFlockMovement => hasPermission(FarmPermission.flockMovement);
 
-  /// Droit d'accès au module Ponte d'œufs (Non applicable pour les élevages de chair)
-  bool get canViewEggs {
-    if (isBroilerOnly) return false;
-    if (isOwner) return true;
-    final r = (role ?? '').toUpperCase();
-    return r == 'MANAGER' || r == 'PRODUCTION_LEAD';
-  }
+  /// Ponte d'œufs (non applicable aux élevages 100 % chair)
+  bool get canViewEggs => !isBroilerOnly && hasPermission(FarmPermission.eggView);
+  bool get canCreateEggs => !isBroilerOnly && hasPermission(FarmPermission.eggCreate);
 
-  /// Droit d'enregistrement des ramassages de ponte
-  bool get canCreateEggs => canViewEggs;
+  /// Caisse / Trésorerie
+  bool get canViewFinance => hasPermission(FarmPermission.financeView);
+  bool get canCreateFinance => hasPermission(FarmPermission.financeCreate);
 
-  /// Droit d'accès aux intrants & alimentation
-  bool get canViewInventory {
-    if (isOwner) return true;
-    final r = (role ?? '').toUpperCase();
-    return r == 'MANAGER' || r == 'STOCK_KEEPER';
-  }
+  /// Stocks, intrants & distribution d'aliment
+  bool get canViewInventory => hasPermission(FarmPermission.inventoryView);
+  bool get canFeed => hasPermission(FarmPermission.inventoryMovement);
 
-  /// Droit d'accès au suivi sanitaire et soins
-  bool get canViewHealth {
-    if (isOwner) return true;
-    final r = (role ?? '').toUpperCase();
-    return r == 'MANAGER' || r == 'VET_CONSULTANT';
-  }
+  /// Suivi sanitaire et soins
+  bool get canViewHealth => hasPermission(FarmPermission.healthView);
+  bool get canManageHealth => hasPermission(FarmPermission.healthManage);
 
-  /// Droit de déclarer un soin ou vaccin
-  bool get canManageHealth => canViewHealth;
+  /// Administration
+  bool get canManageBuildings => hasPermission(FarmPermission.buildingManage);
+  bool get canManageMembers => hasPermission(FarmPermission.memberManage);
+  bool get canManageSubscription => isOwner;
+  bool get canViewReports => canViewEggs || canViewFlocks || canViewFinance;
+
+  /// Au moins une action de saisie rapide est autorisée
+  bool get hasAnyQuickAction =>
+      canCreateEggs || canFeed || canCreateFinance || canManageHealth || canRecordFlockMovement;
 }

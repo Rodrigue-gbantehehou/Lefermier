@@ -75,7 +75,8 @@ void main() {
     expect(find.text('Accueil'), findsOneWidget);
     expect(find.text('Bandes'), findsOneWidget);
     expect(find.text('Caisse'), findsOneWidget);
-    expect(find.text('Menu'), findsOneWidget);
+    expect(find.text('Stocks'), findsOneWidget);
+    expect(find.text('Menu'), findsNothing);
     expect(find.text('Ponte'), findsNothing);
   });
 }

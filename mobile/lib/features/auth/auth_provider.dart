@@ -117,8 +117,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> loadFarms() async {
     try {
-      final response = await _apiClient.dio.get(ApiEndpoints.farms);
-      final rawList = response.data['data'] as List<dynamic>? ?? [];
+      // Le profil /me fournit, pour chaque ferme, les permissions effectives (rôle ∩ abonnement)
+      List<dynamic> rawList;
+      try {
+        final meResponse = await _apiClient.dio.get(ApiEndpoints.me);
+        final profile = meResponse.data['data'] as Map<String, dynamic>? ?? const {};
+        rawList = profile['farms'] as List<dynamic>? ?? [];
+      } on DioException {
+        final response = await _apiClient.dio.get(ApiEndpoints.farms);
+        rawList = response.data['data'] as List<dynamic>? ?? [];
+      }
       final farms = rawList
           .map((item) => Farm.fromJson(item as Map<String, dynamic>))
           .toList();

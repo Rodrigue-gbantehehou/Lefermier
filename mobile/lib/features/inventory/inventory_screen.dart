@@ -9,7 +9,8 @@ import '../../core/widgets/brand_loader.dart';
 import 'inventory_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
-  const InventoryScreen({super.key});
+  final VoidCallback? onOpenMenu;
+  const InventoryScreen({super.key, this.onOpenMenu});
 
   @override
   ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
@@ -669,6 +670,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: "Retour",
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: "Menu",
+                onPressed: widget.onOpenMenu ?? () => Scaffold.of(context).openDrawer(),
+              ),
         title: const Text("Stocks & Intrants"),
         actions: [
           IconButton(

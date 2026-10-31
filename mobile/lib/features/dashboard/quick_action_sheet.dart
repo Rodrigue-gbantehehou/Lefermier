@@ -55,8 +55,12 @@ class QuickActionSheet extends ConsumerWidget {
 
     // Filtres d'actions selon l'abonnement de la ferme et le rôle utilisateur
     final canEgg = farm == null || farm.canCreateEggs;
+    final canFeed = farm == null || farm.canFeed;
     final canFinance = farm == null || farm.canCreateFinance;
     final canHealth = farm == null || farm.canManageHealth;
+    final canMovement = farm == null || farm.canRecordFlockMovement;
+
+    final hasAnyAction = canEgg || canFeed || canFinance || canHealth || canMovement;
 
     return Container(
       decoration: BoxDecoration(
@@ -114,120 +118,135 @@ class QuickActionSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // Grille d'actions filtrées
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 2.2,
-            children: [
-              // 1. Ramassage d'œufs (Uniquement si ponte autorisée & non-chair)
-              if (canEgg)
-                _ActionButton(
-                  icon: Icons.egg_outlined,
-                  label: "Ponte d'œufs",
-                  subtitle: "Ramassage du lot",
-                  color: AppColors.accent,
-                  onTap: () {
-                    Navigator.pop(context);
-                    onRecordEgg();
-                  },
+          if (!hasAnyAction)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  "Aucune action de saisie autorisée pour ce profil.",
+                  style: TextStyle(fontSize: 13, color: AppColors.textMutedLight),
                 ),
+              ),
+            )
+          else ...[
+            // Grille d'actions filtrées
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 2.2,
+              children: [
+                // 1. Ramassage d'œufs (Uniquement si ponte autorisée & non-chair)
+                if (canEgg)
+                  _ActionButton(
+                    icon: Icons.egg_outlined,
+                    label: "Ponte d'œufs",
+                    subtitle: "Ramassage du lot",
+                    color: AppColors.accent,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRecordEgg();
+                    },
+                  ),
 
-              // 2. Nourrir / Distribution d'aliment
-              _ActionButton(
-                icon: Icons.restaurant_outlined,
-                label: "Nourrir",
-                subtitle: "Aliment & Eau",
-                color: AppColors.primary,
+                // 2. Nourrir / Distribution d'aliment (Conditionné par gestion de stock/ration)
+                if (canFeed)
+                  _ActionButton(
+                    icon: Icons.restaurant_outlined,
+                    label: "Nourrir",
+                    subtitle: "Aliment & Eau",
+                    color: AppColors.primary,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRecordFeeding();
+                    },
+                  ),
+
+                // 3. Vente / Encaissement (Conditionné par rôle financier)
+                if (canFinance)
+                  _ActionButton(
+                    icon: Icons.trending_up,
+                    label: "Recette",
+                    subtitle: "Vente d'œufs / poules",
+                    color: AppColors.success,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRecordIncome();
+                    },
+                  ),
+
+                // 4. Dépense / Achat (Conditionné par rôle financier)
+                if (canFinance)
+                  _ActionButton(
+                    icon: Icons.trending_down,
+                    label: "Dépense",
+                    subtitle: "Achat ou charge",
+                    color: AppColors.danger,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRecordExpense();
+                    },
+                  ),
+
+                // 5. Soin / Traitement sanitaire (Conditionné par rôle sanitaire)
+                if (canHealth)
+                  _ActionButton(
+                    icon: Icons.medical_services_outlined,
+                    label: "Soin / Vaccin",
+                    subtitle: "Suivi vétérinaire",
+                    color: AppColors.primary,
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (onRecordHealth != null) {
+                        onRecordHealth!();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Enregistrement soin / vaccin sanitaire...")),
+                        );
+                      }
+                    },
+                  ),
+              ],
+            ),
+
+            if (canMovement) ...[
+              const SizedBox(height: 12),
+              // Perte / Mortalité
+              InkWell(
                 onTap: () {
                   Navigator.pop(context);
-                  onRecordFeeding();
+                  onRecordMovement();
                 },
-              ),
-
-              // 3. Vente / Encaissement (Conditionné par rôle financier)
-              if (canFinance)
-                _ActionButton(
-                  icon: Icons.trending_up,
-                  label: "Recette",
-                  subtitle: "Vente d'œufs / poules",
-                  color: AppColors.success,
-                  onTap: () {
-                    Navigator.pop(context);
-                    onRecordIncome();
-                  },
-                ),
-
-              // 4. Dépense / Achat (Conditionné par rôle financier)
-              if (canFinance)
-                _ActionButton(
-                  icon: Icons.trending_down,
-                  label: "Dépense",
-                  subtitle: "Achat ou charge",
-                  color: AppColors.danger,
-                  onTap: () {
-                    Navigator.pop(context);
-                    onRecordExpense();
-                  },
-                ),
-
-              // 5. Soin / Traitement sanitaire (Conditionné par rôle sanitaire)
-              if (canHealth)
-                _ActionButton(
-                  icon: Icons.medical_services_outlined,
-                  label: "Soin / Vaccin",
-                  subtitle: "Suivi vétérinaire",
-                  color: AppColors.primary,
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (onRecordHealth != null) {
-                      onRecordHealth!();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Enregistrement soin / vaccin sanitaire...")),
-                      );
-                    }
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Perte / Mortalité
-          InkWell(
-            onTap: () {
-              Navigator.pop(context);
-              onRecordMovement();
-            },
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.danger.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 20),
-                  SizedBox(width: 10),
-                  Text(
-                    "Perte / Mortalité ou Sortie",
-                    style: TextStyle(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
                   ),
-                  Spacer(),
-                  Icon(Icons.chevron_right, color: AppColors.danger, size: 18),
-                ],
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 20),
+                      SizedBox(width: 10),
+                      Text(
+                        "Perte / Mortalité ou Sortie",
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Spacer(),
+                      Icon(Icons.chevron_right, color: AppColors.danger, size: 18),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            ],
+          ],
         ],
       ),
     ),
