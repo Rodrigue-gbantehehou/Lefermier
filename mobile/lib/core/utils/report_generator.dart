@@ -94,6 +94,7 @@ class ReportGenerator {
     DateTime? date,
   }) {
     final d = date ?? DateTime.now();
+    final buffer = StringBuffer();
     String formattedMonth;
     try {
       formattedMonth = DateFormat('MMMM yyyy', 'fr_FR').format(d);
