@@ -94,12 +94,20 @@ class ReportGenerator {
     DateTime? date,
   }) {
     final d = date ?? DateTime.now();
-    final buffer = StringBuffer();
-    final monthFmt = DateFormat('MMMM yyyy', 'fr_FR');
+    String formattedMonth;
+    try {
+      formattedMonth = DateFormat('MMMM yyyy', 'fr_FR').format(d);
+    } catch (_) {
+      const months = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ];
+      formattedMonth = "${months[d.month - 1]} ${d.year}";
+    }
 
     buffer.writeln("💰 *BILAN FINANCIER & CAISSE*");
     buffer.writeln("🏠 *Exploitation :* ${farm.name}");
-    buffer.writeln("📅 *Période :* ${monthFmt.format(d)}");
+    buffer.writeln("📅 *Période :* $formattedMonth");
     buffer.writeln("--------------------------------");
     buffer.writeln("💵 *Solde net disponible :*");
     buffer.writeln("  *${summary.netBalance >= 0 ? '+' : ''}${CurrencyFormatter.formatFcfa(summary.netBalance)}*");
