@@ -20,6 +20,7 @@ class FarmVoter extends Voter
     public const VIEW = 'FARM_VIEW';
     public const EDIT = 'FARM_EDIT';
     public const MANAGE_MEMBERS = 'FARM_MANAGE_MEMBERS';
+    public const MANAGE_ROLES = 'FARM_MANAGE_ROLES';
     public const DELETE = 'FARM_DELETE';
 
     public function __construct(
@@ -29,7 +30,7 @@ class FarmVoter extends Voter
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        if (!in_array($attribute, [self::VIEW, self::EDIT, self::MANAGE_MEMBERS, self::DELETE], true)) {
+        if (!in_array($attribute, [self::VIEW, self::EDIT, self::MANAGE_MEMBERS, self::MANAGE_ROLES, self::DELETE], true)) {
             return false;
         }
 
@@ -64,6 +65,7 @@ class FarmVoter extends Voter
             self::VIEW => true, // Tout membre actif d'une ferme a le droit de base de la consulter
             self::EDIT => $membership->hasPermission(Permission::FARM_EDIT),
             self::MANAGE_MEMBERS => $membership->hasPermission(Permission::MEMBER_MANAGE),
+            self::MANAGE_ROLES => $membership->hasPermission(Permission::ROLE_MANAGE),
             self::DELETE => $membership->hasPermission(Permission::FARM_DELETE),
             default => false,
         };

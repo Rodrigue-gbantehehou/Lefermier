@@ -83,19 +83,21 @@ class SubscriptionPlansController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Vérifier que l'utilisateur est bien membre de cette ferme
-        $isMember = false;
-        foreach ($farm->getFarmMemberships() as $membership) {
-            if ($membership->getUser() === $user && $membership->isActive()) {
-                $isMember = true;
-                break;
+        // Vérifier que l'utilisateur est propriétaire ou admin de cette ferme
+        $isOwnerOrAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
+        if (!$isOwnerOrAdmin) {
+            foreach ($farm->getFarmMemberships() as $membership) {
+                if ($membership->getUser() === $user && $membership->isActive() && $membership->getRole() === \App\Enum\FarmRole::OWNER) {
+                    $isOwnerOrAdmin = true;
+                    break;
+                }
             }
         }
 
-        if (!$isMember) {
+        if (!$isOwnerOrAdmin) {
             return $this->json([
                 'status' => 'error',
-                'message' => 'Accès refusé à cette ferme.',
+                'message' => 'Accès refusé. Seul le propriétaire peut consulter les détails d\'abonnement.',
             ], Response::HTTP_FORBIDDEN);
         }
 

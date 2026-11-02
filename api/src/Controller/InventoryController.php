@@ -35,7 +35,7 @@ class InventoryController extends AbstractController
     }
 
     #[Route('/api/farms/{id}/inventory', name: 'api_farms_inventory_list', methods: ['GET'])]
-    #[IsGranted(FarmVoter::VIEW, subject: 'farm')]
+    #[IsGranted(InventoryVoter::VIEW, subject: 'farm')]
     public function list(
         Farm $farm,
         Request $request,
@@ -61,7 +61,7 @@ class InventoryController extends AbstractController
     }
 
     #[Route('/api/farms/{id}/inventory', name: 'api_farms_inventory_create', methods: ['POST'])]
-    #[IsGranted(FarmVoter::EDIT, subject: 'farm')]
+    #[IsGranted(InventoryVoter::CREATE, subject: 'farm')]
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateInventoryItemRequestDto $dto,

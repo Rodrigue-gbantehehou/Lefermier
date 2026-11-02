@@ -10,6 +10,7 @@ use App\Entity\Farm;
 use App\Entity\Role;
 use App\Repository\RoleRepository;
 use App\Security\Permission;
+use App\Security\Voter\FarmVoter;
 use App\Service\RoleService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -53,7 +54,7 @@ class RoleController extends AbstractController
     }
 
     #[Route('/farms/{id}/roles', name: 'farm_roles_create', methods: ['POST'])]
-    #[IsGranted('FARM_EDIT', subject: 'farm')]
+    #[IsGranted(FarmVoter::MANAGE_ROLES, subject: 'farm')]
     public function createFarmRole(
         Farm $farm,
         #[MapRequestPayload] CreateRoleRequestDto $dto,
@@ -68,7 +69,7 @@ class RoleController extends AbstractController
     }
 
     #[Route('/farms/{id}/roles/{roleId}', name: 'farm_roles_update', methods: ['PUT'])]
-    #[IsGranted('FARM_EDIT', subject: 'farm')]
+    #[IsGranted(FarmVoter::MANAGE_ROLES, subject: 'farm')]
     public function updateFarmRole(
         Farm $farm,
         string $roleId,
@@ -92,7 +93,7 @@ class RoleController extends AbstractController
     }
 
     #[Route('/farms/{id}/roles/{roleId}', name: 'farm_roles_delete', methods: ['DELETE'])]
-    #[IsGranted('FARM_EDIT', subject: 'farm')]
+    #[IsGranted(FarmVoter::MANAGE_ROLES, subject: 'farm')]
     public function deleteFarmRole(
         Farm $farm,
         string $roleId,

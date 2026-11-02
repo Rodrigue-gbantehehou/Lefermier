@@ -21,7 +21,7 @@ enum MemberRole {
     for (final r in MemberRole.values) {
       if (r.code == code) return r;
     }
-    return MemberRole.manager;
+    return MemberRole.productionLead;
   }
 }
 

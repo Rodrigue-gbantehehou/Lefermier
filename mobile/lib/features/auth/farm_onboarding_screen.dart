@@ -190,7 +190,7 @@ class _FarmOnboardingScreenState extends ConsumerState<FarmOnboardingScreen> {
                           title: "Poulets de Chair",
                           description: "Suivi de croissance rapide, pesées, gain moyen quotidien (GMQ) et abattage.",
                           icon: Icons.restaurant_rounded,
-                          iconColor: const Color(0xFFE11D48),
+                          iconColor: AppColors.dangerRose,
                           isSelected: _productionType == 'BROILER',
                           isDark: isDark,
                         ),

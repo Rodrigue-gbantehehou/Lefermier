@@ -75,7 +75,7 @@ class FlockController extends AbstractController
     }
 
     #[Route('/api/farms/{id}/flocks', name: 'api_farms_flocks_create', methods: ['POST'])]
-    #[IsGranted(FarmVoter::EDIT, subject: 'farm')]
+    #[IsGranted(FlockVoter::CREATE, subject: 'farm')]
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateFlockRequestDto $dto,

@@ -55,11 +55,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     _selectedFlockId = widget.initialFlockId;
   }
 
-  String _buildReportText() {
+  String _buildReportText(ReportType type) {
     final farm = ref.watch(authProvider).activeFarm;
     if (farm == null) return "Veuillez sélectionner une exploitation.";
 
-    switch (_selectedType) {
+    switch (type) {
       case ReportType.dailyEgg:
         final eggState = ref.watch(eggProvider);
         return ReportGenerator.generateDailyEggReport(
@@ -130,7 +130,22 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final reportText = _buildReportText();
+    final farm = ref.watch(authProvider).activeFarm;
+
+    final availableTypes = ReportType.values.where((type) {
+      if (farm == null) return true;
+      if (type == ReportType.financeBalance) return farm.canViewFinance;
+      if (type == ReportType.dailyEgg) return farm.canViewEggs;
+      if (type == ReportType.inventoryAlerts) return farm.canViewInventory;
+      if (type == ReportType.flockSummary) return farm.canViewFlocks;
+      return true;
+    }).toList();
+
+    final effectiveType = availableTypes.contains(_selectedType)
+        ? _selectedType
+        : (availableTypes.isNotEmpty ? availableTypes.first : _selectedType);
+
+    final reportText = _buildReportText(effectiveType);
     final flockState = ref.watch(flockProvider);
 
     return Scaffold(
@@ -232,8 +247,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: ReportType.values.map((type) {
-                  final isSelected = _selectedType == type;
+                children: availableTypes.map((type) {
+                  final isSelected = effectiveType == type;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: InkWell(

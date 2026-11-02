@@ -68,6 +68,18 @@ class EggProductionVoter extends Voter
             return false;
         }
 
+        $flock = match (true) {
+            $subject instanceof EggProduction => $subject->getFlock(),
+            $subject instanceof Flock => $subject,
+            default => null,
+        };
+
+        if ($flock !== null && $membership->hasBuildingRestrictions()) {
+            if (!$membership->isBuildingAssigned($flock->getBuilding())) {
+                return false;
+            }
+        }
+
         return match ($attribute) {
             self::VIEW => $membership->hasPermission(Permission::EGG_VIEW),
             self::RECORD, self::EDIT, self::DELETE => $membership->hasPermission(Permission::EGG_CREATE),

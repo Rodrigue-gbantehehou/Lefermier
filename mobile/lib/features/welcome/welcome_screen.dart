@@ -54,8 +54,8 @@ class WelcomeScreen extends StatelessWidget {
                 colors: [
                   Colors.black.withValues(alpha: 0.30),
                   Colors.black.withValues(alpha: 0.50),
-                  const Color(0xFF03140E).withValues(alpha: 0.88),
-                  const Color(0xFF03140E).withValues(alpha: 0.98),
+                  AppColors.brandDarkBackground.withValues(alpha: 0.88),
+                  AppColors.brandDarkBackground.withValues(alpha: 0.98),
                 ],
                 stops: const [0.0, 0.30, 0.60, 1.0],
               ),
@@ -160,14 +160,14 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   _buildFeatureRow(
                     icon: Icons.account_balance_wallet_outlined,
-                    iconColor: const Color(0xFF34D399),
+                    iconColor: AppColors.brandEmeraldLight,
                     title: "Caisse & Rentabilité nette",
                     subtitle: "Ventes d'alvéoles, dépenses en aliment et bénéfice net par bande.",
                   ),
                   const SizedBox(height: 10),
                   _buildFeatureRow(
                     icon: Icons.wifi_off_rounded,
-                    iconColor: const Color(0xFF60A5FA),
+                    iconColor: AppColors.brandBlueLight,
                     title: "100% Fonctionnel Hors-Ligne",
                     subtitle: "Enregistrez au poulailler, synchronisation transparente au retour du réseau.",
                   ),

@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/widgets/brand_loader.dart';
+import '../auth/auth_provider.dart';
 import 'subscription_provider.dart';
 
 class SubscriptionScreen extends ConsumerWidget {
@@ -14,6 +15,58 @@ class SubscriptionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final farm = authState.activeFarm;
+
+    if (farm == null || !farm.canManageSubscription) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: onBack != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  tooltip: "Retour",
+                  onPressed: onBack,
+                )
+              : (onOpenMenu != null
+                  ? IconButton(
+                      icon: const Icon(Icons.menu_rounded),
+                      tooltip: "Menu",
+                      onPressed: onOpenMenu,
+                    )
+                  : null),
+          title: const Text("Abonnement"),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 48, color: AppColors.textMutedLight),
+                const SizedBox(height: 16),
+                const Text(
+                  "Accès réservé au propriétaire",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Seul le propriétaire de l'exploitation peut consulter ou modifier la formule d'abonnement.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.textMutedLight),
+                ),
+                const SizedBox(height: 20),
+                if (onBack != null)
+                  ElevatedButton(
+                    onPressed: onBack,
+                    child: const Text("Retour"),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final state = ref.watch(subscriptionProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

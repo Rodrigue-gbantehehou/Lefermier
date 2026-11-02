@@ -169,8 +169,8 @@ class DashboardScreen extends ConsumerWidget {
                               badgeText: "${kpi.todayTraysCount} plateaux",
                               badgeColor: AppColors.accent,
                               icon: Icons.egg_rounded,
-                              customBgColor: isDark ? const Color(0xFF282115) : const Color(0xFFFFFBEB),
-                              customBorderColor: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
+                              customBgColor: isDark ? AppColors.kpiEggBgDark : AppColors.kpiEggBgLight,
+                              customBorderColor: isDark ? AppColors.kpiEggBorderDark : AppColors.kpiEggBorderLight,
                               onTap: onNavigateToEggs,
                             ),
                           if (canViewFlocks)
@@ -181,8 +181,8 @@ class DashboardScreen extends ConsumerWidget {
                               badgeText: "${kpi.activeFlocksCount} lot(s) actif(s)",
                               badgeColor: AppColors.primary,
                               icon: Icons.pets_rounded,
-                              customBgColor: isDark ? const Color(0xFF132A1F) : const Color(0xFFF0FDF4),
-                              customBorderColor: isDark ? const Color(0xFF065F46) : const Color(0xFFBBF7D0),
+                              customBgColor: isDark ? AppColors.kpiFlockBgDark : AppColors.kpiFlockBgLight,
+                              customBorderColor: isDark ? AppColors.kpiFlockBorderDark : AppColors.kpiFlockBorderLight,
                               onTap: onNavigateToFlocks,
                             ),
                           if (canViewFinance)
@@ -194,11 +194,11 @@ class DashboardScreen extends ConsumerWidget {
                               badgeColor: kpi.currentMonthNetBalance >= 0 ? AppColors.success : AppColors.danger,
                               icon: Icons.account_balance_wallet_rounded,
                               customBgColor: isDark
-                                  ? const Color(0xFF172D24)
-                                  : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
+                                  ? AppColors.kpiFinanceBgDark
+                                  : (kpi.currentMonthNetBalance >= 0 ? AppColors.primarySoft : AppColors.kpiFinanceLossBgLight),
                               customBorderColor: isDark
-                                  ? const Color(0xFF047857)
-                                  : (kpi.currentMonthNetBalance >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
+                                  ? AppColors.primaryHover
+                                  : (kpi.currentMonthNetBalance >= 0 ? AppColors.kpiFinanceBorderLight : AppColors.kpiFinanceLossBorderLight),
                               onTap: onNavigateToFinances,
                             ),
                           if (canViewEggs)
@@ -207,10 +207,10 @@ class DashboardScreen extends ConsumerWidget {
                               value: "${kpi.todayLayingRate.toStringAsFixed(1)}%",
                               unit: "journalier",
                               badgeText: kpi.todayLayingRate >= 70 ? "Bon rendement" : "Démarrage / fin",
-                              badgeColor: const Color(0xFF0284C7),
+                              badgeColor: AppColors.kpiRateBadge,
                               icon: Icons.show_chart_rounded,
-                              customBgColor: isDark ? const Color(0xFF172535) : const Color(0xFFF0F9FF),
-                              customBorderColor: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD),
+                              customBgColor: isDark ? AppColors.kpiRateBgDark : AppColors.kpiRateBgLight,
+                              customBorderColor: isDark ? AppColors.kpiRateBorderDark : AppColors.kpiRateBorderLight,
                               onTap: onNavigateToEggs,
                             ),
                         ],
@@ -488,7 +488,7 @@ class _KpiCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textMutedDark : const Color(0xFF334155),
+                    color: isDark ? AppColors.textMutedDark : AppColors.borderDark,
                   ),
                 ),
                 Icon(icon, size: 16, color: badgeColor),

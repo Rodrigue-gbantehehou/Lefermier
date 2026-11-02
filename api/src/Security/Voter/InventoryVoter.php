@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Security\Voter;
 
+use App\Entity\Farm;
 use App\Entity\FarmMembership;
 use App\Entity\InventoryItem;
 use App\Entity\User;
@@ -13,11 +14,12 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
- * @extends Voter<string, InventoryItem>
+ * @extends Voter<string, InventoryItem|Farm>
  */
 class InventoryVoter extends Voter
 {
     public const VIEW = 'INVENTORY_VIEW';
+    public const CREATE = 'INVENTORY_CREATE';
     public const EDIT = 'INVENTORY_EDIT';
     public const MOVE = 'INVENTORY_MOVE';
 
@@ -28,11 +30,11 @@ class InventoryVoter extends Voter
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        if (!in_array($attribute, [self::VIEW, self::EDIT, self::MOVE], true)) {
+        if (!in_array($attribute, [self::VIEW, self::CREATE, self::EDIT, self::MOVE], true)) {
             return false;
         }
 
-        return $subject instanceof InventoryItem;
+        return $subject instanceof InventoryItem || $subject instanceof Farm;
     }
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, #[\SensitiveParameter] mixed $vote = null): bool
@@ -46,11 +48,18 @@ class InventoryVoter extends Voter
             return true;
         }
 
-        /** @var InventoryItem $item */
-        $item = $subject;
+        $farm = match (true) {
+            $subject instanceof InventoryItem => $subject->getFarm(),
+            $subject instanceof Farm => $subject,
+            default => null,
+        };
+
+        if ($farm === null) {
+            return false;
+        }
 
         $membership = $this->membershipRepository->findOneBy([
-            'farm' => $item->getFarm(),
+            'farm' => $farm,
             'user' => $user,
             'isActive' => true,
         ]);
@@ -61,6 +70,7 @@ class InventoryVoter extends Voter
 
         return match ($attribute) {
             self::VIEW => $membership->hasPermission(Permission::INVENTORY_VIEW),
+            self::CREATE => $membership->hasPermission(Permission::INVENTORY_CREATE),
             self::EDIT => $membership->hasPermission(Permission::INVENTORY_CREATE),
             self::MOVE => $membership->hasPermission(Permission::INVENTORY_MOVEMENT),
             default => false,

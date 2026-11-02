@@ -11,6 +11,7 @@ use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\User;
 use App\Repository\EggProductionRepository;
+use App\Repository\FarmMembershipRepository;
 use App\Security\Voter\EggProductionVoter;
 use App\Security\Voter\FarmVoter;
 use App\Service\EggProductionService;
@@ -29,6 +30,7 @@ class EggProductionController extends AbstractController
     public function __construct(
         private readonly EggProductionService $eggProductionService,
         private readonly EggProductionRepository $eggProductionRepository,
+        private readonly FarmMembershipRepository $membershipRepository,
         private readonly IdempotencyService $idempotencyService,
     ) {
     }
@@ -48,6 +50,17 @@ class EggProductionController extends AbstractController
 
         $productions = $this->eggProductionRepository->findByFarm($farm, $startDate, $endDate, $limit);
         $summary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate);
+
+        $currentUser = $this->getUser();
+        if ($currentUser instanceof User) {
+            $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser, 'isActive' => true]);
+            if ($membership !== null && $membership->hasBuildingRestrictions()) {
+                $productions = array_values(array_filter(
+                    $productions,
+                    fn (EggProduction $p) => $membership->isBuildingAssigned($p->getFlock()->getBuilding())
+                ));
+            }
+        }
 
         $serialized = array_map(
             fn (EggProduction $p) => $this->eggProductionService->serializeEggProduction($p),

@@ -38,6 +38,38 @@ class AppColors {
   static const Color borderDark = Color(0xFF334155);
   static const Color textMainDark = Color(0xFFF8FAFC);
   static const Color textMutedDark = Color(0xFF94A3B8);
+
+  // Brand Dark & Ambient Gradients
+  static const Color brandDarkBackground = Color(0xFF03140E);
+  static const Color brandDeepGreen = Color(0xFF062319);
+  static const Color brandEmeraldLight = Color(0xFF34D399);
+  static const Color brandBlueLight = Color(0xFF60A5FA);
+  static const Color dangerRose = Color(0xFFE11D48);
+
+  // Input Fill Colors
+  static const Color inputFillLight = Color(0xFFF1F5F9);
+
+  // KPI Dashboard Cards
+  static const Color kpiEggBgDark = Color(0xFF282115);
+  static const Color kpiEggBorderDark = Color(0xFF78350F);
+  static const Color kpiEggBgLight = Color(0xFFFFFBEB);
+  static const Color kpiEggBorderLight = Color(0xFFFDE68A);
+
+  static const Color kpiFlockBgDark = Color(0xFF132A1F);
+  static const Color kpiFlockBorderDark = Color(0xFF065F46);
+  static const Color kpiFlockBgLight = Color(0xFFF0FDF4);
+  static const Color kpiFlockBorderLight = Color(0xFFBBF7D0);
+
+  static const Color kpiFinanceBgDark = Color(0xFF172D24);
+  static const Color kpiFinanceLossBgLight = Color(0xFFFEF2F2);
+  static const Color kpiFinanceBorderLight = Color(0xFFA7F3D0);
+  static const Color kpiFinanceLossBorderLight = Color(0xFFFECACA);
+
+  static const Color kpiRateBadge = Color(0xFF0284C7);
+  static const Color kpiRateBgDark = Color(0xFF172535);
+  static const Color kpiRateBgLight = Color(0xFFF0F9FF);
+  static const Color kpiRateBorderDark = Color(0xFF0369A1);
+  static const Color kpiRateBorderLight = Color(0xFFBAE6FD);
 }
 
 class AppTheme {
@@ -80,7 +112,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFFF1F5F9),
+        fillColor: AppColors.inputFillLight,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -149,7 +181,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF1E293B),
+        fillColor: AppColors.surfaceDark,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
