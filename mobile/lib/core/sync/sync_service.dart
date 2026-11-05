@@ -76,21 +76,35 @@ class SyncService {
     await _saveQueue(prefs, currentQueue);
   }
 
-  Future<void> retryFailedItem(String id) async {
+  /// Relance une action en échec.
+  /// Sécurité stricte :
+  /// 1. Les actions orphelines (sans propriétaire) restent en quarantaine et ne sont jamais réattribuées subrepticement.
+  /// 2. Une action appartenant à un tiers ne peut pas être relancée par la session courante.
+  Future<bool> retryFailedItem(String id) async {
     final prefs = await SharedPreferences.getInstance();
     final currentQueue = await getQueue();
     final index = currentQueue.indexWhere((item) => item.id == id);
     if (index != -1) {
+      final item = currentQueue[index];
+      // Sécurité : Les actions orphelines restent strictement en quarantaine.
+      if (item.ownerKey == null || item.ownerKey!.isEmpty) {
+        return false;
+      }
       final currentOwner = _apiClient.sessionSubject;
-      currentQueue[index] = currentQueue[index].copyWith(
+      // Sécurité : Seul le propriétaire d'origine peut relancer son action.
+      if (currentOwner == null || item.ownerKey != currentOwner) {
+        return false;
+      }
+      currentQueue[index] = item.copyWith(
         status: SyncItemStatus.pending,
         retryCount: 0,
-        ownerKey: currentQueue[index].ownerKey ?? currentOwner,
         clearNextAttempt: true,
         clearError: true,
       );
       await _saveQueue(prefs, currentQueue);
+      return true;
     }
+    return false;
   }
 
   Future<void> clearQueue() async {

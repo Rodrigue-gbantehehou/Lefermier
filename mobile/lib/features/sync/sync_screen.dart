@@ -225,56 +225,63 @@ class SyncScreen extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: AppColors.danger.withValues(alpha: 0.2),
+                                  color: (item.ownerKey == null || item.ownerKey!.isEmpty)
+                                      ? Colors.orange.withValues(alpha: 0.2)
+                                      : AppColors.danger.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  item.httpStatus != null ? "HTTP ${item.httpStatus}" : "REJETÉ",
-                                  style: const TextStyle(
+                                  (item.ownerKey == null || item.ownerKey!.isEmpty)
+                                      ? "QUARANTAINE"
+                                      : (item.httpStatus != null ? "HTTP ${item.httpStatus}" : "REJETÉ"),
+                                  style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.danger,
+                                    color: (item.ownerKey == null || item.ownerKey!.isEmpty)
+                                        ? Colors.orange.shade800
+                                        : AppColors.danger,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  item.label,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item.label,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              Text(
-                                DateFormat('HH:mm:ss').format(item.createdAt),
-                                style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
-                              ),
-                            ],
-                          ),
-                          if (item.lastError != null) ...[
-                            const SizedBox(height: 6),
+                            ),
                             Text(
-                              item.lastError!,
-                              style: const TextStyle(fontSize: 11, color: AppColors.danger, height: 1.25),
+                              DateFormat('HH:mm:ss').format(item.createdAt),
+                              style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
                             ),
                           ],
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.danger,
-                                  side: BorderSide(color: AppColors.danger.withValues(alpha: 0.4)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  minimumSize: const Size(0, 32),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                icon: const Icon(Icons.delete_outline_rounded, size: 14),
-                                label: const Text("Abandonner", style: TextStyle(fontSize: 11)),
-                                onPressed: () => _confirmRemoveItem(context, ref, item),
+                        ),
+                        if (item.lastError != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            item.lastError!,
+                            style: const TextStyle(fontSize: 11, color: AppColors.danger, height: 1.25),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.danger,
+                                side: BorderSide(color: AppColors.danger.withValues(alpha: 0.4)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: const Size(0, 32),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
+                              icon: const Icon(Icons.delete_outline_rounded, size: 14),
+                              label: const Text("Abandonner", style: TextStyle(fontSize: 11)),
+                              onPressed: () => _confirmRemoveItem(context, ref, item),
+                            ),
+                            if (item.ownerKey != null && item.ownerKey!.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
@@ -289,7 +296,8 @@ class SyncScreen extends ConsumerWidget {
                                 onPressed: () => ref.read(syncProvider.notifier).retryAction(item.id),
                               ),
                             ],
-                          ),
+                          ],
+                        ),
                         ],
                       ),
                     );

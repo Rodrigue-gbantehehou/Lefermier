@@ -71,10 +71,10 @@ class OfflineCacheService {
         final cachedUserId = decoded['userId'] as String?;
 
         // Isolation stricte :
-        // 1. Si session utilisateur active, refuser le cache d'un autre utilisateur
+        // 1. Si session utilisateur active, refuser tout cache qui n'appartient pas exactement à cet utilisateur (interdiction des données sans propriétaire ou d'un tiers)
         // 2. Si le cache a un propriétaire, une session anonyme ne peut pas le lire
         if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
-          if (cachedUserId != null && cachedUserId != effectiveUserId) {
+          if (cachedUserId != effectiveUserId) {
             return null;
           }
         } else if (cachedUserId != null && cachedUserId.isNotEmpty) {
@@ -120,7 +120,7 @@ class OfflineCacheService {
         final cachedUserId = decoded['userId'] as String?;
 
         if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
-          if (cachedUserId != null && cachedUserId != effectiveUserId) {
+          if (cachedUserId != effectiveUserId) {
             return null;
           }
         } else if (cachedUserId != null && cachedUserId.isNotEmpty) {

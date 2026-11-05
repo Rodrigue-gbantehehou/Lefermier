@@ -164,5 +164,24 @@ void main() {
 
       expect(result, isNull);
     });
+
+    test('Authenticated caller cannot read cache with null or missing userId', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final envelope = {
+        'v': 2,
+        'savedAt': DateTime.now().toIso8601String(),
+        'userId': null,
+        'data': {'kpi': 100},
+      };
+      await prefs.setString('offline_cache_v2_farm_001_dashboard', jsonEncode(envelope));
+
+      final result = await cacheService.getMapCache(
+        farmId: 'farm_001',
+        category: 'dashboard',
+        currentUserId: 'user_alice',
+      );
+
+      expect(result, isNull);
+    });
   });
 }

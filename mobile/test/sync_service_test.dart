@@ -186,6 +186,30 @@ void main() {
       expect(queue.first.retryCount, 0);
     });
 
+    test('retryFailedItem refuses to retry or adopt orphan action', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final orphanItem = SyncQueueItem(
+        id: 'orphan_retry_test',
+        label: 'Action orpheline bloquée',
+        method: 'POST',
+        endpoint: '/api/orphan-test',
+        payload: {},
+        idempotencyKey: 'idem_orphan_retry',
+        createdAt: DateTime.now(),
+        ownerKey: null,
+        status: SyncItemStatus.failed,
+        lastError: 'Quarantaine de sécurité',
+      );
+      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(orphanItem.toJson())]);
+
+      final success = await syncService.retryFailedItem('orphan_retry_test');
+      expect(success, isFalse);
+
+      final queue = await syncService.getQueue();
+      expect(queue.first.isFailed, isTrue);
+      expect(queue.first.ownerKey, isNull);
+    });
+
     test('removeQueueItem completely purges target item', () async {
       await syncService.enqueueAction(
         label: 'Action A',

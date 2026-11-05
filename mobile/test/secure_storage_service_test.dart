@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
+import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lefermier/core/security/secure_storage_service.dart';
@@ -6,13 +8,17 @@ import 'package:lefermier/core/security/secure_storage_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late Map<String, String> secureStorageData;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    secureStorageData = {};
+    FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform(secureStorageData);
     SecureStorageService().resetForTesting();
   });
 
-  group('SecureStorageService - Authenticated Cryptographic Vault', () {
-    test('Encrypts and decrypts access token round-trip', () async {
+  group('SecureStorageService - Hardware-Backed Secure Storage (Keystore/Keychain)', () {
+    test('Stores and retrieves access token and refresh token via secure storage', () async {
       final storage = SecureStorageService();
       await storage.init();
       const testToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature';
@@ -23,7 +29,11 @@ void main() {
       expect(storage.refreshToken, 'refresh_abc');
       expect(storage.hasToken, isTrue);
 
-      // Verify fresh instance reads the decrypted values
+      // Verify stored directly in native secure storage data
+      expect(secureStorageData['lf_jwt_token'], testToken);
+      expect(secureStorageData['lf_refresh_token'], 'refresh_abc');
+
+      // Verify fresh instance reads the values
       SecureStorageService().resetForTesting();
       final freshStorage = SecureStorageService();
       await freshStorage.init();
@@ -32,65 +42,65 @@ void main() {
       expect(freshStorage.refreshToken, 'refresh_abc');
     });
 
-    test('Stored raw value uses v2 envelope with authentication tag', () async {
+    test('updateToken updates JWT in secure storage', () async {
       final storage = SecureStorageService();
       await storage.init();
-      await storage.saveTokens(token: 'secret_jwt_token');
+      await storage.saveTokens(token: 'token_v1', refreshToken: 'refresh_v1');
 
-      final prefs = await SharedPreferences.getInstance();
-      final rawStored = prefs.getString('lf_vault_enc_jwt_token');
+      await storage.updateToken('token_v2');
 
-      expect(rawStored, isNotNull);
-      expect(rawStored!.startsWith('v2:'), isTrue);
-
-      final parts = rawStored.split(':');
-      expect(parts.length, 4); // v2 : iv : mac : ciphertext
+      expect(storage.token, 'token_v2');
+      expect(storage.refreshToken, 'refresh_v1');
+      expect(secureStorageData['lf_jwt_token'], 'token_v2');
     });
 
-    test('Tampering with ciphertext causes decryption failure and returns null', () async {
+    test('clearAuth purges tokens from secure storage while preserving deviceId', () async {
       final storage = SecureStorageService();
       await storage.init();
-      await storage.saveTokens(token: 'legitimate_token');
+      final devId = storage.deviceId;
 
-      final prefs = await SharedPreferences.getInstance();
-      final rawStored = prefs.getString('lf_vault_enc_jwt_token')!;
-      final parts = rawStored.split(':');
+      await storage.saveTokens(token: 'token_to_purge', refreshToken: 'ref_to_purge');
+      await storage.clearAuth();
 
-      // Tamper with the ciphertext (alter the last character)
-      final tamperedCiphertext = parts[3].endsWith('A') ? '${parts[3].substring(0, parts[3].length - 1)}B' : '${parts[3]}A';
-      final tamperedRaw = '${parts[0]}:${parts[1]}:${parts[2]}:$tamperedCiphertext';
-      await prefs.setString('lf_vault_enc_jwt_token', tamperedRaw);
+      expect(storage.token, isNull);
+      expect(storage.refreshToken, isNull);
+      expect(storage.deviceId, devId);
 
-      // Create fresh instance to verify decryption failure
-      SecureStorageService().resetForTesting();
-      final freshStorage = SecureStorageService();
-      await freshStorage.init();
-
-      expect(freshStorage.token, isNull);
+      expect(secureStorageData.containsKey('lf_jwt_token'), isFalse);
+      expect(secureStorageData.containsKey('lf_refresh_token'), isFalse);
+      expect(secureStorageData['lf_device_id_raw'], devId);
     });
 
-    test('Tampering with MAC tag causes decryption failure and returns null', () async {
+    test('Generates and preserves deviceId in secure storage across restarts', () async {
       final storage = SecureStorageService();
       await storage.init();
-      await storage.saveTokens(token: 'legitimate_token');
-
-      final prefs = await SharedPreferences.getInstance();
-      final rawStored = prefs.getString('lf_vault_enc_jwt_token')!;
-      final parts = rawStored.split(':');
-
-      // Tamper with HMAC tag
-      const tamperedTag = '0000000000000000000000000000000000000000000000000000000000000000';
-      final tamperedRaw = '${parts[0]}:${parts[1]}:$tamperedTag:${parts[3]}';
-      await prefs.setString('lf_vault_enc_jwt_token', tamperedRaw);
+      final originalDeviceId = storage.deviceId;
+      expect(originalDeviceId.startsWith('dev_'), isTrue);
+      expect(secureStorageData['lf_device_id_raw'], originalDeviceId);
 
       SecureStorageService().resetForTesting();
       final freshStorage = SecureStorageService();
       await freshStorage.init();
-
-      expect(freshStorage.token, isNull);
+      expect(freshStorage.deviceId, originalDeviceId);
     });
 
-    test('Migrates legacy base64-encoded token to encrypted v2 format on startup', () async {
+    test('Migrates legacy deviceId from SharedPreferences to secure storage and purges old key', () async {
+      SharedPreferences.setMockInitialValues({
+        'sec_vault_device_id': 'legacy_device_id_xyz789',
+      });
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+      await storage.init();
+
+      expect(storage.deviceId, 'legacy_device_id_xyz789');
+      expect(secureStorageData['lf_device_id_raw'], 'legacy_device_id_xyz789');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('sec_vault_device_id'), isFalse);
+    });
+
+    test('Migrates legacy base64-encoded token to secure storage on startup', () async {
       const legacyToken = 'legacy_jwt_clear_token';
       final legacyBase64 = base64Encode(utf8.encode(legacyToken));
 
@@ -105,69 +115,26 @@ void main() {
 
       expect(storage.token, legacyToken);
       expect(storage.refreshToken, legacyToken);
+      expect(secureStorageData['lf_jwt_token'], legacyToken);
 
       final prefs = await SharedPreferences.getInstance();
-      // Legacy plain keys must be completely purged
       expect(prefs.containsKey('sec_vault_jwt_token'), isFalse);
       expect(prefs.containsKey('sec_vault_refresh_token'), isFalse);
-
-      // Must be re-persisted under secure v2 keys
-      final rawSecured = prefs.getString('lf_vault_enc_jwt_token');
-      expect(rawSecured, isNotNull);
-      expect(rawSecured!.startsWith('v2:'), isTrue);
     });
 
-    test('clearAuth removes both memory cache and disk records', () async {
-      final storage = SecureStorageService();
-      await storage.init();
-      await storage.saveTokens(token: 'token_to_purge', refreshToken: 'ref_to_purge');
-      await storage.clearAuth();
-
-      expect(storage.token, isNull);
-      expect(storage.refreshToken, isNull);
-
+    test('Migrates legacy plain token to secure storage and purges SharedPreferences', () async {
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('lf_vault_enc_jwt_token'), isNull);
-      expect(prefs.getString('lf_vault_enc_refresh_token'), isNull);
-    });
-
-    test('Migrates legacy deviceId into lf_device_id_raw and persists across restarts', () async {
-      SharedPreferences.setMockInitialValues({
-        'sec_vault_device_id': 'legacy_device_id_xyz789',
-      });
+      const token = 'jwt_token_from_plain';
+      await prefs.setString('lefermier_jwt_token', token);
 
       SecureStorageService().resetForTesting();
       final storage = SecureStorageService();
       await storage.init();
 
-      expect(storage.deviceId, 'legacy_device_id_xyz789');
+      expect(storage.token, token);
+      expect(secureStorageData['lf_jwt_token'], token);
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('lf_device_id_raw'), 'legacy_device_id_xyz789');
-      // The legacy key should be cleaned up
-      expect(prefs.containsKey('sec_vault_device_id'), isFalse);
-
-      // Verify second initialization retains the migrated device ID
-      SecureStorageService().resetForTesting();
-      final freshStorage = SecureStorageService();
-      await freshStorage.init();
-      expect(freshStorage.deviceId, 'legacy_device_id_xyz789');
-    });
-
-    test('Generates and preserves key entropy seed for key stretching', () async {
-      final storage = SecureStorageService();
-      await storage.init();
-
-      final prefs = await SharedPreferences.getInstance();
-      final seed = prefs.getString('lf_vault_entropy_seed');
-      expect(seed, isNotNull);
-      expect(seed!.length, 64); // 32 bytes in hex = 64 characters
-
-      // Subsequent init preserves the same entropy seed
-      SecureStorageService().resetForTesting();
-      final freshStorage = SecureStorageService();
-      await freshStorage.init();
-      expect(prefs.getString('lf_vault_entropy_seed'), seed);
+      expect(prefs.containsKey('lefermier_jwt_token'), isFalse);
     });
   });
 }

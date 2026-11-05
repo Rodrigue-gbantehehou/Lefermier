@@ -1,73 +1,105 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 /// Service de coffre-fort sécurisé pour les jetons de session (JWT, Refresh Token)
 /// et l'identifiant immuable du terminal (deviceId).
 ///
-/// Implémente un chiffrement symétrique authentifié (Chiffrement par flux HMAC-SHA256
-/// avec vecteur d'initialisation unique et code d'authentification de message MAC).
-/// Les données stockées sont protégées contre l'extraction en clair et les altérations.
+/// Utilise le stockage matériel sécurisé natif du système via [FlutterSecureStorage] :
+/// - Android : Android Keystore matériel (avec EncryptedSharedPreferences).
+/// - iOS / macOS : Apple Keychain matériel (avec kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly).
+/// - Windows / Linux : DPAPI / libsecret.
 class SecureStorageService {
   static final SecureStorageService _instance = SecureStorageService._internal();
   factory SecureStorageService() => _instance;
   SecureStorageService._internal();
 
-  static const String _vaultPrefix = "lf_vault_enc_";
-  static const String _keyToken = "${_vaultPrefix}jwt_token";
-  static const String _keyRefreshToken = "${_vaultPrefix}refresh_token";
+  static const String _keyToken = "lf_jwt_token";
+  static const String _keyRefreshToken = "lf_refresh_token";
   static const String _keyDeviceId = "lf_device_id_raw";
-  static const String _keyEntropySeed = "lf_vault_entropy_seed";
 
-  // Anciennes clés non chiffrées ou en Base64 à migrer puis purger
+  // Anciennes clés SharedPreferences à migrer puis purger
+  static const String _legacyEncToken = "lf_vault_enc_jwt_token";
+  static const String _legacyEncRefreshToken = "lf_vault_enc_refresh_token";
   static const String _legacyBase64Token = "sec_vault_jwt_token";
   static const String _legacyBase64Refresh = "sec_vault_refresh_token";
   static const String _legacyDeviceId = "sec_vault_device_id";
   static const String _legacyPlainToken = "lefermier_jwt_token";
+  static const String _legacyEntropySeed = "lf_vault_entropy_seed";
 
-  static const String _appSalt = "LeFermier_Secure_Vault_v2_2026";
+  static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
+
+  FlutterSecureStorage _storage = _defaultStorage;
+  final Map<String, String> _inMemoryFallback = {};
 
   String? _cachedToken;
   String? _cachedRefreshToken;
   String? _cachedDeviceId;
-  String? _cachedEntropySeed;
+
+  @visibleForTesting
+  void setStorageForTesting(FlutterSecureStorage storage) {
+    _storage = storage;
+  }
+
+  Future<String?> _readSafe(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return _inMemoryFallback[key];
+    }
+  }
+
+  Future<void> _writeSafe(String key, String value) async {
+    try {
+      await _storage.write(key: key, value: value);
+    } catch (_) {
+      _inMemoryFallback[key] = value;
+    }
+  }
+
+  Future<void> _deleteSafe(String key) async {
+    try {
+      await _storage.delete(key: key);
+    } catch (_) {
+      _inMemoryFallback.remove(key);
+    }
+  }
 
   /// Initialise le coffre-fort, génère le deviceId si absent et migre les clés héritées
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Initialiser ou restaurer l'identifiant terminal (persistance immédiate de l'hérité)
-    final existingNew = prefs.getString(_keyDeviceId);
-    final existingLegacy = prefs.getString(_legacyDeviceId);
-
-    if (existingNew != null && existingNew.isNotEmpty) {
-      _cachedDeviceId = existingNew;
-    } else if (existingLegacy != null && existingLegacy.isNotEmpty) {
-      _cachedDeviceId = existingLegacy;
-      await prefs.setString(_keyDeviceId, existingLegacy);
-    } else {
-      _cachedDeviceId = "dev_${const Uuid().v4().replaceAll('-', '').substring(0, 20)}";
-      await prefs.setString(_keyDeviceId, _cachedDeviceId!);
+    // 1. Initialiser ou restaurer l'identifiant terminal (deviceId)
+    String? storedDeviceId = await _readSafe(_keyDeviceId);
+    if (storedDeviceId == null || storedDeviceId.isEmpty) {
+      final legacyNew = prefs.getString(_keyDeviceId);
+      final legacyOld = prefs.getString(_legacyDeviceId);
+      if (legacyNew != null && legacyNew.isNotEmpty) {
+        storedDeviceId = legacyNew;
+      } else if (legacyOld != null && legacyOld.isNotEmpty) {
+        storedDeviceId = legacyOld;
+      } else {
+        storedDeviceId = "dev_${const Uuid().v4().replaceAll('-', '').substring(0, 20)}";
+      }
+      await _writeSafe(_keyDeviceId, storedDeviceId);
+      await prefs.remove(_legacyDeviceId);
     }
+    _cachedDeviceId = storedDeviceId;
 
-    // 2. Sel d'entropie d'installation (Key stretching)
-    _cachedEntropySeed = prefs.getString(_keyEntropySeed);
-    if (_cachedEntropySeed == null || _cachedEntropySeed!.isEmpty) {
-      final rand = Random.secure();
-      final seedBytes = List<int>.generate(32, (_) => rand.nextInt(256));
-      _cachedEntropySeed = seedBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      await prefs.setString(_keyEntropySeed, _cachedEntropySeed!);
+    // 2. Lire les jetons depuis le stockage natif sécurisé
+    _cachedToken = await _readSafe(_keyToken);
+    _cachedRefreshToken = await _readSafe(_keyRefreshToken);
+
+    // 3. Migration transparente si des jetons existent encore dans les anciens formats
+    if (_cachedToken == null || _cachedToken!.isEmpty) {
+      await _migrateLegacyKeys(prefs);
     }
-
-    // 3. Tenter de lire les jetons chiffrés avec la clé dérivée du terminal
-    _cachedToken = _readEncrypted(prefs, _keyToken);
-    _cachedRefreshToken = _readEncrypted(prefs, _keyRefreshToken);
-
-    // 4. Migration transparente si anciennes clés Base64 ou texte brut présentes
-    await _migrateLegacyKeys(prefs);
   }
 
   String get deviceId => _cachedDeviceId ?? "dev_default";
@@ -77,28 +109,32 @@ class SecureStorageService {
 
   Future<void> saveTokens({required String token, String? refreshToken}) async {
     _cachedToken = token;
-    final prefs = await SharedPreferences.getInstance();
-    await _writeEncrypted(prefs, _keyToken, token);
+    await _writeSafe(_keyToken, token);
 
     if (refreshToken != null && refreshToken.isNotEmpty) {
       _cachedRefreshToken = refreshToken;
-      await _writeEncrypted(prefs, _keyRefreshToken, refreshToken);
+      await _writeSafe(_keyRefreshToken, refreshToken);
+    } else {
+      _cachedRefreshToken = null;
+      await _deleteSafe(_keyRefreshToken);
     }
   }
 
   Future<void> updateToken(String token) async {
     _cachedToken = token;
-    final prefs = await SharedPreferences.getInstance();
-    await _writeEncrypted(prefs, _keyToken, token);
+    await _writeSafe(_keyToken, token);
   }
 
   /// Efface les jetons de session. Le deviceId est préservé car il identifie le terminal matériel.
   Future<void> clearAuth() async {
     _cachedToken = null;
     _cachedRefreshToken = null;
+    await _deleteSafe(_keyToken);
+    await _deleteSafe(_keyRefreshToken);
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyToken);
-    await prefs.remove(_keyRefreshToken);
+    await prefs.remove(_legacyEncToken);
+    await prefs.remove(_legacyEncRefreshToken);
     await prefs.remove(_legacyBase64Token);
     await prefs.remove(_legacyBase64Refresh);
     await prefs.remove(_legacyPlainToken);
@@ -109,48 +145,79 @@ class SecureStorageService {
     _cachedToken = null;
     _cachedRefreshToken = null;
     _cachedDeviceId = null;
-    _cachedEntropySeed = null;
+    _inMemoryFallback.clear();
+    _storage = _defaultStorage;
   }
 
   // ---------------------------------------------------------------------------
-  // Moteur de chiffrement symétrique authentifié (HMAC-SHA256 Multi-Pass Vault)
+  // Migration ascendante transparente des anciens formats vers FlutterSecureStorage
   // ---------------------------------------------------------------------------
 
-  List<int> _deriveKey() {
-    final seed = _cachedEntropySeed ?? "entropy_fallback_seed";
-    final saltMaterial = utf8.encode("${_appSalt}_${deviceId}_$seed");
-    var key = sha256.convert(saltMaterial).bytes;
-    // PBKDF2-like stretching : 1 000 passes de HMAC-SHA256
-    for (int i = 0; i < 1000; i++) {
-      final hmac = Hmac(sha256, key);
-      key = hmac.convert(saltMaterial).bytes;
+  static const String _appSalt = "LeFermier_Secure_Vault_v2_2026";
+
+  Future<void> _migrateLegacyKeys(SharedPreferences prefs) async {
+    // 1. Récupération éventuelle de l'ancien token
+    if (_cachedToken == null || _cachedToken!.isEmpty) {
+      String? oldToken;
+      final legacyEnc = prefs.getString(_legacyEncToken);
+      if (legacyEnc != null && legacyEnc.isNotEmpty) {
+        oldToken = _decryptLegacy(legacyEnc, prefs);
+      }
+      if (oldToken == null || oldToken.isEmpty) {
+        final legacyBase64 = prefs.getString(_legacyBase64Token);
+        final legacyPlain = prefs.getString(_legacyPlainToken);
+        if (legacyBase64 != null && legacyBase64.isNotEmpty) {
+          try {
+            oldToken = utf8.decode(base64Decode(legacyBase64));
+          } catch (_) {
+            oldToken = legacyBase64;
+          }
+        } else if (legacyPlain != null && legacyPlain.isNotEmpty) {
+          oldToken = legacyPlain;
+        }
+      }
+
+      if (oldToken != null && oldToken.isNotEmpty) {
+        _cachedToken = oldToken;
+        await _writeSafe(_keyToken, oldToken);
+      }
     }
-    return key;
+
+    // 2. Récupération éventuelle de l'ancien refresh token
+    if (_cachedRefreshToken == null || _cachedRefreshToken!.isEmpty) {
+      String? oldRefresh;
+      final legacyEncRefresh = prefs.getString(_legacyEncRefreshToken);
+      if (legacyEncRefresh != null && legacyEncRefresh.isNotEmpty) {
+        oldRefresh = _decryptLegacy(legacyEncRefresh, prefs);
+      }
+      if (oldRefresh == null || oldRefresh.isEmpty) {
+        final legacyRefresh = prefs.getString(_legacyBase64Refresh);
+        if (legacyRefresh != null && legacyRefresh.isNotEmpty) {
+          try {
+            oldRefresh = utf8.decode(base64Decode(legacyRefresh));
+          } catch (_) {
+            oldRefresh = legacyRefresh;
+          }
+        }
+      }
+
+      if (oldRefresh != null && oldRefresh.isNotEmpty) {
+        _cachedRefreshToken = oldRefresh;
+        await _writeSafe(_keyRefreshToken, oldRefresh);
+      }
+    }
+
+    // 3. Purge définitive de toutes les clés d'anciennes versions
+    await prefs.remove(_legacyEncToken);
+    await prefs.remove(_legacyEncRefreshToken);
+    await prefs.remove(_legacyBase64Token);
+    await prefs.remove(_legacyBase64Refresh);
+    await prefs.remove(_legacyPlainToken);
+    await prefs.remove(_legacyDeviceId);
+    await prefs.remove(_legacyEntropySeed);
   }
 
-  List<int> _deriveLegacyKey() {
-    final keyMaterial = utf8.encode("${_appSalt}_$deviceId");
-    return sha256.convert(keyMaterial).bytes;
-  }
-
-  String _encrypt(String plaintext) {
-    final key = _deriveKey();
-    final random = Random.secure();
-    final ivBytes = List<int>.generate(12, (_) => random.nextInt(256));
-    final ivHex = ivBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-    final plainBytes = utf8.encode(plaintext);
-    final cipherBytes = _applyKeystream(plainBytes, key, ivBytes);
-    final cipherBase64 = base64Encode(cipherBytes);
-
-    // Calcul du MAC (HMAC-SHA256) sur IV + Texte chiffré pour garantir l'intégrité
-    final hmac = Hmac(sha256, key);
-    final mac = hmac.convert(utf8.encode("$ivHex:$cipherBase64")).toString();
-
-    return "v2:$ivHex:$mac:$cipherBase64";
-  }
-
-  String? _decryptWithKey(String envelope, List<int> key, {bool silent = false}) {
+  String? _decryptLegacy(String envelope, SharedPreferences prefs) {
     if (!envelope.startsWith("v2:")) return null;
     final parts = envelope.split(':');
     if (parts.length != 4) return null;
@@ -159,15 +226,27 @@ class SecureStorageService {
     final mac = parts[2];
     final cipherBase64 = parts[3];
 
-    // Vérification d'intégrité
+    // Essayer avec la dérivation durcie 1 000 passes
+    final seed = prefs.getString(_legacyEntropySeed) ?? "entropy_fallback_seed";
+    final saltMaterial = utf8.encode("${_appSalt}_${deviceId}_$seed");
+    var key = sha256.convert(saltMaterial).bytes;
+    for (int i = 0; i < 1000; i++) {
+      final hmac = Hmac(sha256, key);
+      key = hmac.convert(saltMaterial).bytes;
+    }
+
+    var decrypted = _decryptWithKey(ivHex, mac, cipherBase64, key);
+    if (decrypted != null) return decrypted;
+
+    // Repli de compatibilité avec la dérivation 1 passe
+    final legacyKey = sha256.convert(utf8.encode("${_appSalt}_$deviceId")).bytes;
+    return _decryptWithKey(ivHex, mac, cipherBase64, legacyKey);
+  }
+
+  String? _decryptWithKey(String ivHex, String mac, String cipherBase64, List<int> key) {
     final hmac = Hmac(sha256, key);
     final expectedMac = hmac.convert(utf8.encode("$ivHex:$cipherBase64")).toString();
-    if (mac != expectedMac) {
-      if (!silent) {
-        debugPrint("SecureStorage: intégrité compromise ou clé erronée.");
-      }
-      return null;
-    }
+    if (mac != expectedMac) return null;
 
     try {
       final ivBytes = <int>[];
@@ -180,21 +259,6 @@ class SecureStorageService {
     } catch (_) {
       return null;
     }
-  }
-
-  String? _decrypt(String envelope) {
-    // 1. Tenter avec la clé durcie PBKDF2
-    final decrypted = _decryptWithKey(envelope, _deriveKey(), silent: true);
-    if (decrypted != null) return decrypted;
-
-    // 2. Repli de compatibilité sur la clé v2 initiale (1 passe) si migration en cours
-    final legacyDecrypted = _decryptWithKey(envelope, _deriveLegacyKey(), silent: true);
-    if (legacyDecrypted != null) {
-      return legacyDecrypted;
-    }
-
-    debugPrint("SecureStorage: intégrité compromise ou clé erronée.");
-    return null;
   }
 
   List<int> _applyKeystream(List<int> input, List<int> key, List<int> iv) {
@@ -214,78 +278,5 @@ class SecureStorageService {
       streamOffset++;
     }
     return output;
-  }
-
-  String? _readEncrypted(SharedPreferences prefs, String key) {
-    final raw = prefs.getString(key);
-    if (raw == null || raw.isEmpty) return null;
-    final value = _decrypt(raw);
-    if (value != null) {
-      // Re-chiffrer avec la clé durcie si c'était l'ancienne clé
-      final hardenedKey = _deriveKey();
-      if (_decryptWithKey(raw, hardenedKey, silent: true) == null) {
-        _writeEncrypted(prefs, key, value);
-      }
-    }
-    return value;
-  }
-
-  Future<void> _writeEncrypted(SharedPreferences prefs, String key, String value) async {
-    final encrypted = _encrypt(value);
-    await prefs.setString(key, encrypted);
-  }
-
-  Future<void> _migrateLegacyKeys(SharedPreferences prefs) async {
-    bool hasMigrated = false;
-
-    // Récupération éventuelle de l'ancien token
-    if (_cachedToken == null) {
-      final legacyBase64 = prefs.getString(_legacyBase64Token);
-      final legacyPlain = prefs.getString(_legacyPlainToken);
-      String? oldToken;
-      if (legacyBase64 != null && legacyBase64.isNotEmpty) {
-        try {
-          oldToken = utf8.decode(base64Decode(legacyBase64));
-        } catch (_) {
-          oldToken = legacyBase64;
-        }
-      } else if (legacyPlain != null && legacyPlain.isNotEmpty) {
-        oldToken = legacyPlain;
-      }
-
-      if (oldToken != null && oldToken.isNotEmpty) {
-        _cachedToken = oldToken;
-        await _writeEncrypted(prefs, _keyToken, oldToken);
-        hasMigrated = true;
-      }
-    }
-
-    // Récupération éventuelle de l'ancien refresh token
-    if (_cachedRefreshToken == null) {
-      final legacyRefresh = prefs.getString(_legacyBase64Refresh);
-      if (legacyRefresh != null && legacyRefresh.isNotEmpty) {
-        String? oldRefresh;
-        try {
-          oldRefresh = utf8.decode(base64Decode(legacyRefresh));
-        } catch (_) {
-          oldRefresh = legacyRefresh;
-        }
-        if (oldRefresh.isNotEmpty) {
-          _cachedRefreshToken = oldRefresh;
-          await _writeEncrypted(prefs, _keyRefreshToken, oldRefresh);
-          hasMigrated = true;
-        }
-      }
-    }
-
-    // Nettoyage définitif des clés non sécurisées
-    if (prefs.containsKey(_keyDeviceId)) {
-      await prefs.remove(_legacyDeviceId);
-    }
-    if (hasMigrated || prefs.containsKey(_legacyBase64Token) || prefs.containsKey(_legacyPlainToken)) {
-      await prefs.remove(_legacyBase64Token);
-      await prefs.remove(_legacyBase64Refresh);
-      await prefs.remove(_legacyPlainToken);
-    }
   }
 }
