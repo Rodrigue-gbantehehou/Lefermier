@@ -8,10 +8,12 @@ import 'package:uuid/uuid.dart';
 /// Service de coffre-fort sécurisé pour les jetons de session (JWT, Refresh Token)
 /// et l'identifiant immuable du terminal (deviceId).
 ///
-/// Utilise le stockage matériel sécurisé natif du système via [FlutterSecureStorage] :
-/// - Android : Android Keystore matériel (avec EncryptedSharedPreferences).
-/// - iOS / macOS : Apple Keychain matériel (avec kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly).
-/// - Windows / Linux : DPAPI / libsecret.
+/// Utilise le stockage sécurisé natif du système d'exploitation via [FlutterSecureStorage] :
+/// - Android : Android Keystore (protection matérielle TEE/StrongBox lorsque l'appareil le supporte,
+///   chiffrement AES-GCM 256 bits avec réinitialisation automatique en cas d'invalidation de clé).
+/// - iOS / macOS : Apple Keychain (matériel Secure Enclave si disponible, avec
+///   kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly interdisant l'exportation et la synchronisation iCloud).
+/// - Windows / Linux : DPAPI (Data Protection API) / Secret Service API.
 class SecureStorageService {
   static final SecureStorageService _instance = SecureStorageService._internal();
   factory SecureStorageService() => _instance;
@@ -55,11 +57,21 @@ class SecureStorageService {
     }
   }
 
-  Future<void> _writeSafe(String key, String value) async {
+  /// Écrit une valeur dans le stockage sécurisé.
+  /// Confirme immédiatement la persistance par relecture.
+  /// En cas d'indisponibilité ou d'échec du plugin, bascule en mémoire et retourne `false`.
+  Future<bool> _writeSafe(String key, String value) async {
     try {
       await _storage.write(key: key, value: value);
+      final confirmed = await _storage.read(key: key);
+      if (confirmed == value) {
+        return true;
+      }
+      _inMemoryFallback[key] = value;
+      return false;
     } catch (_) {
       _inMemoryFallback[key] = value;
+      return false;
     }
   }
 
@@ -87,8 +99,11 @@ class SecureStorageService {
       } else {
         storedDeviceId = "dev_${const Uuid().v4().replaceAll('-', '').substring(0, 20)}";
       }
-      await _writeSafe(_keyDeviceId, storedDeviceId);
-      await prefs.remove(_legacyDeviceId);
+      final deviceIdSaved = await _writeSafe(_keyDeviceId, storedDeviceId);
+      // Sécurité critique : Ne supprimer l'ancienne clé que si l'écriture sécurisée est confirmée !
+      if (deviceIdSaved) {
+        await prefs.remove(_legacyDeviceId);
+      }
     }
     _cachedDeviceId = storedDeviceId;
 
@@ -96,10 +111,8 @@ class SecureStorageService {
     _cachedToken = await _readSafe(_keyToken);
     _cachedRefreshToken = await _readSafe(_keyRefreshToken);
 
-    // 3. Migration transparente si des jetons existent encore dans les anciens formats
-    if (_cachedToken == null || _cachedToken!.isEmpty) {
-      await _migrateLegacyKeys(prefs);
-    }
+    // 3. Migration transparente et indépendante des jetons depuis les anciens formats
+    await _migrateLegacyKeys(prefs);
   }
 
   String get deviceId => _cachedDeviceId ?? "dev_default";
@@ -179,7 +192,12 @@ class SecureStorageService {
 
       if (oldToken != null && oldToken.isNotEmpty) {
         _cachedToken = oldToken;
-        await _writeSafe(_keyToken, oldToken);
+        final tokenMigrated = await _writeSafe(_keyToken, oldToken);
+        if (tokenMigrated) {
+          await prefs.remove(_legacyEncToken);
+          await prefs.remove(_legacyBase64Token);
+          await prefs.remove(_legacyPlainToken);
+        }
       }
     }
 
@@ -203,18 +221,18 @@ class SecureStorageService {
 
       if (oldRefresh != null && oldRefresh.isNotEmpty) {
         _cachedRefreshToken = oldRefresh;
-        await _writeSafe(_keyRefreshToken, oldRefresh);
+        final refreshMigrated = await _writeSafe(_keyRefreshToken, oldRefresh);
+        if (refreshMigrated) {
+          await prefs.remove(_legacyEncRefreshToken);
+          await prefs.remove(_legacyBase64Refresh);
+        }
       }
     }
 
-    // 3. Purge définitive de toutes les clés d'anciennes versions
-    await prefs.remove(_legacyEncToken);
-    await prefs.remove(_legacyEncRefreshToken);
-    await prefs.remove(_legacyBase64Token);
-    await prefs.remove(_legacyBase64Refresh);
-    await prefs.remove(_legacyPlainToken);
-    await prefs.remove(_legacyDeviceId);
-    await prefs.remove(_legacyEntropySeed);
+    // 3. Purge du sel d'entropie uniquement si toutes les clés chiffrées héritées ont été migrées
+    if (!prefs.containsKey(_legacyEncToken) && !prefs.containsKey(_legacyEncRefreshToken)) {
+      await prefs.remove(_legacyEntropySeed);
+    }
   }
 
   String? _decryptLegacy(String envelope, SharedPreferences prefs) {

@@ -136,5 +136,73 @@ void main() {
 
       expect(prefs.containsKey('lefermier_jwt_token'), isFalse);
     });
+
+    test('Migrates refresh token independently when JWT token is already present in secure storage', () async {
+      const legacyRefresh = 'legacy_refresh_secret';
+      final legacyBase64 = base64Encode(utf8.encode(legacyRefresh));
+
+      // JWT is already in native secure storage
+      secureStorageData['lf_jwt_token'] = 'already_saved_jwt';
+
+      // Refresh token is still in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('sec_vault_refresh_token', legacyBase64);
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+      await storage.init();
+
+      expect(storage.token, 'already_saved_jwt');
+      expect(storage.refreshToken, legacyRefresh);
+      expect(secureStorageData['lf_refresh_token'], legacyRefresh);
+
+      // Legacy key must now be purged
+      expect(prefs.containsKey('sec_vault_refresh_token'), isFalse);
+    });
+
+    test('Preserves legacy keys in SharedPreferences if secure storage write fails', () async {
+      final prefs = await SharedPreferences.getInstance();
+      const legacyToken = 'precious_token_to_preserve';
+      final legacyBase64 = base64Encode(utf8.encode(legacyToken));
+      await prefs.setString('sec_vault_jwt_token', legacyBase64);
+      await prefs.setString('sec_vault_device_id', 'legacy_device_777');
+
+      // Simulate failing secure storage
+      FlutterSecureStoragePlatform.instance = _FailingSecureStoragePlatform();
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+      await storage.init();
+
+      // Legacy keys must be PRESERVED and not deleted because write to secure storage failed!
+      expect(prefs.containsKey('sec_vault_jwt_token'), isTrue);
+      expect(prefs.containsKey('sec_vault_device_id'), isTrue);
+
+      // In-memory fallback retains values so the active session does not crash
+      expect(storage.token, legacyToken);
+      expect(storage.deviceId, 'legacy_device_777');
+    });
   });
+}
+
+class _FailingSecureStoragePlatform extends FlutterSecureStoragePlatform {
+  @override
+  Future<bool> containsKey({required String key, required Map<String, String> options}) async => false;
+
+  @override
+  Future<void> delete({required String key, required Map<String, String> options}) async {}
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async {}
+
+  @override
+  Future<String?> read({required String key, required Map<String, String> options}) async => null;
+
+  @override
+  Future<Map<String, String>> readAll({required Map<String, String> options}) async => {};
+
+  @override
+  Future<void> write({required String key, required String value, required Map<String, String> options}) async {
+    throw Exception('Simulated KeyStore write failure');
+  }
 }
