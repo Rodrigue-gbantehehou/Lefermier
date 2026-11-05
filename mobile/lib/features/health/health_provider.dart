@@ -81,14 +81,17 @@ class HealthNotifier extends StateNotifier<HealthState> {
     }
 
     // 1. Restitution instantanée depuis le cache hors-ligne
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.treatments.isEmpty) {
       final cachedTreatments = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'health_treatments',
+        currentUserId: currentUserId,
       );
       final cachedMeta = await OfflineCacheService().getMapCache(
         farmId: activeFarm.id,
         category: 'health_meta',
+        currentUserId: currentUserId,
       );
       if (cachedTreatments != null && cachedTreatments.isNotEmpty) {
         final treatments = cachedTreatments
@@ -129,11 +132,13 @@ class HealthNotifier extends StateNotifier<HealthState> {
         farmId: activeFarm.id,
         category: 'health_treatments',
         data: rawList,
+        userId: currentUserId,
       );
       await OfflineCacheService().setCache(
         farmId: activeFarm.id,
         category: 'health_meta',
         data: meta,
+        userId: currentUserId,
       );
 
       state = state.copyWith(

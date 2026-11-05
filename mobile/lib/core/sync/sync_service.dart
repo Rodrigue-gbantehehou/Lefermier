@@ -81,9 +81,11 @@ class SyncService {
     final currentQueue = await getQueue();
     final index = currentQueue.indexWhere((item) => item.id == id);
     if (index != -1) {
+      final currentOwner = _apiClient.sessionSubject;
       currentQueue[index] = currentQueue[index].copyWith(
         status: SyncItemStatus.pending,
         retryCount: 0,
+        ownerKey: currentQueue[index].ownerKey ?? currentOwner,
         clearNextAttempt: true,
         clearError: true,
       );
@@ -136,22 +138,39 @@ class SyncService {
     final currentOwner = _apiClient.sessionSubject;
     final now = DateTime.now();
 
-    for (final item in queue) {
-      // 1. Isolation de sécurité : ne pas exécuter les actions d'un autre utilisateur
-      if (currentOwner != null && item.ownerKey != null && item.ownerKey != currentOwner) {
-        updatedQueue.add(item);
-        pendingCount++;
+    for (int i = 0; i < queue.length; i++) {
+      final item = queue[i];
+
+      // 1. Quarantaine de sécurité : actions orphelines (sans propriétaire identifié)
+      // Ne sont JAMAIS transmises automatiquement sous la session d'un tiers.
+      if (item.ownerKey == null || item.ownerKey!.isEmpty) {
+        updatedQueue.add(item.copyWith(
+          status: SyncItemStatus.failed,
+          lastError: "Action orpheline sans propriétaire : mise en quarantaine de sécurité.",
+        ));
+        failedCount++;
         continue;
       }
 
-      // 2. Les actions en échec définitif restent enregistrées pour consultation/réessai
+      // 2. Isolation de sécurité : ne pas exécuter les actions d'un autre utilisateur
+      if (currentOwner == null || item.ownerKey != currentOwner) {
+        updatedQueue.add(item);
+        if (item.isFailed) {
+          failedCount++;
+        } else {
+          pendingCount++;
+        }
+        continue;
+      }
+
+      // 3. Les actions en échec définitif restent enregistrées pour consultation/réessai
       if (item.isFailed) {
         updatedQueue.add(item);
         failedCount++;
         continue;
       }
 
-      // 3. Temporisation (Retry-After ou Exponential Backoff)
+      // 4. Temporisation (Retry-After ou Exponential Backoff)
       if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
         updatedQueue.add(item);
         pendingCount++;
@@ -217,12 +236,23 @@ class SyncService {
           ));
           pendingCount++;
         } else if (statusCode == 401) {
-          // Session expirée : conserver l'action et suspendre le flush pour éviter le flood
+          // Session expirée : conserver l'action courante
           updatedQueue.add(item.copyWith(
             lastError: "Session non autorisée (HTTP 401)",
             httpStatus: 401,
           ));
           pendingCount++;
+
+          // PROTECTION CRITIQUE : Conserver l'intégralité des actions subséquentes non traitées !
+          for (int j = i + 1; j < queue.length; j++) {
+            final nextItem = queue[j];
+            updatedQueue.add(nextItem);
+            if (nextItem.isFailed) {
+              failedCount++;
+            } else {
+              pendingCount++;
+            }
+          }
           break;
         } else if (statusCode != null && (statusCode == 400 || statusCode == 403 || statusCode == 404 || statusCode == 422)) {
           // Erreur métier définitive (quota dépassé, validation invalide, ressource supprimée)

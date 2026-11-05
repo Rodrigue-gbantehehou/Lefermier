@@ -84,14 +84,17 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     }
 
     // 1. Restitution instantanée depuis le cache hors-ligne
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.transactions.isEmpty) {
       final cachedTx = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'finance_transactions',
+        currentUserId: currentUserId,
       );
       final cachedSummary = await OfflineCacheService().getMapCache(
         farmId: activeFarm.id,
         category: 'finance_summary',
+        currentUserId: currentUserId,
       );
 
       if (cachedTx != null) {
@@ -131,6 +134,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
           farmId: activeFarm.id,
           category: 'finance_summary',
           data: sumMap,
+          userId: currentUserId,
         );
       }
 
@@ -138,6 +142,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         farmId: activeFarm.id,
         category: 'finance_transactions',
         data: rawList,
+        userId: currentUserId,
       );
 
       state = state.copyWith(

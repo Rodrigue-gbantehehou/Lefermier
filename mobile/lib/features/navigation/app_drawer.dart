@@ -252,17 +252,25 @@ class AppDrawer extends ConsumerWidget {
                   InkWell(
                     onTap: () async {
                       HapticFeedback.lightImpact();
-                      final pending = await ref.read(authProvider.notifier).getPendingSyncCount();
+                      final summary = await ref.read(authProvider.notifier).getUnsyncedActionsSummary();
                       if (!context.mounted) return;
-                      if (pending > 0) {
+                      if (summary.total > 0) {
+                        String detailMsg;
+                        if (summary.pending > 0 && summary.failed > 0) {
+                          detailMsg = "Vous avez ${summary.pending} action(s) en attente d'envoi et ${summary.failed} action(s) rejetée(s).";
+                        } else if (summary.pending > 0) {
+                          detailMsg = "Vous avez ${summary.pending} action(s) hors-ligne en attente d'envoi.";
+                        } else {
+                          detailMsg = "Vous avez ${summary.failed} action(s) rejetée(s) nécessitant une décision.";
+                        }
+
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             title: const Text("Actions non synchronisées"),
                             content: Text(
-                              "Vous avez $pending action(s) hors-ligne en attente d'envoi. "
-                              "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil. "
+                              "$detailMsg\n\nSi vous vous déconnectez, elles seront définitivement supprimées de cet appareil. "
                               "Voulez-vous continuer ?",
                             ),
                             actions: [
@@ -276,7 +284,7 @@ class AppDrawer extends ConsumerWidget {
                                   foregroundColor: Colors.white,
                                 ),
                                 onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text("Se déconnecter"),
+                                child: const Text("Se déconnecter quand même"),
                               ),
                             ],
                           ),

@@ -110,10 +110,12 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
     }
 
     // 1. Restitution instantanée depuis le cache hors-ligne
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.items.isEmpty) {
       final cachedItems = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'inventory_items',
+        currentUserId: currentUserId,
       );
       if (cachedItems != null && cachedItems.isNotEmpty) {
         final items = cachedItems
@@ -154,6 +156,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
         farmId: activeFarm.id,
         category: 'inventory_items',
         data: rawList,
+        userId: currentUserId,
       );
 
       int lowCount = 0;
@@ -199,10 +202,12 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
     if (activeFarm == null) return;
 
     // 1. Restitution instantanée depuis le cache hors-ligne
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.movements.isEmpty) {
       final cachedMovements = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'inventory_movements',
+        currentUserId: currentUserId,
       );
       if (cachedMovements != null && cachedMovements.isNotEmpty) {
         final movements = cachedMovements
@@ -230,6 +235,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
         farmId: activeFarm.id,
         category: 'inventory_movements',
         data: rawList,
+        userId: currentUserId,
       );
 
       state = state.copyWith(

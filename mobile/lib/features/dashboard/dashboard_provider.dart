@@ -101,14 +101,17 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     }
 
     // 1. Restitution instantanée depuis le cache local si données vides
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.kpi.flocks.isEmpty && state.kpi.totalBirds == 0 && state.kpi.todayGoodEggs == 0) {
       final cachedDash = await OfflineCacheService().getMapCache(
         farmId: activeFarm.id,
         category: 'dashboard',
+        currentUserId: currentUserId,
       );
       final cachedFlocks = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'flocks',
+        currentUserId: currentUserId,
       );
       if (cachedDash != null) {
         final flocks = (cachedFlocks ?? [])
@@ -148,6 +151,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         farmId: activeFarm.id,
         category: 'dashboard',
         data: dashData,
+        userId: currentUserId,
       );
 
       final kpi = DashboardKpiData.fromJson(

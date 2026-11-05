@@ -106,19 +106,23 @@ class EggNotifier extends StateNotifier<EggState> {
     }
 
     // 1. Restitution instantanée depuis le cache hors-ligne si vide
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.productions.isEmpty && state.layerFlocks.isEmpty) {
       final cachedFlocks = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'egg_layer_flocks',
+        currentUserId: currentUserId,
       );
       final cacheKey = state.selectedFlockId != null ? 'eggs_${state.selectedFlockId}' : 'eggs_all';
       final cachedEggs = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: cacheKey,
+        currentUserId: currentUserId,
       );
       final cachedSummary = await OfflineCacheService().getMapCache(
         farmId: activeFarm.id,
         category: 'eggs_summary',
+        currentUserId: currentUserId,
       );
 
       if (cachedFlocks != null || cachedEggs != null) {
@@ -160,6 +164,7 @@ class EggNotifier extends StateNotifier<EggState> {
         farmId: activeFarm.id,
         category: 'egg_layer_flocks',
         data: rawFlocks,
+        userId: currentUserId,
       );
 
       // 2. Récupération des collectes d'œufs
@@ -181,6 +186,7 @@ class EggNotifier extends StateNotifier<EggState> {
           farmId: activeFarm.id,
           category: 'eggs_summary',
           data: summaryMap,
+          userId: currentUserId,
         );
       }
 
@@ -189,6 +195,7 @@ class EggNotifier extends StateNotifier<EggState> {
         farmId: activeFarm.id,
         category: cacheKey,
         data: rawEggs,
+        userId: currentUserId,
       );
 
       state = state.copyWith(

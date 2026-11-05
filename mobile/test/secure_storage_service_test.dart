@@ -130,5 +130,44 @@ void main() {
       expect(prefs.getString('lf_vault_enc_jwt_token'), isNull);
       expect(prefs.getString('lf_vault_enc_refresh_token'), isNull);
     });
+
+    test('Migrates legacy deviceId into lf_device_id_raw and persists across restarts', () async {
+      SharedPreferences.setMockInitialValues({
+        'sec_vault_device_id': 'legacy_device_id_xyz789',
+      });
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+      await storage.init();
+
+      expect(storage.deviceId, 'legacy_device_id_xyz789');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('lf_device_id_raw'), 'legacy_device_id_xyz789');
+      // The legacy key should be cleaned up
+      expect(prefs.containsKey('sec_vault_device_id'), isFalse);
+
+      // Verify second initialization retains the migrated device ID
+      SecureStorageService().resetForTesting();
+      final freshStorage = SecureStorageService();
+      await freshStorage.init();
+      expect(freshStorage.deviceId, 'legacy_device_id_xyz789');
+    });
+
+    test('Generates and preserves key entropy seed for key stretching', () async {
+      final storage = SecureStorageService();
+      await storage.init();
+
+      final prefs = await SharedPreferences.getInstance();
+      final seed = prefs.getString('lf_vault_entropy_seed');
+      expect(seed, isNotNull);
+      expect(seed!.length, 64); // 32 bytes in hex = 64 characters
+
+      // Subsequent init preserves the same entropy seed
+      SecureStorageService().resetForTesting();
+      final freshStorage = SecureStorageService();
+      await freshStorage.init();
+      expect(prefs.getString('lf_vault_entropy_seed'), seed);
+    });
   });
 }

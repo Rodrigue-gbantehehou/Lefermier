@@ -208,6 +208,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Le profil /me fournit, pour chaque ferme, les permissions effectives (rôle ∩ abonnement)
       List<dynamic> rawList = [];
       UserProfile? user = state.user;
+      final currentUserId = user?.id ?? _apiClient.sessionSubject;
       try {
         final meResponse = await _apiClient.dio.get(ApiEndpoints.me);
         final profile = meResponse.data['data'] as Map<String, dynamic>? ?? const {};
@@ -218,12 +219,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
             farmId: null,
             category: 'user_profile',
             data: profile,
+            userId: user.id.isNotEmpty ? user.id : currentUserId,
           );
         }
         await OfflineCacheService().setCache(
           farmId: null,
           category: 'farms',
           data: rawList,
+          userId: user?.id.isNotEmpty == true ? user!.id : currentUserId,
         );
       } on DioException {
         try {
@@ -233,12 +236,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
             farmId: null,
             category: 'farms',
             data: rawList,
+            userId: currentUserId,
           );
         } catch (_) {
           // Mode hors-ligne : tentative de restauration depuis le cache local
           final cachedFarms = await OfflineCacheService().getListCache(
             farmId: null,
             category: 'farms',
+            currentUserId: currentUserId,
           );
           if (cachedFarms != null && cachedFarms.isNotEmpty) {
             rawList = cachedFarms;
@@ -246,6 +251,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           final cachedProfile = await OfflineCacheService().getMapCache(
             farmId: null,
             category: 'user_profile',
+            currentUserId: currentUserId,
           );
           if (cachedProfile != null && user == null) {
             user = UserProfile.fromJson(cachedProfile);
@@ -519,11 +525,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Nombre d'actions hors-ligne en attente d'envoi pour avertissement avant déconnexion
+  /// Résumé des actions hors-ligne (en attente et rejetées) pour avertissement avant déconnexion
+  Future<({int pending, int failed, int total})> getUnsyncedActionsSummary() async {
+    try {
+      final queue = await SyncService(_apiClient).getQueue();
+      final pending = queue.where((i) => i.isPending).length;
+      final failed = queue.where((i) => i.isFailed).length;
+      return (pending: pending, failed: failed, total: queue.length);
+    } catch (_) {
+      return (pending: 0, failed: 0, total: 0);
+    }
+  }
+
+  /// Nombre total d'actions hors-ligne non synchronisées (en attente + rejetées)
   Future<int> getPendingSyncCount() async {
     try {
       final queue = await SyncService(_apiClient).getQueue();
-      return queue.where((i) => i.isPending).length;
+      return queue.length;
     } catch (_) {
       return 0;
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../api/api_client.dart';
 
 /// Service de persistance et de cache de lecture hors-ligne (Offline-First).
 /// Permet de stocker et restituer instantanément les données en local
@@ -29,12 +30,16 @@ class OfflineCacheService {
     String? userId,
   }) async {
     try {
+      final effectiveUserId = (userId != null && userId.isNotEmpty)
+          ? userId
+          : ApiClient().sessionSubject;
+
       final prefs = await SharedPreferences.getInstance();
       final key = _buildKey(farmId, category);
       final envelope = {
         'v': _schemaVersion,
         'savedAt': DateTime.now().toIso8601String(),
-        'userId': userId,
+        'userId': effectiveUserId,
         'data': data,
       };
       final encoded = jsonEncode(envelope);
@@ -49,6 +54,10 @@ class OfflineCacheService {
     String? currentUserId,
   }) async {
     try {
+      final effectiveUserId = (currentUserId != null && currentUserId.isNotEmpty)
+          ? currentUserId
+          : ApiClient().sessionSubject;
+
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_buildKey(farmId, category)) ??
           prefs.getString(_buildKey(farmId, category, legacy: true));
@@ -59,16 +68,26 @@ class OfflineCacheService {
       // Enveloppe v2
       if (decoded is Map<String, dynamic> && decoded.containsKey('v') && decoded.containsKey('data')) {
         if (decoded['v'] != _schemaVersion) return null;
-        if (currentUserId != null && decoded['userId'] != null && decoded['userId'] != currentUserId) {
-          return null; // Isolation inter-comptes
+        final cachedUserId = decoded['userId'] as String?;
+
+        // Isolation stricte :
+        // 1. Si session utilisateur active, refuser le cache d'un autre utilisateur
+        // 2. Si le cache a un propriétaire, une session anonyme ne peut pas le lire
+        if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
+          if (cachedUserId != null && cachedUserId != effectiveUserId) {
+            return null;
+          }
+        } else if (cachedUserId != null && cachedUserId.isNotEmpty) {
+          return null;
         }
+
         final inner = decoded['data'];
         if (inner is Map<String, dynamic>) return inner;
         return null;
       }
 
       // Format historique
-      if (decoded is Map<String, dynamic>) {
+      if (effectiveUserId == null && decoded is Map<String, dynamic>) {
         return decoded;
       }
       return null;
@@ -84,6 +103,10 @@ class OfflineCacheService {
     String? currentUserId,
   }) async {
     try {
+      final effectiveUserId = (currentUserId != null && currentUserId.isNotEmpty)
+          ? currentUserId
+          : ApiClient().sessionSubject;
+
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_buildKey(farmId, category)) ??
           prefs.getString(_buildKey(farmId, category, legacy: true));
@@ -94,16 +117,23 @@ class OfflineCacheService {
       // Enveloppe v2
       if (decoded is Map<String, dynamic> && decoded.containsKey('v') && decoded.containsKey('data')) {
         if (decoded['v'] != _schemaVersion) return null;
-        if (currentUserId != null && decoded['userId'] != null && decoded['userId'] != currentUserId) {
+        final cachedUserId = decoded['userId'] as String?;
+
+        if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
+          if (cachedUserId != null && cachedUserId != effectiveUserId) {
+            return null;
+          }
+        } else if (cachedUserId != null && cachedUserId.isNotEmpty) {
           return null;
         }
+
         final inner = decoded['data'];
         if (inner is List) return inner;
         return null;
       }
 
       // Format historique
-      if (decoded is List) {
+      if (effectiveUserId == null && decoded is List) {
         return decoded;
       }
       return null;

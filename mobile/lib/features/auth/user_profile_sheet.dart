@@ -183,21 +183,32 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
   }
 
   Future<void> _confirmLogout() async {
-    final pending = await ref.read(authProvider.notifier).getPendingSyncCount();
+    final summary = await ref.read(authProvider.notifier).getUnsyncedActionsSummary();
     if (!mounted) return;
+
+    String detailMsg = "Voulez-vous vraiment vous déconnecter de cette session ?";
+    if (summary.total > 0) {
+      if (summary.pending > 0 && summary.failed > 0) {
+        detailMsg = "Vous avez ${summary.pending} action(s) hors-ligne en attente d'envoi et ${summary.failed} action(s) rejetée(s).\n\n"
+            "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil.\n\n"
+            "Voulez-vous vraiment vous déconnecter ?";
+      } else if (summary.pending > 0) {
+        detailMsg = "Vous avez ${summary.pending} action(s) hors-ligne en attente d'envoi.\n\n"
+            "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil.\n\n"
+            "Voulez-vous vraiment vous déconnecter ?";
+      } else {
+        detailMsg = "Vous avez ${summary.failed} action(s) rejetée(s) nécessitant une décision.\n\n"
+            "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil.\n\n"
+            "Voulez-vous vraiment vous déconnecter ?";
+      }
+    }
 
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(pending > 0 ? "Actions non synchronisées" : "Déconnexion"),
-        content: Text(
-          pending > 0
-              ? "Vous avez $pending action(s) hors-ligne en attente d'envoi. "
-                "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil.\n\n"
-                "Voulez-vous vraiment vous déconnecter ?"
-              : "Voulez-vous vraiment vous déconnecter de cette session ?",
-        ),
+        title: Text(summary.total > 0 ? "Actions non synchronisées" : "Déconnexion"),
+        content: Text(detailMsg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -219,7 +230,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
                 );
               }
             },
-            child: Text(pending > 0 ? "Se déconnecter quand même" : "Se déconnecter"),
+            child: Text(summary.total > 0 ? "Se déconnecter quand même" : "Se déconnecter"),
           ),
         ],
       ),

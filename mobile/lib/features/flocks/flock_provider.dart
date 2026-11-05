@@ -75,10 +75,12 @@ class FlockNotifier extends StateNotifier<FlockState> {
     }
 
     // 1. Chargement instantané depuis le cache hors-ligne si la mémoire est vide
+    final currentUserId = _ref.read(authProvider).user?.id ?? _apiClient.sessionSubject;
     if (state.flocks.isEmpty) {
       final cachedList = await OfflineCacheService().getListCache(
         farmId: activeFarm.id,
         category: 'flocks',
+        currentUserId: currentUserId,
       );
       if (cachedList != null && cachedList.isNotEmpty && state.flocks.isEmpty) {
         _applyFlocks(cachedList, activeFarm);
@@ -101,6 +103,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
         farmId: activeFarm.id,
         category: 'flocks',
         data: rawList,
+        userId: currentUserId,
       );
 
       _applyFlocks(rawList, activeFarm);

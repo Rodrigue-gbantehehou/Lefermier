@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,16 +6,23 @@ import 'package:lefermier/core/api/api_client.dart';
 import 'package:lefermier/core/models/sync_item.dart';
 import 'package:lefermier/core/sync/sync_service.dart';
 
+String _createMockJwt(String username) {
+  final header = base64Url.encode(utf8.encode(jsonEncode({'alg': 'none', 'typ': 'JWT'}))).replaceAll('=', '');
+  final payload = base64Url.encode(utf8.encode(jsonEncode({'username': username, 'sub': 'user_123'}))).replaceAll('=', '');
+  return '$header.$payload.mock_signature';
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ApiClient apiClient;
   late SyncService syncService;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     apiClient = ApiClient();
     apiClient.dio.interceptors.clear();
+    await apiClient.setAuthTokens(token: _createMockJwt('test_user'), refreshToken: 'refresh_token');
     syncService = SyncService(apiClient);
   });
 
@@ -200,6 +208,115 @@ void main() {
       final updated = await syncService.getQueue();
       expect(updated.length, 1);
       expect(updated.first.label, 'Action B');
+    });
+
+    test('HTTP 401 preserves remaining queue items without silent truncation', () async {
+      await syncService.enqueueAction(
+        label: 'Action 1 - Réussie',
+        method: 'POST',
+        endpoint: '/api/action-1',
+        payload: {'k': 1},
+      );
+      await syncService.enqueueAction(
+        label: 'Action 2 - Non autorisée',
+        method: 'POST',
+        endpoint: '/api/action-2',
+        payload: {'k': 2},
+      );
+      await syncService.enqueueAction(
+        label: 'Action 3 - Subséquente',
+        method: 'POST',
+        endpoint: '/api/action-3',
+        payload: {'k': 3},
+      );
+
+      apiClient.dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.path == '/api/action-1') {
+            handler.resolve(Response(
+              requestOptions: options,
+              statusCode: 200,
+              data: {'ok': true},
+            ));
+          } else if (options.path == '/api/action-2') {
+            handler.reject(DioException(
+              requestOptions: options,
+              response: Response(
+                requestOptions: options,
+                statusCode: 401,
+              ),
+            ));
+          } else {
+            handler.resolve(Response(
+              requestOptions: options,
+              statusCode: 200,
+              data: {'ok': true},
+            ));
+          }
+        },
+      ));
+
+      final result = await syncService.flushQueue();
+
+      expect(result.sentCount, 1);
+      expect(result.pendingCount, 2);
+
+      final queue = await syncService.getQueue();
+      expect(queue.length, 2);
+      expect(queue[0].label, 'Action 2 - Non autorisée');
+      expect(queue[0].httpStatus, 401);
+      expect(queue[1].label, 'Action 3 - Subséquente');
+      expect(queue[1].isPending, isTrue);
+    });
+
+    test('Quarantines orphan actions without ownerKey into failed status', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final orphanItem = SyncQueueItem(
+        id: 'orphan_123',
+        label: 'Action sans propriétaire',
+        method: 'POST',
+        endpoint: '/api/orphan',
+        payload: {},
+        idempotencyKey: 'idem_orphan',
+        createdAt: DateTime.now(),
+        ownerKey: null,
+      );
+      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(orphanItem.toJson())]);
+
+      final result = await syncService.flushQueue();
+
+      expect(result.sentCount, 0);
+      expect(result.failedCount, 1);
+
+      final queue = await syncService.getQueue();
+      expect(queue.length, 1);
+      expect(queue.first.isFailed, isTrue);
+      expect(queue.first.lastError, contains('quarantaine de sécurité'));
+    });
+
+    test('Preserves other users actions in queue without transmitting them', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final aliceItem = SyncQueueItem(
+        id: 'alice_123',
+        label: 'Action de Alice',
+        method: 'POST',
+        endpoint: '/api/alice',
+        payload: {},
+        idempotencyKey: 'idem_alice',
+        createdAt: DateTime.now(),
+        ownerKey: 'user_alice',
+      );
+      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(aliceItem.toJson())]);
+
+      final result = await syncService.flushQueue();
+
+      expect(result.sentCount, 0);
+      expect(result.pendingCount, 1);
+
+      final queue = await syncService.getQueue();
+      expect(queue.length, 1);
+      expect(queue.first.label, 'Action de Alice');
+      expect(queue.first.ownerKey, 'user_alice');
     });
   });
 }

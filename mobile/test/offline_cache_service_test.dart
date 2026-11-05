@@ -147,5 +147,22 @@ void main() {
       expect(await cacheService.getMapCache(farmId: 'farm_A', category: 'data'), isNull);
       expect(await cacheService.getMapCache(farmId: 'farm_B', category: 'data'), isNull);
     });
+
+    test('Anonymous caller cannot read user-designated cache', () async {
+      await cacheService.setCache(
+        farmId: 'farm_001',
+        category: 'secret_flocks',
+        data: [{'id': '1'}],
+        userId: 'user_alice',
+      );
+
+      // Caller without currentUserId
+      final result = await cacheService.getListCache(
+        farmId: 'farm_001',
+        category: 'secret_flocks',
+      );
+
+      expect(result, isNull);
+    });
   });
 }
