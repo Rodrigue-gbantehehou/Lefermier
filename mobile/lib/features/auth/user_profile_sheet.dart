@@ -182,13 +182,22 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
     );
   }
 
-  void _confirmLogout() {
+  Future<void> _confirmLogout() async {
+    final pending = await ref.read(authProvider.notifier).getPendingSyncCount();
+    if (!mounted) return;
+
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Déconnexion"),
-        content: const Text("Voulez-vous vraiment vous déconnecter de cette session ?"),
+        title: Text(pending > 0 ? "Actions non synchronisées" : "Déconnexion"),
+        content: Text(
+          pending > 0
+              ? "Vous avez $pending action(s) hors-ligne en attente d'envoi. "
+                "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil.\n\n"
+                "Voulez-vous vraiment vous déconnecter ?"
+              : "Voulez-vous vraiment vous déconnecter de cette session ?",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -201,7 +210,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
               await ref.read(authProvider.notifier).logout();
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
@@ -210,7 +219,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
                 );
               }
             },
-            child: const Text("Se déconnecter"),
+            child: Text(pending > 0 ? "Se déconnecter quand même" : "Se déconnecter"),
           ),
         ],
       ),

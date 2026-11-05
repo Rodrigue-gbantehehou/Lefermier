@@ -252,6 +252,39 @@ class AppDrawer extends ConsumerWidget {
                   InkWell(
                     onTap: () async {
                       HapticFeedback.lightImpact();
+                      final pending = await ref.read(authProvider.notifier).getPendingSyncCount();
+                      if (!context.mounted) return;
+                      if (pending > 0) {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            title: const Text("Actions non synchronisées"),
+                            content: Text(
+                              "Vous avez $pending action(s) hors-ligne en attente d'envoi. "
+                              "Si vous vous déconnectez, elles seront définitivement supprimées de cet appareil. "
+                              "Voulez-vous continuer ?",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text("Annuler"),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.danger,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text("Se déconnecter"),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                      }
+
+                      if (!context.mounted) return;
                       Navigator.of(context).pop();
                       await ref.read(authProvider.notifier).logout();
                       if (context.mounted) {

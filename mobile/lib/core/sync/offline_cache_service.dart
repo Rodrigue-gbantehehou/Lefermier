@@ -9,25 +9,35 @@ class OfflineCacheService {
   factory OfflineCacheService() => _instance;
   OfflineCacheService._internal();
 
-  static const String _prefix = "offline_cache_";
+  static const String _prefix = "offline_cache_v2_";
+  static const String _legacyPrefix = "offline_cache_";
+  static const int _schemaVersion = 2;
 
-  String _buildKey(String? farmId, String category) {
+  String _buildKey(String? farmId, String category, {bool legacy = false}) {
+    final p = legacy ? _legacyPrefix : _prefix;
     if (farmId == null || farmId.isEmpty) {
-      return "$_prefix$category";
+      return "$p$category";
     }
-    return "$_prefix${farmId}_$category";
+    return "$p${farmId}_$category";
   }
 
-  /// Sauvegarde des données JSON dans le cache local
+  /// Sauvegarde des données JSON dans le cache local avec métadonnées d'enveloppe
   Future<void> setCache({
     required String? farmId,
     required String category,
     required dynamic data,
+    String? userId,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = _buildKey(farmId, category);
-      final encoded = jsonEncode(data);
+      final envelope = {
+        'v': _schemaVersion,
+        'savedAt': DateTime.now().toIso8601String(),
+        'userId': userId,
+        'data': data,
+      };
+      final encoded = jsonEncode(envelope);
       await prefs.setString(key, encoded);
     } catch (_) {}
   }
@@ -36,13 +46,28 @@ class OfflineCacheService {
   Future<Map<String, dynamic>?> getMapCache({
     required String? farmId,
     required String category,
+    String? currentUserId,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = _buildKey(farmId, category);
-      final raw = prefs.getString(key);
+      final raw = prefs.getString(_buildKey(farmId, category)) ??
+          prefs.getString(_buildKey(farmId, category, legacy: true));
+
       if (raw == null || raw.isEmpty) return null;
       final decoded = jsonDecode(raw);
+
+      // Enveloppe v2
+      if (decoded is Map<String, dynamic> && decoded.containsKey('v') && decoded.containsKey('data')) {
+        if (decoded['v'] != _schemaVersion) return null;
+        if (currentUserId != null && decoded['userId'] != null && decoded['userId'] != currentUserId) {
+          return null; // Isolation inter-comptes
+        }
+        final inner = decoded['data'];
+        if (inner is Map<String, dynamic>) return inner;
+        return null;
+      }
+
+      // Format historique
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
@@ -56,15 +81,49 @@ class OfflineCacheService {
   Future<List<dynamic>?> getListCache({
     required String? farmId,
     required String category,
+    String? currentUserId,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = _buildKey(farmId, category);
-      final raw = prefs.getString(key);
+      final raw = prefs.getString(_buildKey(farmId, category)) ??
+          prefs.getString(_buildKey(farmId, category, legacy: true));
+
       if (raw == null || raw.isEmpty) return null;
       final decoded = jsonDecode(raw);
+
+      // Enveloppe v2
+      if (decoded is Map<String, dynamic> && decoded.containsKey('v') && decoded.containsKey('data')) {
+        if (decoded['v'] != _schemaVersion) return null;
+        if (currentUserId != null && decoded['userId'] != null && decoded['userId'] != currentUserId) {
+          return null;
+        }
+        final inner = decoded['data'];
+        if (inner is List) return inner;
+        return null;
+      }
+
+      // Format historique
       if (decoded is List) {
         return decoded;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Retourne la date de mise en cache pour afficher la fraîcheur des données
+  Future<DateTime?> getCacheAge({
+    required String? farmId,
+    required String category,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_buildKey(farmId, category));
+      if (raw == null) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic> && decoded['savedAt'] != null) {
+        return DateTime.tryParse(decoded['savedAt'] as String);
       }
       return null;
     } catch (_) {
@@ -76,8 +135,11 @@ class OfflineCacheService {
   Future<void> clearFarmCache(String farmId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final farmPrefix = "$_prefix${farmId}_";
-      final keysToRemove = prefs.getKeys().where((k) => k.startsWith(farmPrefix)).toList();
+      final farmPrefixV2 = "$_prefix${farmId}_";
+      final farmPrefixLegacy = "$_legacyPrefix${farmId}_";
+      final keysToRemove = prefs.getKeys().where(
+        (k) => k.startsWith(farmPrefixV2) || k.startsWith(farmPrefixLegacy),
+      ).toList();
       for (final k in keysToRemove) {
         await prefs.remove(k);
       }
@@ -88,7 +150,9 @@ class OfflineCacheService {
   Future<void> clearAllCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final keysToRemove = prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();
+      final keysToRemove = prefs.getKeys().where(
+        (k) => k.startsWith(_prefix) || k.startsWith(_legacyPrefix),
+      ).toList();
       for (final k in keysToRemove) {
         await prefs.remove(k);
       }

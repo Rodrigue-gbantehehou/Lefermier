@@ -20,6 +20,7 @@ dependencies:
 
   # Local Persistence & Offline Caching
   shared_preferences: ^2.3.2
+  crypto: ^3.0.7
 
   # Formatting & Localizations
   intl: ^0.19.0

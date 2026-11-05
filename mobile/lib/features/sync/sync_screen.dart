@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/models/sync_item.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/brand_loader.dart';
@@ -121,6 +122,30 @@ class SyncScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (state.lastError != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: AppColors.danger, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          state.lastError!,
+                          style: const TextStyle(fontSize: 12, color: AppColors.danger, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // Bannière explicative "Offline-First"
@@ -156,20 +181,135 @@ class SyncScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // File d'attente des actions hors-ligne
+              // Section 1 : Actions rejetées / bloquées
+              if (state.failedList.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Actions rejetées (${state.failedCount})",
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.danger),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Ces actions ont été refusées par le serveur (règles métier, validation). Vous pouvez les réinjecter ou les abandonner.",
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textMutedLight, height: 1.3),
+                ),
+                const SizedBox(height: 10),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: state.failedList.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (ctx, index) {
+                    final item = state.failedList[index];
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2B1D1D) : const Color(0xFFFFF4F4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.danger.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.httpStatus != null ? "HTTP ${item.httpStatus}" : "REJETÉ",
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item.label,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                DateFormat('HH:mm:ss').format(item.createdAt),
+                                style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
+                              ),
+                            ],
+                          ),
+                          if (item.lastError != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              item.lastError!,
+                              style: const TextStyle(fontSize: 11, color: AppColors.danger, height: 1.25),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.danger,
+                                  side: BorderSide(color: AppColors.danger.withValues(alpha: 0.4)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: const Size(0, 32),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.delete_outline_rounded, size: 14),
+                                label: const Text("Abandonner", style: TextStyle(fontSize: 11)),
+                                onPressed: () => _confirmRemoveItem(context, ref, item),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  minimumSize: const Size(0, 32),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.replay_rounded, size: 14),
+                                label: const Text("Réessayer", style: TextStyle(fontSize: 11)),
+                                onPressed: () => ref.read(syncProvider.notifier).retryAction(item.id),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Section 2 : Actions en attente
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Actions en attente d'envoi (${state.pendingCount})",
+                    "Actions en attente (${state.pendingCount})",
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                  if (state.pendingCount > 0)
+                  if (state.pendingActions.isNotEmpty)
                     TextButton(
-                      onPressed: () => ref.read(syncProvider.notifier).clearQueue(),
-                      child: const Text("Purger", style: TextStyle(color: AppColors.danger, fontSize: 12)),
+                      onPressed: () => _confirmClearQueue(context, ref),
+                      child: const Text("Tout purger", style: TextStyle(color: AppColors.danger, fontSize: 12)),
                     ),
                 ],
               ),
@@ -204,14 +344,34 @@ class SyncScreen extends ConsumerWidget {
                     ],
                   ),
                 )
+              else if (state.pendingList.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    ),
+                  ),
+                  child: const Text(
+                    "Aucune action en attente automatique. Voir ci-dessus les actions rejetées.",
+                    style: TextStyle(fontSize: 12, color: AppColors.textMutedLight),
+                    textAlign: TextAlign.center,
+                  ),
+                )
               else
                 ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: state.pendingActions.length,
+                  itemCount: state.pendingList.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (ctx, index) {
-                    final item = state.pendingActions[index];
+                    final item = state.pendingList[index];
+                    final isDelayed = item.nextAttemptAt != null && item.nextAttemptAt!.isAfter(DateTime.now());
+                    final delaySec = isDelayed ? item.nextAttemptAt!.difference(DateTime.now()).inSeconds : 0;
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
@@ -242,29 +402,46 @@ class SyncScreen extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  "Enregistré à ${DateFormat('HH:mm:ss').format(item.createdAt)} • ${item.method}",
+                                  "Créé à ${DateFormat('HH:mm:ss').format(item.createdAt)} • ${item.method}",
                                   style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
                                 ),
-                                if (item.lastError != null) ...[
+                                if (item.retryCount > 0 || isDelayed) ...[
                                   const SizedBox(height: 2),
                                   Text(
-                                    "Tentative échouée: ${item.lastError}",
-                                    style: const TextStyle(fontSize: 10, color: AppColors.danger),
+                                    isDelayed
+                                        ? "En cours de traitement serveur (409) • Reprise dans ${delaySec}s"
+                                        : "Tentatives : ${item.retryCount}",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isDelayed ? AppColors.warning : AppColors.accent,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.12),
+                              color: (isDelayed ? AppColors.warning : AppColors.accent).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
-                              "En attente",
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent),
+                            child: Text(
+                              isDelayed ? "Reportée (409)" : "En attente",
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isDelayed ? AppColors.warning : AppColors.accent,
+                              ),
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            color: AppColors.textMutedLight,
+                            tooltip: "Supprimer",
+                            onPressed: () => _confirmRemoveItem(context, ref, item),
                           ),
                         ],
                       ),
@@ -274,6 +451,64 @@ class SyncScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmClearQueue(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Purger la file d'attente"),
+        content: const Text(
+          "Toutes les actions hors-ligne (en attente et rejetées) seront définitivement supprimées sans être transmises au serveur.\n\nÊtes-vous sûr ?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(syncProvider.notifier).clearQueue();
+            },
+            child: const Text("Tout purger"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRemoveItem(BuildContext context, WidgetRef ref, SyncQueueItem item) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Abandonner l'action"),
+        content: Text("Voulez-vous supprimer définitivement l'action « ${item.label} » de la file d'attente ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(syncProvider.notifier).removeAction(item.id);
+            },
+            child: const Text("Supprimer"),
+          ),
+        ],
       ),
     );
   }

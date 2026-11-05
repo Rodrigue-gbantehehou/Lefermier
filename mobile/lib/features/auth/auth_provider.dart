@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
@@ -5,6 +6,7 @@ import '../../core/api/api_endpoints.dart';
 import '../../core/models/farm.dart';
 import '../../core/security/secure_storage_service.dart';
 import '../../core/sync/offline_cache_service.dart';
+import '../../core/sync/sync_service.dart';
 
 class UserProfile {
   final String id;
@@ -91,9 +93,23 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
+  StreamSubscription<void>? _sessionExpiredSub;
 
   AuthNotifier(this._apiClient) : super(const AuthState()) {
+    _sessionExpiredSub = _apiClient.onSessionExpired.listen((_) {
+      _handleSessionExpired();
+    });
     checkAuthStatus();
+  }
+
+  void _handleSessionExpired() {
+    state = const AuthState();
+  }
+
+  @override
+  void dispose() {
+    _sessionExpiredSub?.cancel();
+    super.dispose();
   }
 
   Future<void> checkAuthStatus() async {
@@ -503,6 +519,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Nombre d'actions hors-ligne en attente d'envoi pour avertissement avant déconnexion
+  Future<int> getPendingSyncCount() async {
+    try {
+      final queue = await SyncService(_apiClient).getQueue();
+      return queue.where((i) => i.isPending).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Future<void> logout() async {
     try {
       final storage = SecureStorageService();
@@ -519,6 +545,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {}
     await _apiClient.clearAuth();
     await _apiClient.setActiveFarmId(null);
+    await SyncService(_apiClient).clearQueue();
     await OfflineCacheService().clearAllCache();
     state = const AuthState();
   }

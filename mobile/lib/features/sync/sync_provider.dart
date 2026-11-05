@@ -46,7 +46,10 @@ class SyncState {
     );
   }
 
-  int get pendingCount => pendingActions.length;
+  int get pendingCount => pendingActions.where((i) => i.isPending).length;
+  int get failedCount => pendingActions.where((i) => i.isFailed).length;
+  List<SyncQueueItem> get pendingList => pendingActions.where((i) => i.isPending).toList();
+  List<SyncQueueItem> get failedList => pendingActions.where((i) => i.isFailed).toList();
 }
 
 class SyncNotifier extends StateNotifier<SyncState> {
@@ -84,12 +87,14 @@ class SyncNotifier extends StateNotifier<SyncState> {
     required String method,
     required String endpoint,
     required Map<String, dynamic> payload,
+    String? farmId,
   }) async {
     await _syncService.enqueueAction(
       label: label,
       method: method,
       endpoint: endpoint,
       payload: payload,
+      farmId: farmId,
     );
 
     final queue = await _syncService.getQueue();
@@ -101,6 +106,19 @@ class SyncNotifier extends StateNotifier<SyncState> {
       triggerSync();
     }
     return true;
+  }
+
+  Future<void> retryAction(String id) async {
+    await _syncService.retryFailedItem(id);
+    await refreshState();
+    if (state.isOnline) {
+      triggerSync();
+    }
+  }
+
+  Future<void> removeAction(String id) async {
+    await _syncService.removeQueueItem(id);
+    await refreshState();
   }
 
   Future<void> triggerSync() async {
@@ -122,13 +140,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
         return;
       }
 
-      // 1. Envoyer la file d'attente hors-ligne (Push)
-      final flushedCount = await _syncService.flushQueue();
+      // 1. Envoyer la file d'attente hors-ligne (Push robuste)
+      final flushResult = await _syncService.flushQueue();
 
-      // 2. Récupérer les données fraîches du serveur (Pull)
-      await _syncService.pullDelta(activeFarm.id);
-
-      // 3. Rafraîchir les providers principaux
+      // 2. Option A validée : chaque provider recharge sa collection complète (pas de double-emploi avec pullDelta)
       _ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
       _ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
       _ref.read(eggProvider.notifier).loadData(showLoading: false);
@@ -145,7 +160,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
         isOnline: true,
         pendingActions: queue,
         lastSyncTime: lastSync,
-        lastSyncSuccessCount: flushedCount,
+        lastSyncSuccessCount: flushResult.sentCount,
+        lastError: flushResult.failedCount > 0
+            ? "${flushResult.failedCount} action(s) ont rencontré une erreur définitive."
+            : null,
       );
     } catch (e) {
       if (!mounted) return;
