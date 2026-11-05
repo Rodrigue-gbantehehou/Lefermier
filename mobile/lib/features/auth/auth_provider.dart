@@ -181,6 +181,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       await loadFarms();
       return true;
+    } on SecureStoragePersistenceException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: "Erreur de sécurité : ${e.message}",
+      );
+      return false;
     } on DioException catch (e) {
       String message = "Identifiants invalides ou erreur de connexion.";
       if (e.response?.statusCode == 401) {
@@ -354,6 +360,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       await loadFarms();
       return true;
+    } on SecureStoragePersistenceException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: "Erreur de sécurité : ${e.message}",
+      );
+      return false;
     } on DioException catch (e) {
       String message = "Erreur lors de l'inscription.";
       if (e.response?.data != null && e.response?.data is Map) {
@@ -547,7 +559,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> logout() async {
+  Future<bool> logout() async {
     try {
       final storage = SecureStorageService();
       final refreshToken = storage.refreshToken;
@@ -561,11 +573,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
     } catch (_) {}
-    await _apiClient.clearAuth();
+    final secureCleared = await _apiClient.clearAuth();
     await _apiClient.setActiveFarmId(null);
     await SyncService(_apiClient).clearQueue();
     await OfflineCacheService().clearAllCache();
     state = const AuthState();
+    return secureCleared;
   }
 }
 

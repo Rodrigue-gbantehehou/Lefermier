@@ -225,22 +225,23 @@ class ApiClient {
   }
 
   Future<void> setAuthToken(String? token) async {
-    _jwtToken = token;
     if (token != null) {
       await SecureStorageService().updateToken(token);
+      _jwtToken = token;
     } else {
+      _jwtToken = null;
       await SecureStorageService().clearAuth();
     }
   }
 
   Future<void> setAuthTokens({required String token, String? refreshToken}) async {
-    _jwtToken = token;
     await SecureStorageService().saveTokens(token: token, refreshToken: refreshToken);
+    _jwtToken = token;
   }
 
-  Future<void> clearAuth() async {
+  Future<bool> clearAuth({bool throwOnFailure = false}) async {
     _jwtToken = null;
-    await SecureStorageService().clearAuth();
+    return await SecureStorageService().clearAuth(throwOnFailure: throwOnFailure);
   }
 
   Future<void> setActiveFarmId(String? farmId) async {

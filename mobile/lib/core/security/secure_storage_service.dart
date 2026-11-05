@@ -5,6 +5,15 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+/// Exception levée lorsqu'une opération critique sur le coffre-fort matériel échoue
+class SecureStoragePersistenceException implements Exception {
+  final String message;
+  const SecureStoragePersistenceException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 /// Service de coffre-fort sécurisé pour les jetons de session (JWT, Refresh Token)
 /// et l'identifiant immuable du terminal (deviceId).
 ///
@@ -65,6 +74,7 @@ class SecureStorageService {
       await _storage.write(key: key, value: value);
       final confirmed = await _storage.read(key: key);
       if (confirmed == value) {
+        _inMemoryFallback[key] = value;
         return true;
       }
       _inMemoryFallback[key] = value;
@@ -75,11 +85,24 @@ class SecureStorageService {
     }
   }
 
-  Future<void> _deleteSafe(String key) async {
+  /// Supprime une clé du stockage sécurisé et confirme sa suppression par relecture.
+  /// Retourne `true` si la clé a été effectivement effacée.
+  Future<bool> _deleteSafe(String key) async {
+    _inMemoryFallback.remove(key);
     try {
       await _storage.delete(key: key);
+      final remaining = await _storage.read(key: key);
+      if (remaining != null && remaining.isNotEmpty) {
+        // Tentative d'écrasement neutre si delete() n'a pas pris effet
+        await _storage.write(key: key, value: "");
+        final afterOverwrite = await _storage.read(key: key);
+        if (afterOverwrite != null && afterOverwrite.isNotEmpty) {
+          return false;
+        }
+      }
+      return true;
     } catch (_) {
-      _inMemoryFallback.remove(key);
+      return false;
     }
   }
 
@@ -103,7 +126,12 @@ class SecureStorageService {
       // Sécurité critique : Ne supprimer l'ancienne clé que si l'écriture sécurisée est confirmée !
       if (deviceIdSaved) {
         await prefs.remove(_legacyDeviceId);
+        await prefs.remove(_keyDeviceId);
       }
+    } else {
+      // deviceId est déjà confirmé dans le coffre natif : nettoyer les copies SharedPreferences obsolètes
+      await prefs.remove(_legacyDeviceId);
+      await prefs.remove(_keyDeviceId);
     }
     _cachedDeviceId = storedDeviceId;
 
@@ -120,30 +148,53 @@ class SecureStorageService {
   String? get refreshToken => _cachedRefreshToken;
   bool get hasToken => _cachedToken != null && _cachedToken!.isNotEmpty;
 
+  /// Sauvegarde durablement les jetons dans le stockage natif sécurisé.
+  /// Lève une [SecureStoragePersistenceException] si le stockage natif refuse d'écrire ou de confirmer la persistance.
   Future<void> saveTokens({required String token, String? refreshToken}) async {
+    final tokenSaved = await _writeSafe(_keyToken, token);
+    if (!tokenSaved) {
+      throw const SecureStoragePersistenceException(
+        "Échec de l'enregistrement sécurisé du jeton d'accès sur le terminal.",
+      );
+    }
     _cachedToken = token;
-    await _writeSafe(_keyToken, token);
 
     if (refreshToken != null && refreshToken.isNotEmpty) {
+      final refreshSaved = await _writeSafe(_keyRefreshToken, refreshToken);
+      if (!refreshSaved) {
+        throw const SecureStoragePersistenceException(
+          "Échec de l'enregistrement sécurisé du jeton de rafraîchissement sur le terminal.",
+        );
+      }
       _cachedRefreshToken = refreshToken;
-      await _writeSafe(_keyRefreshToken, refreshToken);
     } else {
       _cachedRefreshToken = null;
       await _deleteSafe(_keyRefreshToken);
     }
   }
 
+  /// Met à jour le jeton d'accès dans le stockage natif sécurisé.
+  /// Lève une [SecureStoragePersistenceException] si la persistance n'est pas confirmée.
   Future<void> updateToken(String token) async {
+    final tokenSaved = await _writeSafe(_keyToken, token);
+    if (!tokenSaved) {
+      throw const SecureStoragePersistenceException(
+        "Échec de la mise à jour sécurisée du jeton sur le terminal.",
+      );
+    }
     _cachedToken = token;
-    await _writeSafe(_keyToken, token);
   }
 
   /// Efface les jetons de session. Le deviceId est préservé car il identifie le terminal matériel.
-  Future<void> clearAuth() async {
+  /// Vérifie et confirme la suppression réelle des secrets dans le stockage natif.
+  /// Retourne `true` si le nettoyage sécurisé est confirmé, `false` sinon.
+  /// Lève une [SecureStoragePersistenceException] si [throwOnFailure] est activé et que la suppression échoue.
+  Future<bool> clearAuth({bool throwOnFailure = false}) async {
     _cachedToken = null;
     _cachedRefreshToken = null;
-    await _deleteSafe(_keyToken);
-    await _deleteSafe(_keyRefreshToken);
+
+    final tokenDeleted = await _deleteSafe(_keyToken);
+    final refreshDeleted = await _deleteSafe(_keyRefreshToken);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_legacyEncToken);
@@ -151,6 +202,14 @@ class SecureStorageService {
     await prefs.remove(_legacyBase64Token);
     await prefs.remove(_legacyBase64Refresh);
     await prefs.remove(_legacyPlainToken);
+
+    final success = tokenDeleted && refreshDeleted;
+    if (!success && throwOnFailure) {
+      throw const SecureStoragePersistenceException(
+        "Échec de la purge sécurisée des jetons sur le stockage natif.",
+      );
+    }
+    return success;
   }
 
   @visibleForTesting
@@ -199,6 +258,12 @@ class SecureStorageService {
           await prefs.remove(_legacyPlainToken);
         }
       }
+    } else {
+      // Le jeton JWT est déjà présent et confirmé dans le coffre natif :
+      // Purger immédiatement les anciennes copies résiduelles dans SharedPreferences
+      await prefs.remove(_legacyEncToken);
+      await prefs.remove(_legacyBase64Token);
+      await prefs.remove(_legacyPlainToken);
     }
 
     // 2. Récupération éventuelle de l'ancien refresh token
@@ -227,6 +292,11 @@ class SecureStorageService {
           await prefs.remove(_legacyBase64Refresh);
         }
       }
+    } else {
+      // Le refresh token est déjà présent et confirmé dans le coffre natif :
+      // Purger immédiatement les anciennes copies résiduelles dans SharedPreferences
+      await prefs.remove(_legacyEncRefreshToken);
+      await prefs.remove(_legacyBase64Refresh);
     }
 
     // 3. Purge du sel d'entropie uniquement si toutes les clés chiffrées héritées ont été migrées

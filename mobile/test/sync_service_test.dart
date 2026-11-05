@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
+import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:lefermier/core/api/api_client.dart';
 import 'package:lefermier/core/models/sync_item.dart';
+import 'package:lefermier/core/security/secure_storage_service.dart';
 import 'package:lefermier/core/sync/sync_service.dart';
 
 String _createMockJwt(String username) {
@@ -20,6 +23,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({});
+    SecureStorageService().resetForTesting();
     apiClient = ApiClient();
     apiClient.dio.interceptors.clear();
     await apiClient.setAuthTokens(token: _createMockJwt('test_user'), refreshToken: 'refresh_token');
