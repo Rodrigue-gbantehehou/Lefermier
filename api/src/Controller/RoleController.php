@@ -11,6 +11,7 @@ use App\Entity\Role;
 use App\Repository\RoleRepository;
 use App\Security\Permission;
 use App\Security\Voter\FarmVoter;
+use App\Service\Admin\CommercialPlanService;
 use App\Service\RoleService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,6 +26,7 @@ class RoleController extends AbstractController
     public function __construct(
         private readonly RoleService $roleService,
         private readonly RoleRepository $roleRepository,
+        private readonly CommercialPlanService $commercialPlanService,
     ) {
     }
 
@@ -59,6 +61,8 @@ class RoleController extends AbstractController
         Farm $farm,
         #[MapRequestPayload] CreateRoleRequestDto $dto,
     ): JsonResponse {
+        $this->commercialPlanService->assertModuleAllowed($farm, 'custom_roles');
+
         $role = $this->roleService->createRole($farm, $dto);
 
         return $this->json([
@@ -75,6 +79,8 @@ class RoleController extends AbstractController
         string $roleId,
         #[MapRequestPayload] UpdateRoleRequestDto $dto,
     ): JsonResponse {
+        $this->commercialPlanService->assertModuleAllowed($farm, 'custom_roles');
+
         $role = $this->roleRepository->find($roleId);
         if (!$role instanceof Role || $role->getFarm()->getId()->toRfc4122() !== $farm->getId()->toRfc4122()) {
             return $this->json([

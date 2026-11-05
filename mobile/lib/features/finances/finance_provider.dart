@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/models/transaction.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/sync/offline_cache_service.dart';
 import '../auth/auth_provider.dart';
 
 class FinanceSummary {
@@ -81,7 +83,33 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       return;
     }
 
-    if (showLoading) {
+    // 1. Restitution instantanée depuis le cache hors-ligne
+    if (state.transactions.isEmpty) {
+      final cachedTx = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: 'finance_transactions',
+      );
+      final cachedSummary = await OfflineCacheService().getMapCache(
+        farmId: activeFarm.id,
+        category: 'finance_summary',
+      );
+
+      if (cachedTx != null) {
+        final transactions = cachedTx
+            .map((item) => Transaction.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final summary = cachedSummary != null
+            ? FinanceSummary.fromJson(cachedSummary)
+            : const FinanceSummary();
+
+        state = state.copyWith(
+          transactions: transactions,
+          summary: summary,
+        );
+      }
+    }
+
+    if (showLoading && state.transactions.isEmpty) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
 
@@ -97,8 +125,20 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
       FinanceSummary summary = const FinanceSummary();
       if (response.data['meta']?['summary'] != null) {
-        summary = FinanceSummary.fromJson(response.data['meta']['summary'] as Map<String, dynamic>);
+        final sumMap = response.data['meta']['summary'] as Map<String, dynamic>;
+        summary = FinanceSummary.fromJson(sumMap);
+        await OfflineCacheService().setCache(
+          farmId: activeFarm.id,
+          category: 'finance_summary',
+          data: sumMap,
+        );
       }
+
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'finance_transactions',
+        data: rawList,
+      );
 
       state = state.copyWith(
         isLoading: false,
@@ -106,16 +146,24 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         summary: summary,
       );
     } on DioException catch (e) {
-      String message = "Impossible de charger la caisse et les transactions.";
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        message = e.response!.data['message'] as String;
+      if (state.transactions.isEmpty) {
+        String message = "Impossible de charger la caisse et les transactions.";
+        if (e.response?.data is Map && e.response?.data['message'] != null) {
+          message = e.response!.data['message'] as String;
+        }
+        state = state.copyWith(isLoading: false, error: message);
+      } else {
+        state = state.copyWith(isLoading: false);
       }
-      state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: "Erreur de chargement: $e",
-      );
+      if (state.transactions.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Erreur de chargement: $e",
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
@@ -133,36 +181,65 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     required int amount,
     required DateTime date,
     String paymentMethod = "CASH",
+    String paymentStatus = "PAID",
+    int? paidAmount,
+    DateTime? dueDate,
+    String? reference,
     String? description,
     String? flockId,
+    String? contactId,
   }) async {
     final activeFarm = _ref.read(authProvider).activeFarm;
     if (activeFarm == null) return false;
 
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr =
-          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final dueDateStr = dueDate != null
+        ? "${dueDate.year.toString().padLeft(4, '0')}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}"
+        : null;
 
+    final payload = {
+      'type': type,
+      'category': category,
+      'amount': amount,
+      'transactionDate': dateStr,
+      'paymentMethod': paymentMethod,
+      'paymentStatus': paymentStatus,
+      if (paidAmount != null && paymentStatus == 'PARTIAL') 'paidAmount': paidAmount,
+      if (dueDateStr != null && paymentStatus != 'PAID') 'dueDate': dueDateStr,
+      if (reference != null && reference.trim().isNotEmpty) 'reference': reference.trim(),
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+      if (flockId != null && flockId.isNotEmpty) 'flockId': flockId,
+      if (contactId != null && contactId.isNotEmpty) 'contactId': contactId,
+    };
+
+    try {
       await _apiClient.dio.post(
         ApiEndpoints.farmTransactions(activeFarm.id),
-        data: {
-          'type': type,
-          'category': category,
-          'amount': amount,
-          'transactionDate': dateStr,
-          'paymentMethod': paymentMethod,
-          'paymentStatus': 'PAID',
-          if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
-          if (flockId != null && flockId.isNotEmpty) 'flockId': flockId,
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadTransactions(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Transaction ($type: $amount FCFA)",
+          method: "POST",
+          endpoint: ApiEndpoints.farmTransactions(activeFarm.id),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
+
       String message = "Échec de l'enregistrement de l'opération de caisse.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;

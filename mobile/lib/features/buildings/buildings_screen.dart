@@ -5,6 +5,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'buildings_provider.dart';
+import '../../core/models/flock.dart';
+import '../flocks/flock_provider.dart';
+import '../subscriptions/subscription_screen.dart';
+
 
 class BuildingsScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
@@ -19,6 +23,8 @@ class _BuildingsScreenState extends ConsumerState<BuildingsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(buildingsProvider);
+    final flockState = ref.watch(flockProvider);
+    final flocks = flockState.flocks;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     ref.listen<BuildingsState>(buildingsProvider, (_, next) {
@@ -219,16 +225,209 @@ class _BuildingsScreenState extends ConsumerState<BuildingsScreen> {
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (ctx, index) {
                           final item = state.filteredBuildings[index];
+                          final housedFlock = flocks
+                              .where((f) => f.isActive && f.buildingId == item.id)
+                              .firstOrNull;
                           return _BuildingCard(
                             building: item,
+                            housedFlock: housedFlock,
                             onEdit: () => _openBuildingDialog(context, item),
                             onDelete: () => _confirmDelete(item),
+                            onAssign: () => _openAssignFlockDialog(item, housedFlock),
                           );
                         },
                       ),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  void _openAssignFlockDialog(Building building, Flock? currentFlock) {
+    final flocks = ref.read(flockProvider).flocks.where((f) => f.isActive).toList();
+    String? selectedFlockId = currentFlock?.id;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+          final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+          final flockState = ref.watch(flockProvider);
+
+          return Container(
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: borderColor),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Attribuer une bande à : ${building.name}",
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Capacité du bâtiment : ${building.capacity} sujets (${building.type.label})",
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMutedLight),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (flocks.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Aucun lot actif disponible dans cette exploitation.",
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    ListTile(
+                      leading: Icon(
+                        selectedFlockId == null ? Icons.radio_button_checked : Icons.radio_button_off,
+                        color: selectedFlockId == null ? AppColors.primary : Colors.grey,
+                      ),
+                      title: const Text("Aucun lot (Libérer le poulailler)"),
+                      subtitle: const Text("Le bâtiment sera marqué disponible et prêt"),
+                      onTap: () => setModalState(() => selectedFlockId = null),
+                    ),
+                    const Divider(height: 1),
+                    ...flocks.map((f) {
+                      final isSelected = selectedFlockId == f.id;
+                      final otherBuilding = f.buildingId != null && f.buildingId != building.id;
+                      return ListTile(
+                        leading: Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? AppColors.primary : Colors.grey,
+                        ),
+                        title: Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Text(
+                          "${f.currentQuantity} sujets • ${f.breed}${otherBuilding ? ' (Logé ailleurs)' : ''}",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: otherBuilding ? AppColors.warning : AppColors.textMutedLight,
+                          ),
+                        ),
+                        onTap: () => setModalState(() => selectedFlockId = f.id),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text("Annuler"),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: flockState.isSubmitting
+                              ? null
+                              : () async {
+                                  if (selectedFlockId == null) {
+                                    if (currentFlock != null) {
+                                      await ref.read(flockProvider.notifier).updateFlock(
+                                            flockId: currentFlock.id,
+                                            name: currentFlock.name,
+                                            strain: currentFlock.breed,
+                                            buildingId: null,
+                                            status: currentFlock.status,
+                                            notes: currentFlock.notes,
+                                          );
+                                    }
+                                  } else {
+                                    final target = flocks.firstWhere((f) => f.id == selectedFlockId);
+                                    await ref.read(flockProvider.notifier).updateFlock(
+                                          flockId: target.id,
+                                          name: target.name,
+                                          strain: target.breed,
+                                          buildingId: building.id,
+                                          status: target.status,
+                                          notes: target.notes,
+                                        );
+                                  }
+
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Attribution du poulailler enregistrée !"),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: flockState.isSubmitting
+                              ? const BrandLoader.button()
+                              : const Text("Confirmer"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -327,13 +526,17 @@ class _FilterChip extends StatelessWidget {
 
 class _BuildingCard extends StatelessWidget {
   final Building building;
+  final Flock? housedFlock;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAssign;
 
   const _BuildingCard({
     required this.building,
+    this.housedFlock,
     required this.onEdit,
     required this.onDelete,
+    required this.onAssign,
   });
 
   @override
@@ -408,10 +611,21 @@ class _BuildingCard extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onSelected: (val) {
+                  if (val == 'assign') onAssign();
                   if (val == 'edit') onEdit();
                   if (val == 'delete') onDelete();
                 },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'assign',
+                    child: Row(
+                      children: [
+                        Icon(Icons.link_rounded, size: 16),
+                        SizedBox(width: 8),
+                        Text("Attribuer / Changer de lot"),
+                      ],
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'edit',
                     child: Row(
@@ -466,6 +680,139 @@ class _BuildingCard extends StatelessWidget {
               ),
             ],
           ),
+          if (building.type != BuildingType.storage) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: housedFlock != null
+                    ? (isDark ? AppColors.surfaceLight.withValues(alpha: 0.05) : AppColors.surfaceLight)
+                    : AppColors.success.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: housedFlock != null
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.success.withValues(alpha: 0.25),
+                ),
+              ),
+              child: housedFlock != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              housedFlock!.isLayer ? Icons.egg_rounded : Icons.pets_rounded,
+                              size: 15,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "Bande hébergée : ${housedFlock!.name}",
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              "${housedFlock!.currentQuantity} / ${building.capacity}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: building.capacity > 0
+                                ? (housedFlock!.currentQuantity / building.capacity).clamp(0.0, 1.0)
+                                : 0.0,
+                            minHeight: 6,
+                            backgroundColor: isDark ? AppColors.borderDark : AppColors.borderLight,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              (building.capacity > 0 && housedFlock!.currentQuantity > building.capacity)
+                                  ? AppColors.danger
+                                  : (housedFlock!.currentQuantity >= building.capacity * 0.9
+                                      ? AppColors.warning
+                                      : AppColors.primary),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Occupation : ${building.capacity > 0 ? (housedFlock!.currentQuantity / building.capacity * 100).toStringAsFixed(0) : 0}% (${housedFlock!.breed})",
+                              style: const TextStyle(fontSize: 10, color: AppColors.textMutedLight),
+                            ),
+                            Text(
+                              housedFlock!.typeLabel,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : const Row(
+                      children: [
+                        Icon(Icons.check_circle_outline_rounded, size: 16, color: AppColors.success),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Disponible • Vide sanitaire prêt",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          "0 sujet",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onAssign,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: Icon(
+                  housedFlock != null ? Icons.swap_horiz_rounded : Icons.add_link_rounded,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+                label: Text(
+                  housedFlock != null ? "Changer de lot" : "Attribuer un lot",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -583,6 +930,32 @@ class _BuildingFormModalState extends ConsumerState<_BuildingFormModal> {
           backgroundColor: AppColors.primary,
         ),
       );
+    } else if (mounted) {
+      final err = ref.read(buildingsProvider).error ?? "Une erreur est survenue.";
+      final isQuotaOrUpgrade = err.contains("Limite atteinte") ||
+          err.contains("quota") ||
+          err.contains("formule") ||
+          err.contains("Passez à");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err),
+          backgroundColor: AppColors.danger,
+          duration: isQuotaOrUpgrade ? const Duration(seconds: 7) : const Duration(seconds: 4),
+          action: isQuotaOrUpgrade
+              ? SnackBarAction(
+                  label: "Voir offres",
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SubscriptionScreen(),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        ),
+      );
     }
   }
 
@@ -602,9 +975,11 @@ class _BuildingFormModalState extends ConsumerState<_BuildingFormModal> {
         20,
         MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      child: Material(
+        color: Colors.transparent,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -767,7 +1142,8 @@ class _BuildingFormModalState extends ConsumerState<_BuildingFormModal> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

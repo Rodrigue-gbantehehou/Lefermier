@@ -5,6 +5,7 @@ import '../../core/api/api_endpoints.dart';
 import '../../core/models/flock.dart';
 import '../../core/models/transaction.dart';
 import '../auth/auth_provider.dart';
+import '../../core/sync/offline_cache_service.dart';
 
 class DashboardKpiData {
   final int todayGoodEggs;
@@ -99,7 +100,27 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       return;
     }
 
-    if (showLoading) {
+    // 1. Restitution instantanée depuis le cache local si données vides
+    if (state.kpi.flocks.isEmpty && state.kpi.totalBirds == 0 && state.kpi.todayGoodEggs == 0) {
+      final cachedDash = await OfflineCacheService().getMapCache(
+        farmId: activeFarm.id,
+        category: 'dashboard',
+      );
+      final cachedFlocks = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: 'flocks',
+      );
+      if (cachedDash != null) {
+        final flocks = (cachedFlocks ?? [])
+            .map((item) => Flock.fromJson(item as Map<String, dynamic>))
+            .toList();
+        state = state.copyWith(
+          kpi: DashboardKpiData.fromJson(cachedDash, flocks),
+        );
+      }
+    }
+
+    if (showLoading && state.kpi.flocks.isEmpty) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
 
@@ -120,8 +141,17 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           .map((item) => Flock.fromJson(item as Map<String, dynamic>))
           .toList();
 
+      final dashData = dashRes.data['data'] as Map<String, dynamic>? ?? {};
+
+      // Sauvegarde dans le cache local
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'dashboard',
+        data: dashData,
+      );
+
       final kpi = DashboardKpiData.fromJson(
-        dashRes.data['data'] as Map<String, dynamic>? ?? {},
+        dashData,
         flocks,
       );
 
@@ -130,16 +160,24 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         kpi: kpi,
       );
     } on DioException catch (e) {
-      String message = "Impossible de charger le tableau de bord.";
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        message = e.response!.data['message'] as String;
+      if (state.kpi.flocks.isEmpty) {
+        String message = "Impossible de charger le tableau de bord.";
+        if (e.response?.data is Map && e.response?.data['message'] != null) {
+          message = e.response!.data['message'] as String;
+        }
+        state = state.copyWith(isLoading: false, error: message);
+      } else {
+        state = state.copyWith(isLoading: false);
       }
-      state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: "Erreur de chargement: $e",
-      );
+      if (state.kpi.flocks.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Erreur de chargement: $e",
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 }

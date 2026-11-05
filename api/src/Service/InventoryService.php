@@ -191,7 +191,8 @@ class InventoryService
         ];
 
         if ($includeMovements) {
-            $data['movements'] = array_map([$this, 'serializeMovement'], $item->getMovements()->toArray());
+            $movements = $this->movementRepository->findByItem($item);
+            $data['movements'] = array_map([$this, 'serializeMovement'], $movements);
         }
 
         return $data;
@@ -206,6 +207,8 @@ class InventoryService
         return [
             'id' => $movement->getId()?->toBase32(),
             'itemId' => $movement->getItem()->getId()?->toBase32(),
+            'itemName' => $movement->getItem()->getName(),
+            'itemCategory' => $movement->getItem()->getCategory()->value,
             'type' => $movement->getType()->value,
             'quantity' => $movement->getQuantity(),
             'unit' => $unit->value,

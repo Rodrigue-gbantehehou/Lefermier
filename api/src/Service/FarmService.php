@@ -17,6 +17,7 @@ use App\Enum\FarmRole;
 use App\Repository\BuildingRepository;
 use App\Repository\FarmRepository;
 use App\Repository\OrganizationRepository;
+use App\Service\Admin\CommercialPlanService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\String\Slugger\SluggerInterface;
@@ -28,6 +29,7 @@ class FarmService
         private readonly FarmRepository $farmRepository,
         private readonly BuildingRepository $buildingRepository,
         private readonly OrganizationRepository $organizationRepository,
+        private readonly CommercialPlanService $commercialPlanService,
         private readonly EntityManagerInterface $entityManager,
         private readonly SluggerInterface $slugger,
     ) {
@@ -50,6 +52,9 @@ class FarmService
 
     public function createFarm(User $user, CreateFarmRequestDto $dto): Farm
     {
+        // 0. Contrôle d'accès et des quotas de la formule commerciale
+        $this->commercialPlanService->assertCanCreateFarm($user);
+
         // 1. Déterminer l'organisation de rattachement du propriétaire
         $organization = null;
         foreach ($user->getFarmMemberships() as $membership) {
@@ -125,6 +130,9 @@ class FarmService
 
     public function createBuilding(Farm $farm, CreateBuildingRequestDto $dto): Building
     {
+        // 0. Contrôle d'accès et des quotas de la formule commerciale
+        $this->commercialPlanService->assertCanCreateBuilding($farm);
+
         $building = new Building($farm, $dto->name, $dto->type, $dto->capacity);
         if ($dto->surfaceArea !== null) {
             $building->setSurfaceArea((string) $dto->surfaceArea);
@@ -248,5 +256,11 @@ class FarmService
             'isActive' => $building->isActive(),
             'createdAt' => $building->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    public function deleteFarm(Farm $farm): void
+    {
+        $this->entityManager->remove($farm);
+        $this->entityManager->flush();
     }
 }

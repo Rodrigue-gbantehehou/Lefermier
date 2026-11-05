@@ -157,8 +157,9 @@ export const flocksApi = {
   },
 
   addMovement: async (flockId: string, movement: any) => {
+    const normalizedType = movement.type === "CULL" ? "CULLING" : movement.type;
     const payload = {
-      type: movement.type,
+      type: normalizedType,
       quantity: Number(movement.quantity),
       movementDate: movement.movementDate || movement.date || new Date().toISOString().split("T")[0],
       reason: movement.reason || undefined,

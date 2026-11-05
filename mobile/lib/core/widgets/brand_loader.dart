@@ -120,16 +120,16 @@ class _BrandLoaderState extends State<BrandLoader> with TickerProviderStateMixin
                     child: ScaleTransition(
                       scale: _pulseAnimation,
                       child: Container(
-                        width: widget.size * 0.42,
-                        height: widget.size * 0.42,
+                        width: widget.size * 0.44,
+                        height: widget.size * 0.44,
+                        padding: const EdgeInsets.all(2.5),
                         decoration: const BoxDecoration(
-                          color: AppColors.primarySoft,
+                          color: Colors.white,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.egg_rounded,
-                          size: widget.size * 0.28,
-                          color: primary,
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),

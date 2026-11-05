@@ -58,6 +58,12 @@ export const farmsApi = {
     return res?.data || res;
   },
 
+  delete: async (id: string): Promise<void> => {
+    await apiRequest<void>(`/farms/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   listBuildings: async (farmId: string, params?: { onlyActive?: boolean }): Promise<any[]> => {
     const q = new URLSearchParams();
     if (params?.onlyActive !== undefined) q.append("onlyActive", String(params.onlyActive));

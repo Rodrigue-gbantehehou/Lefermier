@@ -1,3 +1,5 @@
+import 'subscription_plan.dart';
+
 /// Clés de permissions métier exposées par l'API (miroir de `App\Security\Permission`).
 class FarmPermission {
   static const String flockView = 'flock:view';
@@ -26,6 +28,7 @@ class Farm {
   final String? plan;
   final String? planName;
   final List<String> modules;
+  final PlanQuotas? quotas;
 
   /// Permissions effectives calculées par le serveur : droits du rôle ∩ modules de l'abonnement.
   /// `null` si l'API n'a pas transmis la matrice (ancienne réponse) → repli sur les règles de rôle.
@@ -34,6 +37,13 @@ class Farm {
   /// IDs des bâtiments/poulaillers assignés au membre connecté.
   /// `null` ou vide signifie qu'aucune restriction n'est appliquée (accès à tous les bâtiments).
   final List<String>? assignedBuildingIds;
+
+  final String? phone;
+  final String? email;
+  final String? address;
+  final String? ifu;
+  final String? rccm;
+  final String? description;
 
   const Farm({
     required this.id,
@@ -46,8 +56,15 @@ class Farm {
     this.plan,
     this.planName,
     this.modules = const [],
+    this.quotas,
     this.permissions,
     this.assignedBuildingIds,
+    this.phone,
+    this.email,
+    this.address,
+    this.ifu,
+    this.rccm,
+    this.description,
   });
 
   factory Farm.fromJson(Map<String, dynamic> json) {
@@ -56,6 +73,11 @@ class Farm {
 
     final rawModules = subscription['modules'] ?? json['modules'];
     final parsedModules = rawModules is List ? rawModules.map((m) => m.toString()).toList() : <String>[];
+
+    final rawQuotas = subscription['quotas'] ?? json['quotas'];
+    final parsedQuotas = rawQuotas is Map
+        ? PlanQuotas.fromJson(Map<String, dynamic>.from(rawQuotas))
+        : null;
 
     final rawPermissions = json['permissions'];
     final parsedPermissions = rawPermissions is List ? rawPermissions.map((p) => p.toString()).toList() : null;
@@ -79,8 +101,15 @@ class Farm {
       plan: (subscription['plan'] ?? json['plan'] ?? json['subscriptionPlan']) as String?,
       planName: subscription['planName'] as String?,
       modules: parsedModules,
+      quotas: parsedQuotas,
       permissions: parsedPermissions,
       assignedBuildingIds: parsedAssignedBuildings,
+      phone: json['phone'] as String?,
+      email: json['email'] as String?,
+      address: json['address'] as String?,
+      ifu: json['ifu'] as String?,
+      rccm: json['rccm'] as String?,
+      description: json['description'] as String?,
     );
   }
 
@@ -94,6 +123,12 @@ class Farm {
     'role': role,
     'permissions': permissions,
     'assignedBuildingIds': assignedBuildingIds,
+    'phone': phone,
+    'email': email,
+    'address': address,
+    'ifu': ifu,
+    'rccm': rccm,
+    'description': description,
     'subscription': {
       'plan': plan,
       'planName': planName,

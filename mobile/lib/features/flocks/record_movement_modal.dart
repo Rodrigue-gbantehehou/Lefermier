@@ -171,13 +171,13 @@ class _RecordMovementModalState extends ConsumerState<RecordMovementModal> {
               ),
               const SizedBox(height: 14),
 
-              // 2. Type de mouvement
-              const Text("Type d'événement *", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              // 2. Type de perte sanitaire
+              const Text("Type d'événement sanitaire *", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               Row(
                 children: [
                   _TypeChip(
-                    label: "Mortalité",
+                    label: "Mortalité (décès)",
                     icon: Icons.heart_broken_rounded,
                     color: AppColors.danger,
                     isSelected: _movementType == "MORTALITY",
@@ -185,19 +185,11 @@ class _RecordMovementModalState extends ConsumerState<RecordMovementModal> {
                   ),
                   const SizedBox(width: 8),
                   _TypeChip(
-                    label: "Réforme",
+                    label: "Réforme sanitaire (isolé/éliminé)",
                     icon: Icons.remove_circle_outline,
                     color: AppColors.accent,
                     isSelected: _movementType == "CULLING",
                     onTap: () => setState(() => _movementType = "CULLING"),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeChip(
-                    label: "Vente vifs",
-                    icon: Icons.shopping_bag_outlined,
-                    color: AppColors.success,
-                    isSelected: _movementType == "SALE",
-                    onTap: () => setState(() => _movementType = "SALE"),
                   ),
                 ],
               ),
@@ -216,7 +208,7 @@ class _RecordMovementModalState extends ConsumerState<RecordMovementModal> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Nombre de sujets :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text("Nombre de sujets perdus :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     Row(
                       children: [
                         IconButton(
@@ -242,14 +234,38 @@ class _RecordMovementModalState extends ConsumerState<RecordMovementModal> {
               ),
               const SizedBox(height: 14),
 
+              // Suggestions rapides de causes
+              const Text("Causes fréquentes :", style: TextStyle(fontSize: 11, color: AppColors.textMutedLight)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  "Coup de chaleur",
+                  "Maladie / Faiblesse",
+                  "Étouffement",
+                  "Picage",
+                  "Autopsie requise",
+                ].map((cause) {
+                  return ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(cause, style: const TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      setState(() {
+                        _reasonController.text = cause;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 10),
+
               // 4. Motif / Cause
               TextField(
                 controller: _reasonController,
                 decoration: InputDecoration(
-                  labelText: "Cause ou observation (optionnel)",
-                  hintText: _movementType == "MORTALITY"
-                      ? "Ex : Coup de chaleur, asphyxie, picage..."
-                      : "Ex : Vente aux restaurateurs...",
+                  labelText: "Cause ou observation constatée",
+                  hintText: "Ex : Coup de chaleur, asphyxie, picage...",
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),

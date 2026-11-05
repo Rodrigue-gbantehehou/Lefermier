@@ -24,6 +24,7 @@ import {
   Printer,
   AlertCircle,
   Info,
+  Utensils,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { StatCard } from "@/components/ui/stat-card";
@@ -38,6 +39,8 @@ import { api } from "@/lib/api-client";
 import {
   Flock,
   FlockMovement,
+  StockMovement,
+  InventoryItem,
   MovementType,
   EggProduction,
   EggSession,
@@ -53,6 +56,7 @@ import {
   formatEggTraysSummary,
 } from "@/lib/utils";
 import { FlockSummaryReportModal } from "@/components/flocks/flock-summary-report-modal";
+import { RecordFeedingModal } from "@/components/dashboard/record-feeding-modal";
 
 const MOVEMENT_LABELS: Record<MovementType, { label: string; badge: "danger" | "warning" | "info" | "neutral" }> = {
   MORTALITY: { label: "Mortalité / Perte", badge: "danger" },
@@ -82,7 +86,10 @@ function FlockDetailContent() {
   }>({ totalIncome: 0, totalExpense: 0, grossMargin: 0, currency: "XOF" });
 
   const [buildings, setBuildings] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"movements" | "eggs" | "health" | "finance" | "details">("movements");
+  const [activeTab, setActiveTab] = useState<"movements" | "feeding" | "eggs" | "health" | "finance" | "details">("movements");
+  const [feedingMovements, setFeedingMovements] = useState<StockMovement[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [feedingModalOpen, setFeedingModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modale Mouvement
@@ -154,6 +161,20 @@ function FlockDetailContent() {
       if (activeFarm?.id && hasModule("health")) {
         promises.push(
           api.health.list(activeFarm.id, { flockId }).then((res) => setTreatments(res.data)).catch(() => {})
+        );
+      }
+
+      // Alimentation & Consommations si module inventaire
+      if (activeFarm?.id && hasModule("inventory")) {
+        promises.push(
+          api.inventory.listFarmMovements(activeFarm.id, { flockId }).then((res: any) => {
+            setFeedingMovements(res || []);
+          }).catch(() => {})
+        );
+        promises.push(
+          api.inventory.listItems({ farmId: activeFarm.id }).then((items: any) => {
+            setInventoryItems(items || []);
+          }).catch(() => {})
         );
       }
 
@@ -307,6 +328,52 @@ function FlockDetailContent() {
       totalTrays,
     };
   }, [flock, eggProductions]);
+
+  // Colonnes Alimentation & Rations
+  const feedingColumns: ColumnDef<StockMovement>[] = [
+    {
+      key: "date",
+      header: "Date de la tournée",
+      sortable: true,
+      cell: (m) => <span className="font-mono text-xs text-foreground font-semibold">{formatDate(m.date)}</span>,
+    },
+    {
+      key: "itemName",
+      header: "Aliment / Produit",
+      sortable: true,
+      cell: (m) => (
+        <div>
+          <span className="font-bold text-xs text-foreground">{m.itemName || "Aliment"}</span>
+          <span className="block text-[10px] text-muted">{m.itemCategory === "FEED" ? "Aliment complet" : "Intrant / Soin eau"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Quantité distribuée",
+      sortable: true,
+      align: "right",
+      cell: (m) => (
+        <span className="font-mono font-bold text-sm text-accent">
+          -{m.quantity} {m.unitShortLabel || m.unit}
+        </span>
+      ),
+    },
+    {
+      key: "reason",
+      header: "Détails & Abreuvement",
+      cell: (m) => <span className="text-xs text-muted">{m.reason || "Distribution de ration"}</span>,
+    },
+    {
+      key: "recordedBy",
+      header: "Opérateur",
+      cell: (m) => (
+        <span className="text-xs text-muted">
+          {typeof m.recordedBy === "object" ? m.recordedBy?.name : m.recordedBy || "—"}
+        </span>
+      ),
+    },
+  ];
 
   // Colonnes Mouvements
   const movementColumns: ColumnDef<FlockMovement>[] = [
@@ -695,6 +762,21 @@ function FlockDetailContent() {
                 Mouvements d'effectif ({movements.length})
               </button>
 
+              {hasModule("inventory") && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("feeding")}
+                  className={`py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                    activeTab === "feeding"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Utensils className="h-4 w-4" />
+                  Alimentation & Rations ({feedingMovements.length})
+                </button>
+              )}
+
               {canViewEgg && (
                 <button
                   onClick={() => setActiveTab("eggs")}
@@ -767,6 +849,44 @@ function FlockDetailContent() {
               ) : (
                 <DataTable data={movements} columns={movementColumns} pageSize={10} />
               )
+            )}
+
+            {activeTab === "feeding" && hasModule("inventory") && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-border bg-surface">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold">
+                      <Utensils className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">Bilan de nutrition & consommations</h3>
+                      <p className="text-xs text-muted">
+                        Total rations enregistrées : {feedingMovements.length} distribution(s)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFeedingModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-primary rounded-xl hover:bg-primary-hover shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nourrir ce lot
+                  </button>
+                </div>
+
+                {feedingMovements.length === 0 ? (
+                  <EmptyState
+                    icon={<Utensils className="h-6 w-6" />}
+                    title="Aucune ration d'aliment enregistrée"
+                    description="Les distributions de provende et les traitements d'eau administrés à cette bande s'afficheront ici."
+                    actionLabel="Enregistrer une tournée d'alimentation"
+                    onAction={() => setFeedingModalOpen(true)}
+                  />
+                ) : (
+                  <DataTable data={feedingMovements} columns={feedingColumns} pageSize={10} />
+                )}
+              </div>
             )}
 
             {activeTab === "eggs" && canViewEgg && (

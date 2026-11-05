@@ -51,31 +51,30 @@ class SplashScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Emblème Le Fermier
+                    // Logo Officiel Le Fermier
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 88,
+                      height: 88,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.primaryLight.withValues(alpha: 0.5),
-                          width: 2.5,
-                        ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                            blurRadius: 28,
-                            spreadRadius: 4,
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.25),
+                            blurRadius: 36,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.egg_alt_rounded,
-                          size: 42,
-                          color: AppColors.accent,
-                        ),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                     const SizedBox(height: 18),

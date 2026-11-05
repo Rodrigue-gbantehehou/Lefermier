@@ -9,9 +9,12 @@ use App\Dto\Inventory\CreateStockMovementRequestDto;
 use App\Dto\Inventory\UpdateInventoryItemRequestDto;
 use App\Entity\Farm;
 use App\Entity\InventoryItem;
+use App\Entity\StockMovement;
 use App\Entity\User;
 use App\Enum\InventoryCategory;
+use App\Enum\StockMovementType;
 use App\Repository\InventoryItemRepository;
+use App\Repository\StockMovementRepository;
 use App\Security\Voter\FarmVoter;
 use App\Security\Voter\InventoryVoter;
 use App\Service\IdempotencyService;
@@ -24,12 +27,14 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Uid\Ulid;
 
 class InventoryController extends AbstractController
 {
     public function __construct(
         private readonly InventoryService $inventoryService,
         private readonly InventoryItemRepository $itemRepository,
+        private readonly StockMovementRepository $movementRepository,
         private readonly IdempotencyService $idempotencyService,
     ) {
     }
@@ -141,15 +146,55 @@ class InventoryController extends AbstractController
     public function listMovements(
         InventoryItem $item,
     ): JsonResponse {
-        $movements = array_map(
-            fn ($m) => $this->inventoryService->serializeMovement($m),
-            $item->getMovements()->toArray()
+        $movements = $this->movementRepository->findByItem($item);
+        $serialized = array_map(
+            fn (StockMovement $m) => $this->inventoryService->serializeMovement($m),
+            $movements
         );
 
         return $this->json([
-            'data' => $movements,
+            'data' => $serialized,
             'meta' => [
-                'totalItems' => count($movements),
+                'totalItems' => count($serialized),
+            ],
+        ]);
+    }
+
+    #[Route('/api/farms/{id}/inventory/movements', name: 'api_farms_inventory_movements_list', methods: ['GET'])]
+    #[IsGranted(InventoryVoter::VIEW, subject: 'farm')]
+    public function listFarmMovements(
+        Farm $farm,
+        Request $request,
+    ): JsonResponse {
+        $typeParam = $request->query->get('type');
+        $type = $typeParam !== null && $typeParam !== '' && $typeParam !== 'ALL'
+            ? StockMovementType::tryFrom(strtoupper((string) $typeParam))
+            : null;
+
+        $itemIdParam = $request->query->get('itemId');
+        $itemId = $itemIdParam !== null && $itemIdParam !== ''
+            ? Ulid::fromString((string) $itemIdParam)
+            : null;
+
+        $flockIdParam = $request->query->get('flockId');
+        $flockId = $flockIdParam !== null && $flockIdParam !== ''
+            ? Ulid::fromString((string) $flockIdParam)
+            : null;
+
+        $sortOrder = $request->query->get('sort', 'DESC');
+        $limit = min(500, max(1, $request->query->getInt('limit', 200)));
+
+        $movements = $this->movementRepository->findByFarm($farm, $type, $itemId, $flockId, $limit, $sortOrder);
+
+        $serialized = array_map(
+            fn (StockMovement $m) => $this->inventoryService->serializeMovement($m),
+            $movements
+        );
+
+        return $this->json([
+            'data' => $serialized,
+            'meta' => [
+                'totalMovements' => count($serialized),
             ],
         ]);
     }

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../auth/auth_provider.dart';
 import '../auth/farm_selection_sheet.dart';
-import '../../core/widgets/brand_loader.dart';
+import '../auth/user_profile_sheet.dart';
 import '../sync/sync_status_badge.dart';
 import '../eggs/record_egg_modal.dart';
 import '../inventory/record_feeding_modal.dart';
 import '../flocks/record_movement_modal.dart';
+import '../../core/design_system/app_shimmer.dart';
 import 'dashboard_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -94,30 +96,65 @@ class DashboardScreen extends ConsumerWidget {
             tooltip: isDark ? "Mode clair" : "Mode sombre",
             onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.sync_rounded, color: Colors.white),
-            tooltip: "Actualiser",
-            onPressed: () async {
-              await ref.read(dashboardProvider.notifier).loadDashboard();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Données actualisées"),
-                    backgroundColor: AppColors.primary,
-                    duration: Duration(seconds: 1),
+          // Bouton Profil "Mon Compte"
+          InkWell(
+            onTap: () => UserProfileSheet.show(context),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              margin: const EdgeInsets.only(right: 14, left: 4),
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1.5),
+              ),
+              child: CircleAvatar(
+                radius: 15,
+                backgroundColor: AppColors.accent,
+                child: Text(
+                  authState.user?.initials ??
+                      (authState.activeFarm?.name.isNotEmpty == true
+                          ? authState.activeFarm!.name[0].toUpperCase()
+                          : "U"),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
-                );
-              }
-            },
+                ),
+              ),
+            ),
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false),
         child: dashState.isLoading
-            ? const Center(child: BrandLoader(message: "Chargement du tableau de bord..."))
-            : SingleChildScrollView(
+            ? SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppShimmer.block(width: 140, height: 20),
+                    const SizedBox(height: 14),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.35,
+                      children: List.generate(4, (_) => AppShimmer.kpiCard()),
+                    ),
+                    const SizedBox(height: 18),
+                    AppShimmer.block(width: 180, height: 20),
+                    const SizedBox(height: 12),
+                    AppShimmer.block(width: double.infinity, height: 110, borderRadius: AppRadius.lg),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,8 +422,8 @@ class DashboardScreen extends ConsumerWidget {
                                         const SizedBox(width: 6),
                                         OutlinedButton.icon(
                                           onPressed: () => RecordMovementModal.show(context, defaultFlockId: flock.id),
-                                          icon: const Icon(Icons.remove_circle_outline, size: 14, color: AppColors.danger),
-                                          label: const Text("Perte"),
+                                          icon: const Icon(Icons.heart_broken_rounded, size: 14, color: AppColors.danger),
+                                          label: const Text("Mortalité"),
                                           style: OutlinedButton.styleFrom(
                                             foregroundColor: AppColors.danger,
                                             side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
@@ -455,7 +492,10 @@ class _KpiCard extends StatelessWidget {
     final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
 
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(

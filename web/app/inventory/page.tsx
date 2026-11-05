@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { api } from "@/lib/api-client";
-import { InventoryItem, InventoryCategory, StockMovementType } from "@/lib/types";
+import { InventoryItem, InventoryCategory, StockMovement, StockMovementType } from "@/lib/types";
 import { formatFcfa, formatNumber } from "@/lib/utils";
 import { exportInventoryToCsv } from "@/lib/export";
 import { ModuleLockedState } from "@/components/ui/module-locked-state";
@@ -31,7 +31,10 @@ export default function InventoryPage() {
   const { toast } = useToast();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [activeTab, setActiveTab] = useState<"ITEMS" | "MOVEMENTS">("ITEMS");
   const [filterCategory, setFilterCategory] = useState<string>("ALL");
+  const [movementTypeFilter, setMovementTypeFilter] = useState<string>("ALL");
   const [isLoading, setIsLoading] = useState(true);
 
   // Create Item Modal
@@ -80,10 +83,15 @@ export default function InventoryPage() {
   }, [activeFarm?.id]);
 
   async function loadInventory() {
+    if (!activeFarm?.id) return;
     setIsLoading(true);
     try {
-      const data = await api.inventory.listItems({ farmId: activeFarm?.id });
-      setItems(data);
+      const [itemsData, movementsData] = await Promise.all([
+        api.inventory.listItems({ farmId: activeFarm.id }),
+        api.inventory.listFarmMovements(activeFarm.id),
+      ]);
+      setItems(itemsData);
+      setMovements(movementsData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -285,6 +293,151 @@ export default function InventoryPage() {
     },
   ];
 
+  const movementColumns: ColumnDef<StockMovement>[] = [
+    {
+      key: "date",
+      header: "Date",
+      sortable: true,
+      cell: (m) => (
+        <span className="font-mono text-xs text-foreground font-semibold">
+          {m.date}
+        </span>
+      ),
+    },
+    {
+      key: "type",
+      header: "Opération",
+      sortable: true,
+      cell: (m) => {
+        const isInc = m.type === "INCOMING" || (m.type as string) === "IN";
+        const isFeed = m.type === "FEEDING" || (m.type as string) === "OUT";
+        const isLoss = m.type === "LOSS";
+        return (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+              isInc
+                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                : isFeed
+                ? "bg-primary/15 text-primary border border-primary/25"
+                : isLoss
+                ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25"
+                : "bg-surface text-muted border border-border"
+            }`}
+          >
+            {isInc
+              ? "+ Approvisionnement"
+              : isFeed
+              ? "- Sortie / Nourri"
+              : isLoss
+              ? "! Perte"
+              : "~ Ajustement"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "itemName",
+      header: "Produit / Article",
+      sortable: true,
+      cell: (m) => (
+        <div>
+          <Link
+            href={`/inventory/${m.itemId}`}
+            className="font-bold text-xs text-foreground hover:text-primary transition-colors block"
+          >
+            {m.itemName || "Article"}
+          </Link>
+          {m.itemCategory && (
+            <span className="text-[10px] text-muted">
+              {m.itemCategory === "FEED"
+                ? "Aliment"
+                : m.itemCategory === "MEDICINE"
+                ? "Santé & Soins"
+                : m.itemCategory}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Quantité",
+      sortable: true,
+      align: "right",
+      cell: (m) => {
+        const isInc = m.type === "INCOMING" || (m.type as string) === "IN";
+        const isFeed = m.type === "FEEDING" || (m.type as string) === "OUT";
+        const isLoss = m.type === "LOSS";
+        return (
+          <span
+            className={`font-mono font-bold text-xs ${
+              isInc
+                ? "text-emerald-600 dark:text-emerald-400"
+                : (isFeed || isLoss)
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-foreground"
+            }`}
+          >
+            {isInc ? "+" : (isFeed || isLoss ? "-" : "")}
+            {formatNumber(m.quantity)} {m.unitShortLabel || m.unitLabel || m.unit || ""}
+          </span>
+        );
+      },
+    },
+    {
+      key: "cost",
+      header: "Coût Total",
+      align: "right",
+      cell: (m) => {
+        if (m.totalCostFcfa && m.totalCostFcfa > 0) {
+          return (
+            <div className="text-right">
+              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {formatFcfa(m.totalCostFcfa)}
+              </span>
+              {m.unitPriceFcfa > 0 && (
+                <div className="text-[10px] text-muted font-mono">
+                  {formatFcfa(m.unitPriceFcfa)} / u
+                </div>
+              )}
+            </div>
+          );
+        }
+        return <span className="text-xs text-muted font-mono">—</span>;
+      },
+    },
+    {
+      key: "flock",
+      header: "Bande assignée",
+      cell: (m) => (
+        m.flock ? (
+          <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            {m.flock.name}
+          </span>
+        ) : (
+          <span className="text-xs text-muted">—</span>
+        )
+      ),
+    },
+    {
+      key: "reason",
+      header: "Motif / Fournisseur",
+      cell: (m) => (
+        <span className="text-xs text-muted italic">
+          {m.reason || "—"}
+        </span>
+      ),
+    },
+  ];
+
+  const filteredMovements = movements.filter((m) => {
+    if (movementTypeFilter === "ALL") return true;
+    if (movementTypeFilter === "INCOMING") return m.type === "INCOMING" || (m.type as string) === "IN";
+    if (movementTypeFilter === "FEEDING") return m.type === "FEEDING" || (m.type as string) === "OUT";
+    if (movementTypeFilter === "LOSS") return m.type === "LOSS";
+    return true;
+  });
+
   if (!hasModule("inventory")) {
     return (
       <Shell>
@@ -356,134 +509,265 @@ export default function InventoryPage() {
         />
       </div>
 
-      {/* DataTable Articles en Stock */}
-      <div className="mt-6 sm:mt-8">
-        <DataTable<InventoryItem>
-          title="Articles en stock"
-          data={filteredItems}
-          columns={itemColumns}
-          searchable={true}
-          searchPlaceholder="Rechercher par produit, référence SKU..."
-          searchAccessor={(item) => `${item.name} ${item.sku} ${item.category}`}
-          pageSize={15}
-          initialSort={{ key: "name", direction: "asc" }}
-          isLoading={isLoading}
-          secondaryFilter={
-            <div className="flex items-center gap-1.5 shrink-0">
-              {[
-                { label: "Tous", value: "ALL" },
-                { label: "Aliments", value: "FEED" },
-                { label: "Vaccins", value: "VACCINE" },
-                { label: "Médicaments", value: "MEDICINE" },
-                { label: "Matériel", value: "EQUIPMENT" },
-              ].map((tab) => {
-                const isActive = filterCategory === tab.value;
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setFilterCategory(tab.value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
-                      isActive
-                        ? "bg-primary text-white shadow-xs"
-                        : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          }
-          renderMobileCard={(item) => {
-            const isLow = item.currentStock <= item.minThreshold;
-            const totalVal = item.currentStock * item.unitCostFcfa;
-            return (
-              <div
-                className={`rounded-2xl border bg-surface p-4 shadow-xs space-y-3 transition-all ${
-                  isLow ? "border-danger/40 bg-danger-soft/5" : "border-border"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
-                  <div className="min-w-0">
-                    <Link
-                      href={`/inventory/${item.id}`}
-                      className="font-bold text-xs text-foreground hover:text-primary transition-colors block truncate"
-                    >
-                      {item.name}
-                    </Link>
-                    <div className="text-[10px] text-muted font-mono">{item.sku}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div
-                      className={`text-xs font-bold font-mono ${
-                        isLow ? "text-danger" : "text-primary"
+      {/* Onglets : Articles en réserve vs Journal des mouvements */}
+      <div className="mt-6 flex items-center border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab("ITEMS")}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "ITEMS"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>Articles en réserve ({items.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("MOVEMENTS")}
+          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "MOVEMENTS"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          <Filter className="h-4 w-4" />
+          <span>Journal des mouvements ({movements.length})</span>
+        </button>
+      </div>
+
+      {activeTab === "ITEMS" ? (
+        <div className="mt-4 sm:mt-6">
+          <DataTable<InventoryItem>
+            title="Articles en stock"
+            data={filteredItems}
+            columns={itemColumns}
+            searchable={true}
+            searchPlaceholder="Rechercher par produit, référence SKU..."
+            searchAccessor={(item) => `${item.name} ${item.sku} ${item.category}`}
+            pageSize={15}
+            initialSort={{ key: "name", direction: "asc" }}
+            isLoading={isLoading}
+            secondaryFilter={
+              <div className="flex items-center gap-1.5 shrink-0">
+                {[
+                  { label: "Tous", value: "ALL" },
+                  { label: "Aliments", value: "FEED" },
+                  { label: "Vaccins", value: "VACCINE" },
+                  { label: "Médicaments", value: "MEDICINE" },
+                  { label: "Matériel", value: "EQUIPMENT" },
+                ].map((tab) => {
+                  const isActive = filterCategory === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setFilterCategory(tab.value)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                        isActive
+                          ? "bg-primary text-white shadow-xs"
+                          : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
                       }`}
                     >
-                      {formatInventoryUnit(item.currentStock, item.unit)}
-                    </div>
-                    {isLow ? (
-                      <span className="inline-block text-[9px] text-danger font-semibold bg-danger-soft px-1.5 py-0.5 rounded mt-0.5">
-                        Alerte ({formatInventoryUnit(item.minThreshold, item.unit, { short: true })})
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-muted">
-                        Seuil : {formatInventoryUnit(item.minThreshold, item.unit, { short: true })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs py-0.5">
-                  <div>
-                    <span className="text-muted text-[11px] block">Catégorie</span>
-                    <span className="font-semibold text-foreground text-xs">
-                      {item.category === "FEED"
-                        ? "Aliment"
-                        : item.category === "VACCINE"
-                        ? "Vaccin"
-                        : item.category === "MEDICINE"
-                        ? "Médicament"
-                        : item.category === "EQUIPMENT"
-                        ? "Matériel"
-                        : item.category}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-muted text-[11px] block">Valeur estimée</span>
-                    <span className="font-semibold font-mono text-foreground text-xs">
-                      {formatFcfa(totalVal)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-muted font-mono">
-                    {formatFcfa(item.unitCostFcfa)} / {getUnitShortLabel(item.unit)}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Link
-                      href={`/inventory/${item.id}`}
-                      className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover inline-flex items-center gap-1"
-                    >
-                      <Eye className="h-3 w-3 text-muted" />
-                      <span>Détails</span>
-                    </Link>
-                    
-                  </div>
-                </div>
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
-            );
-          }}
-          emptyState={{
-            icon: <Package className="h-6 w-6 text-primary" />,
-            title: "Aucun article en stock",
-            description: "Enregistrez vos aliments (Démarrage, Croissance, Ponte) pour suivre la consommation.",
-            actionLabel: hasPermission("inventory:create") ? "Créer un article" : undefined,
-            onAction: () => setCreateModalOpen(true),
-          }}
-        />
-      </div>
+            }
+            renderMobileCard={(item) => {
+              const isLow = item.currentStock <= item.minThreshold;
+              const totalVal = item.currentStock * item.unitCostFcfa;
+              return (
+                <div
+                  className={`rounded-2xl border bg-surface p-4 shadow-xs space-y-3 transition-all ${
+                    isLow ? "border-danger/40 bg-danger-soft/5" : "border-border"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 border-b border-border/50 pb-2.5">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/inventory/${item.id}`}
+                        className="font-bold text-xs text-foreground hover:text-primary transition-colors block truncate"
+                      >
+                        {item.name}
+                      </Link>
+                      <div className="text-[10px] text-muted font-mono">{item.sku}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div
+                        className={`text-xs font-bold font-mono ${
+                          isLow ? "text-danger" : "text-primary"
+                        }`}
+                      >
+                        {formatInventoryUnit(item.currentStock, item.unit)}
+                      </div>
+                      {isLow ? (
+                        <span className="inline-block text-[9px] text-danger font-semibold bg-danger-soft px-1.5 py-0.5 rounded mt-0.5">
+                          Alerte ({formatInventoryUnit(item.minThreshold, item.unit, { short: true })})
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted">
+                          Seuil : {formatInventoryUnit(item.minThreshold, item.unit, { short: true })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs py-0.5">
+                    <div>
+                      <span className="text-muted text-[11px] block">Catégorie</span>
+                      <span className="font-semibold text-foreground text-xs">
+                        {item.category === "FEED"
+                          ? "Aliment"
+                          : item.category === "VACCINE"
+                          ? "Vaccin"
+                          : item.category === "MEDICINE"
+                          ? "Médicament"
+                          : item.category === "EQUIPMENT"
+                          ? "Matériel"
+                          : item.category}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-muted text-[11px] block">Valeur estimée</span>
+                      <span className="font-semibold font-mono text-foreground text-xs">
+                        {formatFcfa(totalVal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted font-mono">
+                      {formatFcfa(item.unitCostFcfa)} / {getUnitShortLabel(item.unit)}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/inventory/${item.id}`}
+                        className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover inline-flex items-center gap-1"
+                      >
+                        <Eye className="h-3 w-3 text-muted" />
+                        <span>Détails</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+            emptyState={{
+              icon: <Package className="h-6 w-6 text-primary" />,
+              title: "Aucun article en stock",
+              description: "Enregistrez vos aliments (Démarrage, Croissance, Ponte) pour suivre la consommation.",
+              actionLabel: hasPermission("inventory:create") ? "Créer un article" : undefined,
+              onAction: () => setCreateModalOpen(true),
+            }}
+          />
+        </div>
+      ) : (
+        <div className="mt-4 sm:mt-6">
+          <DataTable<StockMovement>
+            title="Journal des approvisionnements & consommations"
+            data={filteredMovements}
+            columns={movementColumns}
+            searchable={true}
+            searchPlaceholder="Rechercher par article, motif, bande..."
+            searchAccessor={(m) => `${m.itemName} ${m.reason || ""} ${m.flock?.name || ""} ${m.type}`}
+            pageSize={20}
+            initialSort={{ key: "date", direction: "desc" }}
+            isLoading={isLoading}
+            renderMobileCard={(m) => {
+              const isInc = m.type === "INCOMING" || (m.type as string) === "IN";
+              const isFeed = m.type === "FEEDING" || (m.type as string) === "OUT";
+              const isLoss = m.type === "LOSS";
+
+              const badgeBg = isInc
+                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                : isFeed
+                ? "bg-primary/15 text-primary border-primary/25"
+                : isLoss
+                ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/25"
+                : "bg-surface text-muted border-border";
+
+              const badgeLabel = isInc
+                ? "+ Approvisionnement"
+                : isFeed
+                ? "- Sortie / Nourri"
+                : isLoss
+                ? "! Perte"
+                : "~ Ajustement";
+
+              return (
+                <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${badgeBg}`}>
+                      {badgeLabel}
+                    </span>
+                    <span className="font-mono text-xs text-muted font-semibold">{m.date}</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <Link href={`/inventory/${m.itemId}`} className="font-bold text-xs text-foreground hover:text-primary">
+                        {m.itemName || "Article"}
+                      </Link>
+                      {m.flock && (
+                        <div className="mt-0.5">
+                          <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            Lot : {m.flock.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-mono font-bold text-xs ${isInc ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                        {isInc ? "+" : "-"}{formatNumber(m.quantity)} {m.unitShortLabel || m.unitLabel || m.unit || ""}
+                      </span>
+                      {m.totalCostFcfa && m.totalCostFcfa > 0 ? (
+                        <div className="text-[10px] font-mono text-muted">{formatFcfa(m.totalCostFcfa)}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                  {m.reason && (
+                    <p className="text-[11px] text-muted italic border-t border-border/30 pt-1.5">{m.reason}</p>
+                  )}
+                </div>
+              );
+            }}
+            secondaryFilter={
+              <div className="flex items-center gap-1.5 shrink-0">
+                {[
+                  { label: "Tous", value: "ALL" },
+                  { label: "Approvisionnements (+)", value: "INCOMING" },
+                  { label: "Sorties / Nourri (-)", value: "FEEDING" },
+                  { label: "Pertes", value: "LOSS" },
+                ].map((tab) => {
+                  const isActive = movementTypeFilter === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setMovementTypeFilter(tab.value)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold shrink-0 transition-all active:scale-95 cursor-pointer ${
+                        isActive
+                          ? "bg-primary text-white shadow-xs"
+                          : "bg-surface text-muted hover:text-foreground border border-border/80 hover:bg-surface-muted"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            }
+            emptyState={{
+              icon: <Filter className="h-6 w-6 text-primary" />,
+              title: "Aucun mouvement enregistré",
+              description: "Enregistrez vos entrées en stock ou sorties de nourriture pour suivre l'historique.",
+            }}
+          />
+        </div>
+      )}
 
       {/* CREATE ITEM MODAL */}
       <Modal

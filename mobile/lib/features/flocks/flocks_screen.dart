@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
-import '../../core/models/flock.dart';
 import '../buildings/buildings_provider.dart';
+import '../../core/design_system/app_shimmer.dart';
+import '../../core/design_system/app_badge.dart';
+import '../../core/design_system/app_empty_state.dart';
 import '../../core/widgets/brand_loader.dart';
+import '../inventory/record_feeding_modal.dart';
+import '../eggs/record_egg_modal.dart';
 import 'flock_provider.dart';
+import 'record_movement_modal.dart';
+import 'record_poultry_sale_modal.dart';
+import '../auth/auth_provider.dart';
+import 'flock_detail_screen.dart';
+import 'flock_summary_modal.dart';
+import '../subscriptions/subscription_screen.dart';
 
 class FlocksScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenMenu;
@@ -16,285 +26,15 @@ class FlocksScreen extends ConsumerStatefulWidget {
 }
 
 class _FlocksScreenState extends ConsumerState<FlocksScreen> {
-  void _openRecordMovementDialog(List<Flock> flocks, [String? preselectedFlockId]) {
-    if (flocks.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Aucune bande disponible pour enregistrer un mouvement."),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-      return;
-    }
-
-    String selectedFlockId = preselectedFlockId ?? flocks.first.id;
-    if (!flocks.any((f) => f.id == selectedFlockId)) {
-      selectedFlockId = flocks.first.id;
-    }
-
-    String movementType = "MORTALITY";
-    int quantity = 1;
-    final reasonController = TextEditingController();
-    DateTime movementDate = DateTime.now();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-          final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-          final flockState = ref.watch(flockProvider);
-          final currentFlock = flocks.firstWhere((f) => f.id == selectedFlockId, orElse: () => flocks.first);
-
-          return Container(
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: borderColor),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Mouvement / Perte d'effectif",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Sélection de la bande
-                  const Text("Bande concernée *", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedFlockId,
-                        isExpanded: true,
-                        items: flocks.map((flock) {
-                          return DropdownMenuItem<String>(
-                            value: flock.id,
-                            child: Text(
-                              "${flock.name} (${flock.currentQuantity} vivants)",
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setModalState(() => selectedFlockId = val);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Type de mouvement
-                  const Text("Type d'opération *", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _TypeChip(
-                        label: "Mortalité",
-                        icon: Icons.warning_amber_rounded,
-                        color: AppColors.danger,
-                        isSelected: movementType == "MORTALITY",
-                        onTap: () => setModalState(() => movementType = "MORTALITY"),
-                      ),
-                      const SizedBox(width: 6),
-                      _TypeChip(
-                        label: "Réforme",
-                        icon: Icons.sync_problem_rounded,
-                        color: AppColors.accent,
-                        isSelected: movementType == "CULLING",
-                        onTap: () => setModalState(() => movementType = "CULLING"),
-                      ),
-                      const SizedBox(width: 6),
-                      _TypeChip(
-                        label: "Vente sujets",
-                        icon: Icons.storefront_rounded,
-                        color: AppColors.success,
-                        isSelected: movementType == "SALE",
-                        onTap: () => setModalState(() => movementType = "SALE"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Quantité de sujets
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: (movementType == "MORTALITY" ? AppColors.danger : AppColors.primary).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: (movementType == "MORTALITY" ? AppColors.danger : AppColors.primary).withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              movementType == "MORTALITY" ? "Nombre de pertes *" : "Nombre de sujets *",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: movementType == "MORTALITY" ? AppColors.danger : AppColors.primary,
-                              ),
-                            ),
-                            Text(
-                              "Effectif max: ${currentFlock.currentQuantity} sujets",
-                              style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: quantity > 1 ? () => setModalState(() => quantity--) : null,
-                              icon: const Icon(Icons.remove_circle_outline, size: 24),
-                            ),
-                            Container(
-                              constraints: const BoxConstraints(minWidth: 40),
-                              alignment: Alignment.center,
-                              child: Text(
-                                "$quantity",
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: quantity < currentFlock.currentQuantity ? () => setModalState(() => quantity++) : null,
-                              icon: const Icon(Icons.add_circle_outline, size: 24),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Motif
-                  TextField(
-                    controller: reasonController,
-                    decoration: InputDecoration(
-                      labelText: "Motif ou cause observée (optionnel)",
-                      hintText: "Ex: Coup de chaleur, piquage, maladie, vente directe...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Boutons d'action
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text("Annuler"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: !flockState.isSubmitting
-                              ? () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  final navigator = Navigator.of(ctx);
-
-                                  final success = await ref.read(flockProvider.notifier).recordMovement(
-                                    flockId: selectedFlockId,
-                                    type: movementType,
-                                    quantity: quantity,
-                                    date: movementDate,
-                                    reason: reasonController.text,
-                                  );
-
-                                  if (ctx.mounted) {
-                                    if (success) {
-                                      navigator.pop();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text("Mouvement de $quantity sujet(s) enregistré"),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                    } else {
-                                      final err = ref.read(flockProvider).error ?? "Une erreur est survenue.";
-                                      messenger.showSnackBar(
-                                        SnackBar(content: Text(err), backgroundColor: AppColors.danger),
-                                      );
-                                    }
-                                  }
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            backgroundColor: movementType == "MORTALITY" ? AppColors.danger : AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: flockState.isSubmitting
-                              ? const BrandLoader.button()
-                              : const Text("Valider"),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+  String _statusFilter = 'ACTIVE'; // 'ACTIVE', 'COMPLETED', 'ALL'
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+      }
+    });
   }
 
   void _openCreateFlockDialog() {
@@ -572,8 +312,29 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                                       );
                                     } else {
                                       final err = ref.read(flockProvider).error ?? "Une erreur est survenue.";
+                                      final isQuotaOrUpgrade = err.contains("Limite atteinte") ||
+                                          err.contains("quota") ||
+                                          err.contains("formule") ||
+                                          err.contains("Passez à");
                                       messenger.showSnackBar(
-                                        SnackBar(content: Text(err), backgroundColor: AppColors.danger),
+                                        SnackBar(
+                                          content: Text(err),
+                                          backgroundColor: AppColors.danger,
+                                          duration: isQuotaOrUpgrade ? const Duration(seconds: 7) : const Duration(seconds: 4),
+                                          action: isQuotaOrUpgrade
+                                              ? SnackBarAction(
+                                                  label: "Voir offres",
+                                                  textColor: Colors.white,
+                                                  onPressed: () {
+                                                    Navigator.of(context).push(
+                                                      MaterialPageRoute(
+                                                        builder: (_) => const SubscriptionScreen(),
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                              : null,
+                                        ),
                                       );
                                     }
                                   }
@@ -604,10 +365,14 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final flockState = ref.watch(flockProvider);
     final summary = flockState.summary;
+    final farm = ref.watch(authProvider).activeFarm;
+    final canCreateFinance = farm == null || farm.canCreateFinance;
 
     final filteredFlocks = flockState.flocks.where((f) {
-      if (flockState.filterType == null) return true;
-      return f.type == flockState.filterType;
+      if (flockState.filterType != null && f.type != flockState.filterType) return false;
+      if (_statusFilter == 'ACTIVE') return f.isActive;
+      if (_statusFilter == 'COMPLETED') return !f.isActive;
+      return true;
     }).toList();
 
     return Scaffold(
@@ -637,7 +402,10 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_flocks',
-        onPressed: () => _openRecordMovementDialog(flockState.flocks),
+        onPressed: () => RecordMovementModal.show(
+          context,
+          onSaved: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
+        ),
         backgroundColor: AppColors.danger,
         icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
         label: const Text("Mortalité / Perte", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -645,9 +413,15 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
       body: RefreshIndicator(
         onRefresh: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
         child: flockState.isLoading
-            ? const Center(child: BrandLoader(message: "Chargement des bandes..."))
-            : SingleChildScrollView(
+            ? SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                child: Column(
+                  children: List.generate(3, (_) => AppShimmer.flockCard()),
+                ),
+              )
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,6 +473,39 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                         ],
                       ),
                     ),
+
+                    // Filtre de statut (Actifs / Clôturés / Tous)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildStatusChip(
+                            label: "En élevage (${flockState.flocks.where((f) => f.isActive).length})",
+                            isSelected: _statusFilter == 'ACTIVE',
+                            color: AppColors.primary,
+                            onTap: () => setState(() => _statusFilter = 'ACTIVE'),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildStatusChip(
+                            label: "Clôturés (${flockState.flocks.where((f) => !f.isActive).length})",
+                            isSelected: _statusFilter == 'COMPLETED',
+                            color: Colors.grey.shade700,
+                            onTap: () => setState(() => _statusFilter = 'COMPLETED'),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildStatusChip(
+                            label: "Tous (${flockState.flocks.length})",
+                            isSelected: _statusFilter == 'ALL',
+                            color: AppColors.primary,
+                            onTap: () => setState(() => _statusFilter = 'ALL'),
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
 
                     // Filtre segmenté mobile 3 boutons
                     Container(
@@ -819,38 +626,12 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
 
                     // Liste ou état vide
                     if (filteredFlocks.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(28),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.pets_outlined, size: 48, color: AppColors.primary.withValues(alpha: 0.6)),
-                            const SizedBox(height: 12),
-                            const Text(
-                              "Aucune bande d'élevage enregistrée",
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              "Démarrez une nouvelle bande pour suivre la croissance, la ponte et la mortalité.",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: AppColors.textMutedLight),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _openCreateFlockDialog,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text("Créer une bande"),
-                            ),
-                          ],
-                        ),
+                      AppEmptyState(
+                        icon: Icons.pets_outlined,
+                        title: "Aucune bande d'élevage enregistrée",
+                        description: "Démarrez une nouvelle bande pour suivre la croissance, la ponte et la mortalité.",
+                        actionLabel: "Créer une bande",
+                        onAction: _openCreateFlockDialog,
                       )
                     else
                       ListView.separated(
@@ -863,116 +644,241 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
                           final mortalityRate = flock.calculatedMortalityRate;
 
                           return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              flock.name,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                            ),
-                                            if (flock.code != null)
-                                              Text(
-                                                "Code: ${flock.code}",
-                                                style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: flock.isLayer ? AppColors.accentSoft : AppColors.primarySoft,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          flock.typeLabel,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: flock.isLayer ? AppColors.accent : AppColors.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => FlockDetailScreen(flock: flock),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "${flock.breed} • ${flock.buildingName ?? 'Bâtiment standard'}${flock.ageInWeeks != null ? ' • ${flock.ageInWeeks} sem.' : ''}",
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textMutedLight),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text("Vivant", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
-                                          Text(
-                                            "${flock.currentQuantity} sujets",
-                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text("Départ", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
-                                          Text(
-                                            "${flock.initialQuantity}",
-                                            style: const TextStyle(fontSize: 14, color: AppColors.textMutedLight, fontFamily: 'monospace'),
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text("Pertes", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
-                                          Text(
-                                            "${mortalityRate.toStringAsFixed(1)}%",
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: mortalityRate > 5 ? AppColors.danger : AppColors.success,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      InkWell(
-                                        onTap: () => _openRecordMovementDialog(flockState.flocks, flock.id),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.danger.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                ).then((_) => ref.read(flockProvider.notifier).loadFlocks(showLoading: false));
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Icon(Icons.remove, size: 14, color: AppColors.danger),
-                                              SizedBox(width: 4),
                                               Text(
-                                                "Perte",
-                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.danger),
+                                                flock.name,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                               ),
+                                              if (flock.code != null)
+                                                Text(
+                                                  "Code: ${flock.code}",
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.textMutedLight),
+                                                ),
                                             ],
                                           ),
                                         ),
+                                        Row(
+                                          children: [
+                                            if (!flock.isActive) ...[
+                                              const AppBadge(
+                                                label: "Clôturé",
+                                                variant: AppBadgeVariant.neutral,
+                                                showDot: true,
+                                              ),
+                                              const SizedBox(width: 6),
+                                            ],
+                                            AppBadge(
+                                              label: flock.typeLabel,
+                                              variant: flock.isLayer ? AppBadgeVariant.warning : AppBadgeVariant.brand,
+                                              showDot: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "${flock.breed} • ${flock.buildingName ?? 'Bâtiment standard'}${flock.ageInWeeks != null ? ' • ${flock.ageInWeeks} sem.' : ''}",
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textMutedLight),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text("Vivant", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
+                                            Text(
+                                              "${flock.currentQuantity} sujets",
+                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text("Départ", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
+                                            Text(
+                                              "${flock.initialQuantity}",
+                                              style: const TextStyle(fontSize: 14, color: AppColors.textMutedLight, fontFamily: 'monospace'),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text("Pertes", style: TextStyle(fontSize: 10, color: AppColors.textMutedLight)),
+                                            Text(
+                                              "${mortalityRate.toStringAsFixed(1)}%",
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: mortalityRate > 5 ? AppColors.danger : AppColors.success,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 10),
+                                    // Barre d'actions quotidiennes
+                                    if (!flock.isActive)
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.archive_outlined, size: 13, color: Colors.grey),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  "Bande clôturée",
+                                                  style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          ElevatedButton.icon(
+                                            onPressed: () => FlockSummaryModal.show(context, flock: flock, farm: farm),
+                                            icon: const Icon(Icons.assessment_rounded, size: 14),
+                                            label: const Text("Bilan final", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.accent,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          // Bouton Bilan rapide
+                                          IconButton(
+                                            icon: const Icon(Icons.assessment_outlined, size: 18),
+                                            color: AppColors.textMutedLight,
+                                            tooltip: "Bilan technico-économique",
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            onPressed: () => FlockSummaryModal.show(context, flock: flock, farm: farm),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // Bouton Nourrir
+                                          ElevatedButton.icon(
+                                            onPressed: () => RecordFeedingModal.show(
+                                              context,
+                                              defaultFlockId: flock.id,
+                                              onSaved: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
+                                            ),
+                                            icon: const Icon(Icons.restaurant_rounded, size: 14),
+                                            label: const Text("Nourrir", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                          if (flock.isLayer) ...[
+                                            const SizedBox(width: 6),
+                                            // Bouton Collecte d'œufs
+                                            OutlinedButton.icon(
+                                              onPressed: () => RecordEggModal.show(
+                                                context,
+                                                defaultFlockId: flock.id,
+                                              ),
+                                              icon: const Icon(Icons.egg_rounded, size: 14, color: AppColors.accent),
+                                              label: const Text("Collecte", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppColors.accent,
+                                                side: BorderSide(color: AppColors.accent.withValues(alpha: 0.5)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                            ),
+                                          ],
+                                          if (canCreateFinance) ...[
+                                            const SizedBox(width: 6),
+                                            // Bouton Vente de volailles
+                                            ElevatedButton.icon(
+                                              onPressed: () => RecordPoultrySaleModal.show(
+                                                context,
+                                                defaultFlockId: flock.id,
+                                                onSaved: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
+                                              ),
+                                              icon: const Icon(Icons.shopping_bag_outlined, size: 13, color: Colors.white),
+                                              label: const Text("Vendre", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppColors.success,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                elevation: 0,
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(width: 6),
+                                          // Bouton Perte / Mortalité
+                                          OutlinedButton.icon(
+                                            onPressed: () => RecordMovementModal.show(
+                                              context,
+                                              defaultFlockId: flock.id,
+                                              onSaved: () => ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
+                                            ),
+                                            icon: const Icon(Icons.heart_broken_rounded, size: 14, color: AppColors.danger),
+                                            label: const Text("Mortalité", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: AppColors.danger,
+                                              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -984,53 +890,32 @@ class _FlocksScreenState extends ConsumerState<FlocksScreen> {
       ),
     );
   }
-}
 
-
-class _TypeChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _TypeChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? color : AppColors.borderLight,
-            ),
+  Widget _buildStatusChip({
+    required String label,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color : (isDark ? Colors.grey.shade900 : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : (isDark ? Colors.grey.shade800 : Colors.grey.shade300),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.textMutedLight),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : AppColors.textMutedLight,
-                ),
-              ),
-            ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textMainLight),
           ),
         ),
       ),

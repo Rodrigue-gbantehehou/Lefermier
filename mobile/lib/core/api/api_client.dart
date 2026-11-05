@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../config/app_config.dart';
+import '../security/secure_storage_service.dart';
 import 'api_endpoints.dart';
 
 class ApiClient {
@@ -10,7 +11,6 @@ class ApiClient {
 
   late final Dio dio;
   static const String _tokenKey = "lefermier_jwt_token";
-  static const String _deviceRefreshKey = "lefermier_device_refresh_token";
   static const String _activeFarmKey = "lefermier_active_farm_id";
   static const String _hasSeenWelcomeKey = "lefermier_has_seen_welcome";
 
@@ -80,8 +80,20 @@ class ApiClient {
   }
 
   Future<void> init() async {
+    await SecureStorageService().init();
+    _jwtToken = SecureStorageService().token;
+
     final prefs = await SharedPreferences.getInstance();
-    _jwtToken = prefs.getString(_tokenKey);
+    // Migration transparente si ancien token dans SharedPreferences brut
+    if (_jwtToken == null && prefs.containsKey(_tokenKey)) {
+      final oldToken = prefs.getString(_tokenKey);
+      if (oldToken != null) {
+        await SecureStorageService().saveTokens(token: oldToken);
+        _jwtToken = oldToken;
+        await prefs.remove(_tokenKey);
+      }
+    }
+
     _activeFarmId = prefs.getString(_activeFarmKey);
     _hasSeenWelcome = prefs.getBool(_hasSeenWelcomeKey) ?? false;
     dio.options.baseUrl = await AppConfig.resolveApiBaseUrl();
@@ -93,12 +105,21 @@ class ApiClient {
 
   Future<void> setAuthToken(String? token) async {
     _jwtToken = token;
-    final prefs = await SharedPreferences.getInstance();
     if (token != null) {
-      await prefs.setString(_tokenKey, token);
+      await SecureStorageService().updateToken(token);
     } else {
-      await prefs.remove(_tokenKey);
+      await SecureStorageService().clearAuth();
     }
+  }
+
+  Future<void> setAuthTokens({required String token, String? refreshToken}) async {
+    _jwtToken = token;
+    await SecureStorageService().saveTokens(token: token, refreshToken: refreshToken);
+  }
+
+  Future<void> clearAuth() async {
+    _jwtToken = null;
+    await SecureStorageService().clearAuth();
   }
 
   Future<void> setActiveFarmId(String? farmId) async {
@@ -119,25 +140,34 @@ class ApiClient {
 
   bool get hasSeenWelcome => _hasSeenWelcome;
   String? get activeFarmId => _activeFarmId;
-  bool get isAuthenticated => _jwtToken != null;
+  String? get jwtToken => _jwtToken;
+  bool get isAuthenticated => _jwtToken != null && _jwtToken!.isNotEmpty;
 
   Future<bool> _attemptTokenRefresh() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final refreshToken = prefs.getString(_deviceRefreshKey);
-      if (refreshToken == null) return false;
+    final storage = SecureStorageService();
+    final refreshToken = storage.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) return false;
 
+    try {
       final res = await dio.post(
         ApiEndpoints.deviceRefresh,
-        data: {'refreshToken': refreshToken},
+        data: {
+          'refreshToken': refreshToken,
+          'deviceId': storage.deviceId,
+        },
         options: Options(headers: {'Authorization': null}),
       );
 
-      if (res.statusCode == 200 && res.data['token'] != null) {
-        await setAuthToken(res.data['token']);
+      final data = res.data is Map ? (res.data['data'] ?? res.data) : null;
+      if (res.statusCode == 200 && data != null && data['token'] != null) {
+        final newToken = data['token'] as String;
+        final newRefresh = data['refreshToken'] as String?;
+        await setAuthTokens(token: newToken, refreshToken: newRefresh);
         return true;
       }
-    } catch (_) {}
+    } catch (_) {
+      await clearAuth();
+    }
     return false;
   }
 }

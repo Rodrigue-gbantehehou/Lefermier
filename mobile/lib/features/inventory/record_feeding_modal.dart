@@ -46,7 +46,25 @@ class _RecordFeedingModalState extends ConsumerState<RecordFeedingModal> {
 
   // 1. Provende
   String? _selectedFeedItemId;
+  String _feedUnit = "KG"; // KG, G, BAG_50KG, BAG_25KG, BAG, etc.
   final _feedQtyController = TextEditingController(text: "25");
+
+  String get _feedUnitLabel {
+    switch (_feedUnit) {
+      case "KG":
+        return "kg";
+      case "G":
+        return "g";
+      case "BAG":
+      case "BAG_50KG":
+      case "BAG_25KG":
+        return "sac(s)";
+      case "TON":
+        return "t";
+      default:
+        return _feedUnit.toLowerCase();
+    }
+  }
 
   // 2. Abreuvement
   bool _isWaterTreated = false;
@@ -368,82 +386,221 @@ class _RecordFeedingModalState extends ConsumerState<RecordFeedingModal> {
                   const SizedBox(height: 10),
 
                   // Sélecteur de provende
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String?>(
-                        value: _selectedFeedItemId,
-                        isExpanded: true,
-                        items: [
-                          const DropdownMenuItem<String?>(
-                            value: null,
+                  if (feedItems.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
-                              "-- Aucun aliment à cette tournée --",
-                              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textMutedLight),
+                              "Aucun aliment / provende enregistré en stock. Rendez-vous dans le stock pour en ajouter.",
+                              style: TextStyle(fontSize: 11, color: AppColors.warning),
                             ),
                           ),
-                          ...feedItems.map((item) {
-                            return DropdownMenuItem<String?>(
-                              value: item.id,
-                              child: Text(
-                                "${item.name} (${item.currentStock.toStringAsFixed(0)} ${item.unitShortLabel})",
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          }),
                         ],
-                        onChanged: (val) {
-                          setState(() => _selectedFeedItemId = val);
-                        },
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: surfaceColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: _selectedFeedItemId,
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                "-- Aucun aliment à cette tournée --",
+                                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textMutedLight),
+                              ),
+                            ),
+                            ...feedItems.map((item) {
+                              final stockLabel = item.isMassFamily
+                                  ? "${item.availableStockKg.toStringAsFixed(0)} kg dispo (${item.currentStock % 1 == 0 ? item.currentStock.toInt() : item.currentStock} ${item.unitShortLabel})"
+                                  : "${item.currentStock} ${item.unitShortLabel} en stock";
+                              return DropdownMenuItem<String?>(
+                                value: item.id,
+                                child: Text(
+                                  "${item.name} • $stockLabel",
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedFeedItemId = val;
+                              final it = feedItems.where((i) => i.id == val).firstOrNull;
+                              if (it != null) {
+                                if (it.isMassFamily) {
+                                  _feedUnit = "KG";
+                                } else {
+                                  _feedUnit = it.unit;
+                                }
+                              }
+                            });
+                          },
+                        ),
                       ),
                     ),
-                  ),
 
                   if (_selectedFeedItemId != null) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _feedQtyController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                            decoration: InputDecoration(
-                              labelText: "Poids pesé (kg)",
-                              hintText: "25",
-                              suffixText: "kg",
-                              suffixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent),
-                              prefixIcon: const Icon(Icons.scale_rounded, size: 20),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    () {
+                      final selectedItem = feedItems.where((i) => i.id == _selectedFeedItemId).firstOrNull;
+                      final availableKg = selectedItem?.availableStockKg ?? 0.0;
+                      final parsedQty = double.tryParse(_feedQtyController.text) ?? 0.0;
+                      final isOverStock = _feedUnit == "KG"
+                          ? parsedQty > availableKg
+                          : (_feedUnit == "G"
+                              ? (parsedQty / 1000.0) > availableKg
+                              : parsedQty > (selectedItem?.currentStock ?? 0.0));
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: _feedQtyController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => setState(() {}),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                                  decoration: InputDecoration(
+                                    labelText: "Quantité distribuée",
+                                    hintText: "25",
+                                    prefixIcon: const Icon(Icons.scale_rounded, size: 20),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: surfaceColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _feedUnit,
+                                      isExpanded: true,
+                                      items: [
+                                        const DropdownMenuItem(value: "KG", child: Text("kg (pesé)", style: TextStyle(fontSize: 12))),
+                                        if (selectedItem != null && selectedItem.unit.startsWith("BAG"))
+                                          DropdownMenuItem(value: selectedItem.unit, child: Text(selectedItem.unitShortLabel, style: const TextStyle(fontSize: 12))),
+                                        const DropdownMenuItem(value: "G", child: Text("g (grammes)", style: TextStyle(fontSize: 12))),
+                                        if (selectedItem != null && !selectedItem.isMassFamily)
+                                          DropdownMenuItem(value: selectedItem.unit, child: Text(selectedItem.unitShortLabel, style: const TextStyle(fontSize: 12))),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) setState(() => _feedUnit = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+
+                          // Informations de conversion & alerte stock
+                          if (selectedItem != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isOverStock
+                                    ? AppColors.danger.withValues(alpha: 0.1)
+                                    : AppColors.accent.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isOverStock
+                                      ? AppColors.danger.withValues(alpha: 0.4)
+                                      : AppColors.accent.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isOverStock ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
+                                    size: 14,
+                                    color: isOverStock ? AppColors.danger : AppColors.accent,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      isOverStock
+                                          ? "Stock insuffisant : $parsedQty $_feedUnitLabel demandés, seulement ${selectedItem.availableStockKg.toStringAsFixed(1)} kg en réserve !"
+                                          : selectedItem.isMassFamily && _feedUnit == "KG"
+                                              ? "Soit ${(parsedQty / selectedItem.effectiveWeightPerUnitKg).toStringAsFixed(2)} sac (Stock restant: ${(availableKg - parsedQty).clamp(0.0, double.infinity).toStringAsFixed(1)} kg)"
+                                              : "Stock disponible : ${selectedItem.currentStock} ${selectedItem.unitShortLabel}",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isOverStock ? AppColors.danger : AppColors.accent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+
+                          // Raccourcis rapides adaptés à l'unité
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _feedUnit == "KG"
+                                  ? [
+                                      _buildQuickQtyChip("+5 kg", 5),
+                                      const SizedBox(width: 5),
+                                      _buildQuickQtyChip("+10 kg", 10),
+                                      const SizedBox(width: 5),
+                                      _buildQuickQtyChip("+25 kg (1/2 sac)", 25),
+                                      const SizedBox(width: 5),
+                                      _buildQuickQtyChip("+50 kg (1 sac)", 50),
+                                    ]
+                                  : _feedUnit.startsWith("BAG")
+                                      ? [
+                                          _buildQuickQtyChip("+0.5 sac", 0.5),
+                                          const SizedBox(width: 5),
+                                          _buildQuickQtyChip("+1 sac", 1.0),
+                                          const SizedBox(width: 5),
+                                          _buildQuickQtyChip("+2 sacs", 2.0),
+                                        ]
+                                      : [
+                                          _buildQuickQtyChip("+100 g", 100),
+                                          const SizedBox(width: 5),
+                                          _buildQuickQtyChip("+250 g", 250),
+                                          const SizedBox(width: 5),
+                                          _buildQuickQtyChip("+500 g", 500),
+                                        ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Raccourcis rapides
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildQuickQtyChip("+5 kg", 5),
-                          const SizedBox(width: 5),
-                          _buildQuickQtyChip("+10 kg", 10),
-                          const SizedBox(width: 5),
-                          _buildQuickQtyChip("+25 kg (1/2 sac)", 25),
-                          const SizedBox(width: 5),
-                          _buildQuickQtyChip("+50 kg (1 sac)", 50),
                         ],
-                      ),
-                    ),
+                      );
+                    }(),
                   ],
                 ],
               ),
@@ -848,16 +1005,52 @@ class _RecordFeedingModalState extends ConsumerState<RecordFeedingModal> {
   }
 
   Future<void> _submitFeeding() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     if (_selectedFlockId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text("Veuillez sélectionner une bande."), backgroundColor: AppColors.danger),
       );
       return;
     }
 
+    final hasFeed = _selectedFeedItemId != null;
+    final feedQty = double.tryParse(_feedQtyController.text) ?? 0.0;
+    final hasHealth = _isWaterTreated && _selectedHealthItemId != null;
+    final healthQty = double.tryParse(_healthQtyController.text) ?? 0.0;
+
+    if (!hasFeed && !hasHealth) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text("Veuillez sélectionner au moins un aliment à distribuer ou un produit de soin dans l'eau."),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    if (hasFeed && feedQty <= 0) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text("Veuillez saisir une quantité d'aliment supérieure à 0."),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    if (hasHealth && healthQty <= 0) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text("Veuillez saisir une dose de produit de soin supérieure à 0."),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
 
     final sessionLabel = _session == "MORNING"
         ? "Matin"
@@ -866,33 +1059,51 @@ class _RecordFeedingModalState extends ConsumerState<RecordFeedingModal> {
             : "Soir";
 
     try {
-      // 1. Décompte de la provende si renseignée
-      if (_selectedFeedItemId != null) {
-        final feedQty = double.tryParse(_feedQtyController.text);
-        if (feedQty != null && feedQty > 0) {
-          await ref.read(inventoryProvider.notifier).recordMovement(
-            itemId: _selectedFeedItemId!,
-            type: "FEEDING",
-            quantity: feedQty,
-            date: _selectedDate,
-            flockId: _selectedFlockId,
-            reason: "Ration $sessionLabel ($feedQty kg)${_notesController.text.trim().isNotEmpty ? ' - ${_notesController.text.trim()}' : ''}",
-          );
+      // 1. Décompte de la provende si renseignée avec son unité exacte
+      if (hasFeed && feedQty > 0) {
+        final feedOk = await ref.read(inventoryProvider.notifier).recordMovement(
+          itemId: _selectedFeedItemId!,
+          type: "FEEDING",
+          quantity: feedQty,
+          unit: _feedUnit,
+          date: _selectedDate,
+          flockId: _selectedFlockId,
+          reason: "Ration $sessionLabel ($feedQty $_feedUnitLabel)${_notesController.text.trim().isNotEmpty ? ' - ${_notesController.text.trim()}' : ''}",
+        );
+
+        if (!feedOk) {
+          final err = ref.read(inventoryProvider).error ?? "Stock insuffisant pour cette ration.";
+          if (mounted) {
+            setState(() => _isSubmitting = false);
+            scaffoldMessenger.showSnackBar(
+              SnackBar(content: Text(err), backgroundColor: AppColors.danger),
+            );
+          }
+          return;
         }
       }
 
       // 2. Décompte du produit de santé dans l'eau si eau traitée
-      if (_isWaterTreated && _selectedHealthItemId != null) {
-        final healthQty = double.tryParse(_healthQtyController.text);
-        if (healthQty != null && healthQty > 0) {
-          await ref.read(inventoryProvider.notifier).recordMovement(
-            itemId: _selectedHealthItemId!,
-            type: "FEEDING",
-            quantity: healthQty,
-            date: _selectedDate,
-            flockId: _selectedFlockId,
-            reason: "Abreuvement $sessionLabel ($healthQty $_healthUnit dans ${_waterVolumeController.text}L d'eau)",
-          );
+      if (hasHealth && healthQty > 0) {
+        final healthOk = await ref.read(inventoryProvider.notifier).recordMovement(
+          itemId: _selectedHealthItemId!,
+          type: "FEEDING",
+          quantity: healthQty,
+          unit: _healthUnit,
+          date: _selectedDate,
+          flockId: _selectedFlockId,
+          reason: "Abreuvement $sessionLabel ($healthQty $_healthUnit dans ${_waterVolumeController.text}L d'eau)",
+        );
+
+        if (!healthOk) {
+          final err = ref.read(inventoryProvider).error ?? "Stock insuffisant pour ce produit de santé.";
+          if (mounted) {
+            setState(() => _isSubmitting = false);
+            scaffoldMessenger.showSnackBar(
+              SnackBar(content: Text(err), backgroundColor: AppColors.danger),
+            );
+          }
+          return;
         }
 
         // 3. Validation automatique du vaccin / soin planifié au carnet de santé
@@ -906,7 +1117,10 @@ class _RecordFeedingModalState extends ConsumerState<RecordFeedingModal> {
       }
 
       // Rechargements
+      ref.read(inventoryProvider.notifier).loadMovements(showLoading: false);
+      ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
       ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
+      ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
       widget.onSaved?.call();
 
       if (mounted) {

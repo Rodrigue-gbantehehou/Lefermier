@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/models/flock.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/sync/offline_cache_service.dart';
 import '../auth/auth_provider.dart';
 
 class FlockSummary {
@@ -72,7 +74,18 @@ class FlockNotifier extends StateNotifier<FlockState> {
       return;
     }
 
-    if (showLoading) {
+    // 1. Chargement instantané depuis le cache hors-ligne si la mémoire est vide
+    if (state.flocks.isEmpty) {
+      final cachedList = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: 'flocks',
+      );
+      if (cachedList != null && cachedList.isNotEmpty && state.flocks.isEmpty) {
+        _applyFlocks(cachedList, activeFarm);
+      }
+    }
+
+    if (showLoading && state.flocks.isEmpty) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
 
@@ -82,52 +95,72 @@ class FlockNotifier extends StateNotifier<FlockState> {
       );
 
       final rawList = response.data['data'] as List<dynamic>? ?? [];
-      final allFlocks = rawList
-          .map((item) => Flock.fromJson(item as Map<String, dynamic>))
-          .toList();
 
-      final flocks = activeFarm.hasBuildingRestrictions
-          ? allFlocks.where((f) => activeFarm.isBuildingAssigned(f.buildingId)).toList()
-          : allFlocks;
-
-      int totalBirds = 0;
-      int totalInitial = 0;
-      int activeCount = 0;
-      double totalMortality = 0.0;
-
-      for (final f in flocks) {
-        if (f.isActive) {
-          totalBirds += f.currentQuantity;
-          totalInitial += f.initialQuantity;
-          activeCount++;
-          totalMortality += f.calculatedMortalityRate;
-        }
-      }
-
-      final avgMortality = activeCount > 0 ? (totalMortality / activeCount) : 0.0;
-
-      state = state.copyWith(
-        isLoading: false,
-        flocks: flocks,
-        summary: FlockSummary(
-          totalBirds: totalBirds,
-          initialBirds: totalInitial,
-          activeFlocksCount: activeCount,
-          averageMortality: avgMortality,
-        ),
+      // Mettre en cache pour consultation hors-ligne future
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'flocks',
+        data: rawList,
       );
+
+      _applyFlocks(rawList, activeFarm);
     } on DioException catch (e) {
-      String message = "Impossible de charger les bandes d'élevage.";
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        message = e.response!.data['message'] as String;
+      if (state.flocks.isEmpty) {
+        String message = "Impossible de charger les bandes d'élevage.";
+        if (e.response?.data is Map && e.response?.data['message'] != null) {
+          message = e.response!.data['message'] as String;
+        }
+        state = state.copyWith(isLoading: false, error: message);
+      } else {
+        state = state.copyWith(isLoading: false);
       }
-      state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: "Erreur de chargement: $e",
-      );
+      if (state.flocks.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Erreur de chargement: $e",
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
+  }
+
+  void _applyFlocks(List<dynamic> rawList, dynamic activeFarm) {
+    final allFlocks = rawList
+        .map((item) => Flock.fromJson(item as Map<String, dynamic>))
+        .toList();
+
+    final flocks = activeFarm.hasBuildingRestrictions
+        ? allFlocks.where((f) => activeFarm.isBuildingAssigned(f.buildingId)).toList()
+        : allFlocks;
+
+    int totalBirds = 0;
+    int totalInitial = 0;
+    int activeCount = 0;
+    double totalMortality = 0.0;
+
+    for (final f in flocks) {
+      if (f.isActive) {
+        totalBirds += f.currentQuantity;
+        totalInitial += f.initialQuantity;
+        activeCount++;
+        totalMortality += f.calculatedMortalityRate;
+      }
+    }
+
+    final avgMortality = activeCount > 0 ? (totalMortality / activeCount) : 0.0;
+
+    state = state.copyWith(
+      isLoading: false,
+      flocks: flocks,
+      summary: FlockSummary(
+        totalBirds: totalBirds,
+        initialBirds: totalInitial,
+        activeFlocksCount: activeCount,
+        averageMortality: avgMortality,
+      ),
+    );
   }
 
   void setFilterType(String? type) {
@@ -147,24 +180,40 @@ class FlockNotifier extends StateNotifier<FlockState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr =
-          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
+    final payload = {
+      'type': type,
+      'quantity': quantity,
+      'movementDate': dateStr,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    };
+
+    try {
       await _apiClient.dio.post(
         ApiEndpoints.flockMovements(flockId),
-        data: {
-          'type': type,
-          'quantity': quantity,
-          'movementDate': dateStr,
-          if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadFlocks(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Mouvement de bande ($type: $quantity)",
+          method: "POST",
+          endpoint: ApiEndpoints.flockMovements(flockId),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
       String message = "Échec de l'enregistrement du mouvement.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;
@@ -193,29 +242,45 @@ class FlockNotifier extends StateNotifier<FlockState> {
 
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr =
-          "${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}";
 
+    final payload = {
+      'code': code.trim(),
+      'name': name.trim(),
+      'initialQuantity': initialQuantity,
+      'startDate': dateStr,
+      'poultryType': poultryType,
+      if (strain != null && strain.trim().isNotEmpty) 'strain': strain.trim(),
+      'initialAgeDays': initialAgeDays,
+      if (buildingId != null && buildingId.trim().isNotEmpty) 'buildingId': buildingId.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    };
+
+    try {
       await _apiClient.dio.post(
         ApiEndpoints.farmFlocks(activeFarm.id),
-        data: {
-          'code': code.trim(),
-          'name': name.trim(),
-          'initialQuantity': initialQuantity,
-          'startDate': dateStr,
-          'poultryType': poultryType,
-          if (strain != null && strain.trim().isNotEmpty) 'strain': strain.trim(),
-          'initialAgeDays': initialAgeDays,
-          if (buildingId != null && buildingId.trim().isNotEmpty) 'buildingId': buildingId.trim(),
-          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadFlocks(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Création de bande ($name)",
+          method: "POST",
+          endpoint: ApiEndpoints.farmFlocks(activeFarm.id),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
       String message = "Échec de la création de la bande.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;
@@ -226,6 +291,87 @@ class FlockNotifier extends StateNotifier<FlockState> {
       state = state.copyWith(isSubmitting: false, error: "Erreur: $e");
       return false;
     }
+  }
+
+  Future<bool> updateFlock({
+    required String flockId,
+    required String name,
+    String? strain,
+    String? buildingId,
+    String status = "ACTIVE",
+    String? actualEndDate,
+    String? notes,
+  }) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+
+    final payload = {
+      'name': name.trim(),
+      if (strain != null && strain.trim().isNotEmpty) 'strain': strain.trim(),
+      if (buildingId != null && buildingId.trim().isNotEmpty)
+        'buildingId': buildingId.trim()
+      else
+        'buildingId': null,
+      'status': status,
+      if (actualEndDate != null && actualEndDate.trim().isNotEmpty)
+        'actualEndDate': actualEndDate.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    };
+
+    try {
+      await _apiClient.dio.put(
+        ApiEndpoints.flockDetails(flockId),
+        data: payload,
+      );
+
+      state = state.copyWith(isSubmitting: false);
+      await loadFlocks(showLoading: false);
+      return true;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Modification du lot ($name)",
+          method: "PUT",
+          endpoint: ApiEndpoints.flockDetails(flockId),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
+      String message = "Échec de la modification de la bande.";
+      if (e.response?.data is Map && e.response?.data['message'] != null) {
+        message = e.response!.data['message'] as String;
+      }
+      state = state.copyWith(isSubmitting: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, error: "Erreur: $e");
+      return false;
+    }
+  }
+
+  Future<bool> closeFlock({
+    required String flockId,
+    required String name,
+    required DateTime actualEndDate,
+    String? notes,
+    String? strain,
+    String? buildingId,
+  }) async {
+    final dateStr =
+        "${actualEndDate.year.toString().padLeft(4, '0')}-${actualEndDate.month.toString().padLeft(2, '0')}-${actualEndDate.day.toString().padLeft(2, '0')}";
+    return updateFlock(
+      flockId: flockId,
+      name: name,
+      strain: strain,
+      buildingId: buildingId,
+      status: "COMPLETED",
+      actualEndDate: dateStr,
+      notes: notes,
+    );
   }
 }
 

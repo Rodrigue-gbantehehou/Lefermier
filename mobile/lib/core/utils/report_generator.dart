@@ -3,6 +3,7 @@ import '../models/farm.dart';
 import '../models/flock.dart';
 import '../models/egg_production.dart';
 import '../models/inventory_item.dart';
+import '../models/transaction.dart';
 import '../../features/eggs/egg_provider.dart';
 import '../../features/finances/finance_provider.dart';
 import 'currency_formatter.dart';
@@ -152,6 +153,54 @@ class ReportGenerator {
     }
 
     buffer.writeln("📲 _Généré via l'application Le Fermier_");
+    return buffer.toString();
+  }
+
+  /// Génère un reçu officiel de vente formaté pour WhatsApp / SMS
+  static String generateSalesReceiptReport({
+    required Farm farm,
+    required Transaction transaction,
+  }) {
+    final buffer = StringBuffer();
+    final refCode = transaction.reference ??
+        'REC-${transaction.id.length >= 6 ? transaction.id.substring(transaction.id.length - 6).toUpperCase() : transaction.id.toUpperCase()}';
+
+    buffer.writeln("🧾 *REÇU DE VENTE OFFICIEL*");
+    buffer.writeln("🏠 *${farm.name.toUpperCase()}*");
+    if (farm.city != null && farm.city!.isNotEmpty) {
+      buffer.writeln("📍 *Lieu :* ${farm.city}");
+    }
+    if (farm.phone != null && farm.phone!.isNotEmpty) {
+      buffer.writeln("📞 *Contact :* ${farm.phone}");
+    }
+    if (farm.ifu != null && farm.ifu!.isNotEmpty) {
+      buffer.writeln("🏛️ *IFU :* ${farm.ifu}");
+    }
+    buffer.writeln("--------------------------------");
+    buffer.writeln("📄 *N° Pièce :* $refCode");
+    buffer.writeln("📅 *Date :* ${transaction.date}");
+    if (transaction.contactName != null && transaction.contactName!.isNotEmpty) {
+      buffer.writeln("👤 *Client :* ${transaction.contactName}");
+    } else {
+      buffer.writeln("👤 *Client :* Client comptoir / Passage");
+    }
+    buffer.writeln("--------------------------------");
+    buffer.writeln("📦 *DÉSIGNATION :*");
+    buffer.writeln("  • ${transaction.note ?? transaction.categoryLabel}");
+    buffer.writeln("💰 *MONTANT TOTAL :* *${transaction.formattedAmount}*");
+    buffer.writeln("💳 *Règlement :* ${transaction.paymentMethodLabel}");
+    buffer.writeln("📌 *Statut :* ${transaction.paymentStatusLabel.toUpperCase()}");
+    if (transaction.isPartial || transaction.isUnpaid) {
+      final rest = transaction.remainingAmount ?? (transaction.amount - (transaction.paidAmount ?? 0));
+      buffer.writeln("⚠️ *Reste à payer :* *${CurrencyFormatter.formatFcfa(rest)}*");
+      if (transaction.dueDate != null) {
+        buffer.writeln("⏳ *Échéance :* ${transaction.dueDate}");
+      }
+    }
+    buffer.writeln("--------------------------------");
+    buffer.writeln("🙏 _Merci pour votre confiance !_");
+    buffer.writeln("📲 _Émis via Le Fermier App_");
+
     return buffer.toString();
   }
 }

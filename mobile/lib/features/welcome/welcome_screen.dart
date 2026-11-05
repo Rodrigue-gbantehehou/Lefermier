@@ -62,17 +62,20 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
 
-          // Contenu interactif avec défilement pour garantir aucune coupure d'écran
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Barre supérieure : Badge Le Fermier + Bouton Passer
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Barre supérieure : Badge Le Fermier + Bouton Passer
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -83,16 +86,24 @@ class WelcomeScreen extends StatelessWidget {
                             width: 1,
                           ),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.egg_alt_rounded,
-                              size: 16,
-                              color: AppColors.accent,
+                            Container(
+                              width: 18,
+                              height: 18,
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                              ),
                             ),
-                            SizedBox(width: 6),
-                            Text(
+                            const SizedBox(width: 8),
+                            const Text(
                               "LE FERMIER",
                               style: TextStyle(
                                 fontSize: 12,
@@ -125,7 +136,34 @@ class WelcomeScreen extends StatelessWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 36),
+
+                  // Logo Officiel Lefermier
+                  Row(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
 
                   // Titre et Accroche forte
                   const Text(
@@ -189,13 +227,17 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          "Créer mon exploitation",
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
+                        Flexible(
+                          child: Text(
+                            "Créer mon exploitation",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         SizedBox(width: 8),
@@ -247,6 +289,8 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
         ],
       ),
     );

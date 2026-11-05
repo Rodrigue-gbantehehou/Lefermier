@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../navigation/bottom_nav_scaffold.dart';
 import 'auth_provider.dart';
 import 'farm_onboarding_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -141,19 +142,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(7),
+                                  width: 48,
+                                  height: 48,
+                                  padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.18),
+                                    color: Colors.white,
                                     shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.35),
-                                      width: 1.5,
-                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.15),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Icon(
-                                    Icons.egg_alt_rounded,
-                                    size: 24,
-                                    color: AppColors.accent,
+                                  child: Image.asset(
+                                    'assets/images/logo.png',
+                                    fit: BoxFit.contain,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -349,6 +354,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   ],
                                 ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Pas encore de compte ?",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                                );
+                              },
+                              child: const Text(
+                                "Créer un compte",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

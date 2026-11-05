@@ -68,11 +68,28 @@ class ApiExceptionListener
                 default => 'Erreur HTTP',
             };
 
-            $response = new JsonResponse([
+            $payload = [
                 'title' => $title,
                 'status' => $statusCode,
                 'detail' => $exception->getMessage(),
-            ], $statusCode, $exception->getHeaders());
+                'message' => $exception->getMessage(),
+            ];
+
+            if ($exception instanceof \App\Exception\PlanQuotaExceededException) {
+                $payload['error'] = 'QUOTA_EXCEEDED';
+                $payload['quota'] = $exception->getQuotaKey();
+                $payload['current'] = $exception->getCurrentUsage();
+                $payload['max'] = $exception->getMaxAllowed();
+                $payload['plan'] = $exception->getPlanName();
+                $payload['upgradeRequired'] = true;
+            } elseif ($exception instanceof \App\Exception\PlanModuleNotAllowedException) {
+                $payload['error'] = 'MODULE_NOT_ALLOWED';
+                $payload['module'] = $exception->getModuleKey();
+                $payload['plan'] = $exception->getPlanName();
+                $payload['upgradeRequired'] = true;
+            }
+
+            $response = new JsonResponse($payload, $statusCode, $exception->getHeaders());
 
             $event->setResponse($response);
             return;

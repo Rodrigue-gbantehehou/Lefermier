@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/member.dart';
 import '../../core/theme/app_theme.dart';
@@ -6,6 +6,7 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/brand_loader.dart';
 import '../buildings/buildings_provider.dart';
 import 'members_provider.dart';
+import '../subscriptions/subscription_screen.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
@@ -610,6 +611,32 @@ class _AddMemberModalState extends ConsumerState<_AddMemberModal> {
           backgroundColor: AppColors.primary,
         ),
       );
+    } else if (mounted) {
+      final err = ref.read(membersProvider).error ?? "Une erreur est survenue lors de l'ajout.";
+      final isQuotaOrUpgrade = err.contains("Limite atteinte") ||
+          err.contains("quota") ||
+          err.contains("formule") ||
+          err.contains("Passez à");
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(err),
+          backgroundColor: AppColors.danger,
+          duration: isQuotaOrUpgrade ? const Duration(seconds: 7) : const Duration(seconds: 4),
+          action: isQuotaOrUpgrade
+              ? SnackBarAction(
+                  label: "Voir offres",
+                  textColor: Colors.white,
+                  onPressed: () {
+                    navigator.push(
+                      MaterialPageRoute(
+                        builder: (_) => const SubscriptionScreen(),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        ),
+      );
     }
   }
 
@@ -943,10 +970,13 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
         20,
         MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: Material(
+        color: Colors.transparent,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Center(
             child: Container(
               width: 40,
@@ -1112,6 +1142,8 @@ class _EditMemberModalState extends ConsumerState<_EditMemberModal> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }

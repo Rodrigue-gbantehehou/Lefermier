@@ -16,6 +16,7 @@ use App\Repository\BuildingRepository;
 use App\Repository\FarmMembershipRepository;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
+use App\Service\Admin\CommercialPlanService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -29,6 +30,7 @@ class MemberService
         private readonly UserRepository $userRepository,
         private readonly RoleRepository $roleRepository,
         private readonly BuildingRepository $buildingRepository,
+        private readonly CommercialPlanService $commercialPlanService,
         private readonly UserPasswordHasherInterface $passwordHasher,
     ) {
     }
@@ -45,6 +47,9 @@ class MemberService
 
     public function addMember(Farm $farm, CreateMemberRequestDto $dto): FarmMembership
     {
+        // 0. Contrôle d'accès et des quotas de la formule commerciale
+        $this->commercialPlanService->assertCanAddMember($farm);
+
         $normalizedEmail = mb_strtolower(trim($dto->email));
 
         // 1. Rechercher si l'utilisateur existe déjà ou le créer

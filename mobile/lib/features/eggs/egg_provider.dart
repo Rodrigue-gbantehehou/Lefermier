@@ -4,6 +4,8 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/models/egg_production.dart';
 import '../../core/models/flock.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/sync/offline_cache_service.dart';
 import '../auth/auth_provider.dart';
 
 class EggSummaryStats {
@@ -103,7 +105,42 @@ class EggNotifier extends StateNotifier<EggState> {
       return;
     }
 
-    if (showLoading) {
+    // 1. Restitution instantanée depuis le cache hors-ligne si vide
+    if (state.productions.isEmpty && state.layerFlocks.isEmpty) {
+      final cachedFlocks = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: 'egg_layer_flocks',
+      );
+      final cacheKey = state.selectedFlockId != null ? 'eggs_${state.selectedFlockId}' : 'eggs_all';
+      final cachedEggs = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: cacheKey,
+      );
+      final cachedSummary = await OfflineCacheService().getMapCache(
+        farmId: activeFarm.id,
+        category: 'eggs_summary',
+      );
+
+      if (cachedFlocks != null || cachedEggs != null) {
+        final flocks = (cachedFlocks ?? [])
+            .map((item) => Flock.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final productions = (cachedEggs ?? [])
+            .map((item) => EggProduction.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final summary = cachedSummary != null
+            ? EggSummaryStats.fromJson(cachedSummary)
+            : const EggSummaryStats();
+
+        state = state.copyWith(
+          layerFlocks: flocks,
+          productions: productions,
+          summary: summary,
+        );
+      }
+    }
+
+    if (showLoading && state.productions.isEmpty) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
 
@@ -119,6 +156,12 @@ class EggNotifier extends StateNotifier<EggState> {
           .where((f) => f.isLayer)
           .toList();
 
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'egg_layer_flocks',
+        data: rawFlocks,
+      );
+
       // 2. Récupération des collectes d'œufs
       final endpoint = state.selectedFlockId != null
           ? ApiEndpoints.flockEggs(state.selectedFlockId!)
@@ -132,8 +175,21 @@ class EggNotifier extends StateNotifier<EggState> {
 
       EggSummaryStats summary = const EggSummaryStats();
       if (eggsRes.data['meta']?['summary'] != null) {
-        summary = EggSummaryStats.fromJson(eggsRes.data['meta']['summary'] as Map<String, dynamic>);
+        final summaryMap = eggsRes.data['meta']['summary'] as Map<String, dynamic>;
+        summary = EggSummaryStats.fromJson(summaryMap);
+        await OfflineCacheService().setCache(
+          farmId: activeFarm.id,
+          category: 'eggs_summary',
+          data: summaryMap,
+        );
       }
+
+      final cacheKey = state.selectedFlockId != null ? 'eggs_${state.selectedFlockId}' : 'eggs_all';
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: cacheKey,
+        data: rawEggs,
+      );
 
       state = state.copyWith(
         isLoading: false,
@@ -142,16 +198,24 @@ class EggNotifier extends StateNotifier<EggState> {
         summary: summary,
       );
     } on DioException catch (e) {
-      String message = "Impossible de charger les données de ponte.";
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        message = e.response!.data['message'] as String;
+      if (state.productions.isEmpty) {
+        String message = "Impossible de charger les données de ponte.";
+        if (e.response?.data is Map && e.response?.data['message'] != null) {
+          message = e.response!.data['message'] as String;
+        }
+        state = state.copyWith(isLoading: false, error: message);
+      } else {
+        state = state.copyWith(isLoading: false);
       }
-      state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: "Erreur de chargement: $e",
-      );
+      if (state.productions.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Erreur de chargement: $e",
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
@@ -176,27 +240,44 @@ class EggNotifier extends StateNotifier<EggState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final payload = {
+      'productionDate': dateStr,
+      'session': session,
+      'goodEggs': goodEggs,
+      'crackedEggs': crackedEggs,
+      'dirtyEggs': dirtyEggs,
+      'deformedEggs': deformedEggs,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      'allowUpdate': true,
+    };
 
+    try {
       await _apiClient.dio.post(
         ApiEndpoints.flockEggs(flockId),
-        data: {
-          'productionDate': dateStr,
-          'session': session,
-          'goodEggs': goodEggs,
-          'crackedEggs': crackedEggs,
-          'dirtyEggs': dirtyEggs,
-          'deformedEggs': deformedEggs,
-          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-          'allowUpdate': true,
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadData(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Collecte d'œufs ($goodEggs œufs - $session)",
+          method: "POST",
+          endpoint: ApiEndpoints.flockEggs(flockId),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
+
       String message = "Échec de l'enregistrement de la collecte.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;

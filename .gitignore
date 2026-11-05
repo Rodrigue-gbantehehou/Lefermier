@@ -39,6 +39,9 @@ landing/*.tsbuildinfo
 # API (Symfony / PHP)
 api/vendor/
 api/var/
+api/.env
+api/.env.*
+!api/.env.example
 api/.env.local
 api/.env.local.php
 api/.env.*.local

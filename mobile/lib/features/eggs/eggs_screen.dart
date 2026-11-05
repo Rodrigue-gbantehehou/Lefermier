@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
-import '../../core/utils/egg_calculator.dart';
 import '../../core/models/flock.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'egg_provider.dart';
+import 'record_egg_modal.dart';
+import '../auth/auth_provider.dart';
+import '../finances/record_transaction_modal.dart';
+
 
 class EggsScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
@@ -17,6 +20,14 @@ class EggsScreen extends ConsumerStatefulWidget {
 }
 
 class _EggsScreenState extends ConsumerState<EggsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(eggProvider.notifier).loadData(showLoading: false);
+    });
+  }
+
   void _openRecordEggDialog(List<Flock> layerFlocks, String? defaultFlockId) {
     if (layerFlocks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -27,405 +38,10 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
       );
       return;
     }
-
-    String selectedFlockId = defaultFlockId ?? layerFlocks.first.id;
-    if (!layerFlocks.any((f) => f.id == selectedFlockId)) {
-      selectedFlockId = layerFlocks.first.id;
-    }
-
-    DateTime selectedDate = DateTime.now();
-    String session = "MORNING";
-    int goodEggs = 0;
-    int crackedEggs = 0;
-    int dirtyEggs = 0;
-    int deformedEggs = 0;
-    final notesController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-          final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-          final trayInfo = EggCalculator.calculate(goodEggs);
-          final eggState = ref.watch(eggProvider);
-
-          return Container(
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: borderColor),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Nouvelle Collecte d'Œufs",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Sélection du Lot / Bande
-                  if (layerFlocks.length > 1) ...[
-                    const Text(
-                      "Bande de pondeuses *",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedFlockId,
-                          isExpanded: true,
-                          items: layerFlocks.map((flock) {
-                            return DropdownMenuItem<String>(
-                              value: flock.id,
-                              child: Text(
-                                "${flock.name} (${flock.currentQuantity} sujets)",
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setModalState(() => selectedFlockId = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.pets, size: 16, color: AppColors.accent),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Bande : ${layerFlocks.first.name} (${layerFlocks.first.currentQuantity} sujets)",
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Session de ramassage (Matin, Midi, Soir, Journée)
-                  const Text(
-                    "Session de collecte *",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _SessionChip(
-                        label: "Matin",
-                        icon: Icons.wb_sunny_outlined,
-                        isSelected: session == "MORNING",
-                        onTap: () => setModalState(() => session = "MORNING"),
-                      ),
-                      const SizedBox(width: 6),
-                      _SessionChip(
-                        label: "Midi",
-                        icon: Icons.wb_sunny,
-                        isSelected: session == "AFTERNOON",
-                        onTap: () => setModalState(() => session = "AFTERNOON"),
-                      ),
-                      const SizedBox(width: 6),
-                      _SessionChip(
-                        label: "Soir",
-                        icon: Icons.nightlight_round_outlined,
-                        isSelected: session == "EVENING",
-                        onTap: () => setModalState(() => session = "EVENING"),
-                      ),
-                      const SizedBox(width: 6),
-                      _SessionChip(
-                        label: "Jour",
-                        icon: Icons.all_inclusive,
-                        isSelected: session == "ALL_DAY",
-                        onTap: () => setModalState(() => session = "ALL_DAY"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bons Œufs counter box avec calcul automatique des alvéoles de 30
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "Bons œufs récoltés *",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            if (goodEggs > 0)
-                              InkWell(
-                                onTap: () => setModalState(() => goodEggs = 0),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                  child: Text(
-                                    "Remettre à 0",
-                                    style: TextStyle(fontSize: 11, color: AppColors.danger, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              "$goodEggs",
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                fontFamily: 'monospace',
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              "œufs",
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.accent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                trayInfo.text,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.accent,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          "Ajout rapide par alvéoles / plateaux de 30 :",
-                          style: TextStyle(fontSize: 11, color: AppColors.textMutedLight, fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            _TrayBtn(
-                              label: "+1 pl. (30)",
-                              onTap: () => setModalState(() => goodEggs += 30),
-                            ),
-                            const SizedBox(width: 6),
-                            _TrayBtn(
-                              label: "+2 pl. (60)",
-                              onTap: () => setModalState(() => goodEggs += 60),
-                            ),
-                            const SizedBox(width: 6),
-                            _TrayBtn(
-                              label: "+5 pl. (150)",
-                              onTap: () => setModalState(() => goodEggs += 150),
-                            ),
-                            const SizedBox(width: 6),
-                            _TrayBtn(
-                              label: "+10 pl. (300)",
-                              onTap: () => setModalState(() => goodEggs += 300),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              onPressed: goodEggs > 0 ? () => setModalState(() => goodEggs = (goodEggs - 1).clamp(0, 99999)) : null,
-                              icon: const Icon(Icons.remove_circle_outline, size: 22, color: AppColors.primary),
-                            ),
-                            const Text("Unité (+/-)", style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                            IconButton(
-                              onPressed: () => setModalState(() => goodEggs++),
-                              icon: const Icon(Icons.add_circle_outline, size: 22, color: AppColors.primary),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Déclassement (Fêlés / Sales / Déformés)
-                  const Text(
-                    "Déclassement & Anomalies",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  _EggQualityRow(
-                    label: "Œufs fêlés / cassés",
-                    count: crackedEggs,
-                    color: AppColors.danger,
-                    onDecrement: crackedEggs > 0 ? () => setModalState(() => crackedEggs--) : null,
-                    onIncrement: () => setModalState(() => crackedEggs++),
-                  ),
-                  const SizedBox(height: 6),
-                  _EggQualityRow(
-                    label: "Œufs sales",
-                    count: dirtyEggs,
-                    color: AppColors.textMutedLight,
-                    onDecrement: dirtyEggs > 0 ? () => setModalState(() => dirtyEggs--) : null,
-                    onIncrement: () => setModalState(() => dirtyEggs++),
-                  ),
-                  const SizedBox(height: 6),
-                  _EggQualityRow(
-                    label: "Œufs déformés / anormaux",
-                    count: deformedEggs,
-                    color: AppColors.accent,
-                    onDecrement: deformedEggs > 0 ? () => setModalState(() => deformedEggs--) : null,
-                    onIncrement: () => setModalState(() => deformedEggs++),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Notes optionnelles
-                  TextField(
-                    controller: notesController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: "Observations / Notes (optionnel)",
-                      hintText: "Ex: Ramassage retardé, propreté des pondoirs...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Boutons d'action
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text("Annuler"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: (goodEggs > 0 && !eggState.isSubmitting)
-                              ? () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  final navigator = Navigator.of(ctx);
-
-                                  final success = await ref.read(eggProvider.notifier).recordProduction(
-                                    flockId: selectedFlockId,
-                                    date: selectedDate,
-                                    session: session,
-                                    goodEggs: goodEggs,
-                                    crackedEggs: crackedEggs,
-                                    dirtyEggs: dirtyEggs,
-                                    deformedEggs: deformedEggs,
-                                    notes: notesController.text,
-                                  );
-
-                                  if (ctx.mounted) {
-                                    if (success) {
-                                      navigator.pop();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text("Collecte de $goodEggs œufs (${trayInfo.text}) enregistrée avec succès"),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                    } else {
-                                      final err = ref.read(eggProvider).error ?? "Une erreur est survenue.";
-                                      messenger.showSnackBar(
-                                        SnackBar(content: Text(err), backgroundColor: AppColors.danger),
-                                      );
-                                    }
-                                  }
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: eggState.isSubmitting
-                              ? const BrandLoader.button()
-                              : const Text("Enregistrer"),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    RecordEggModal.show(
+      context,
+      defaultFlockId: defaultFlockId,
+      onSaved: () => ref.read(eggProvider.notifier).loadData(showLoading: false),
     );
   }
 
@@ -434,6 +50,8 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final eggState = ref.watch(eggProvider);
     final summary = eggState.summary;
+    final farm = ref.watch(authProvider).activeFarm;
+    final canCreateFinance = farm == null || farm.canCreateFinance;
 
     return Scaffold(
       appBar: AppBar(
@@ -536,16 +154,38 @@ class _EggsScreenState extends ConsumerState<EggsScreen> {
                               ),
                             ],
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () => _openRecordEggDialog(eggState.layerFlocks, eggState.selectedFlockId),
-                            icon: const Icon(Icons.add_rounded, size: 16),
-                            label: const Text("Ramassage", style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                          Row(
+                            children: [
+                              if (canCreateFinance) ...[
+                                OutlinedButton.icon(
+                                  onPressed: () => RecordTransactionModal.show(
+                                    context,
+                                    initialType: "INCOME",
+                                    initialCategory: "EGG_SALE",
+                                  ),
+                                  icon: const Icon(Icons.point_of_sale_rounded, size: 15),
+                                  label: const Text("Vendre", style: TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.success,
+                                    side: const BorderSide(color: AppColors.success),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              ElevatedButton.icon(
+                                onPressed: () => _openRecordEggDialog(eggState.layerFlocks, eggState.selectedFlockId),
+                                icon: const Icon(Icons.add_rounded, size: 15),
+                                label: const Text("Ramassage", style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -809,147 +449,6 @@ class _QualityBadge extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
-      ),
-    );
-  }
-}
-
-class _EggQualityRow extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color color;
-  final VoidCallback? onDecrement;
-  final VoidCallback onIncrement;
-
-  const _EggQualityRow({
-    required this.label,
-    required this.count,
-    required this.color,
-    required this.onDecrement,
-    required this.onIncrement,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
-        Row(
-          children: [
-            IconButton(
-              onPressed: onDecrement,
-              icon: const Icon(Icons.remove_circle_outline, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-            Container(
-              constraints: const BoxConstraints(minWidth: 28),
-              alignment: Alignment.center,
-              child: Text(
-                "$count",
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                  color: count > 0 ? color : null,
-                ),
-              ),
-            ),
-            IconButton(
-              onPressed: onIncrement,
-              icon: Icon(Icons.add_circle_outline, size: 20, color: color),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SessionChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SessionChip({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? AppColors.accent : AppColors.borderLight,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 13, color: isSelected ? Colors.white : AppColors.textMutedLight),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : AppColors.textMutedLight,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrayBtn extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _TrayBtn({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
-          ),
-        ),
       ),
     );
   }

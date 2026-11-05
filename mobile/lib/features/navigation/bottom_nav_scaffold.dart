@@ -1,24 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/farm.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_provider.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../dashboard/dashboard_provider.dart';
 import '../dashboard/quick_action_sheet.dart';
 import '../eggs/eggs_screen.dart';
+import '../eggs/egg_provider.dart';
 import '../eggs/record_egg_modal.dart';
 import '../finances/finances_screen.dart';
+import '../finances/finance_provider.dart';
 import '../finances/record_transaction_modal.dart';
 import '../flocks/flocks_screen.dart';
+import '../flocks/flock_provider.dart';
 import '../flocks/record_movement_modal.dart';
+import '../flocks/record_poultry_sale_modal.dart';
 import '../health/health_screen.dart';
+import '../health/health_provider.dart';
 import '../inventory/inventory_screen.dart';
+import '../inventory/inventory_provider.dart';
 import '../inventory/record_feeding_modal.dart';
 import '../reports/reports_screen.dart';
 import '../buildings/buildings_screen.dart';
 import '../members/members_screen.dart';
 import '../sync/sync_screen.dart';
 import '../subscriptions/subscription_screen.dart';
+import '../contacts/contacts_screen.dart';
+import '../settings/farm_settings_screen.dart';
 import 'app_drawer.dart';
 
 class _NavDestination {
@@ -60,20 +70,102 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   }
 
   void _onTabSelected(int index) {
+    HapticFeedback.selectionClick();
     setState(() {
       _activeSecondaryKey = null;
       _currentIndex = index;
     });
+
+    if (index == 0) {
+      ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
+      return;
+    }
+
+    if (index == 1) {
+      ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+      return;
+    }
+
+    final farm = ref.read(authProvider).activeFarm;
+    final rightDestinations = _getRightDestinations(farm);
+    if (index >= 2 && (index - 2) < rightDestinations.length) {
+      final destKey = rightDestinations[index - 2].key;
+      _refreshModuleData(destKey);
+    }
+  }
+
+  void _refreshModuleData(String destKey) {
+    switch (destKey) {
+      case 'inventory':
+        ref.read(inventoryProvider.notifier).loadMovements(showLoading: false);
+        ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
+        break;
+      case 'finance':
+        ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+        break;
+      case 'eggs':
+        ref.read(eggProvider.notifier).loadData(showLoading: false);
+        break;
+      case 'health':
+        ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
+        break;
+      case 'flocks':
+        ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+        break;
+      case 'dashboard':
+        ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
+        break;
+    }
   }
 
   void _openQuickActions() {
+    HapticFeedback.lightImpact();
     QuickActionSheet.show(
       context,
       onRecordEgg: () => RecordEggModal.show(context),
-      onRecordFeeding: () => RecordFeedingModal.show(context),
-      onRecordMovement: () => RecordMovementModal.show(context),
-      onRecordIncome: () => RecordTransactionModal.show(context, initialType: "INCOME"),
-      onRecordExpense: () => RecordTransactionModal.show(context, initialType: "EXPENSE"),
+      onRecordFeeding: () => RecordFeedingModal.show(
+        context,
+        onSaved: () {
+          ref.read(inventoryProvider.notifier).loadMovements(showLoading: false);
+          ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
+        },
+      ),
+      onRecordPoultrySale: () => RecordPoultrySaleModal.show(
+        context,
+        onSaved: () {
+          ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+          ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+        },
+      ),
+      onRecordEggSale: () => RecordTransactionModal.show(
+        context,
+        initialType: "INCOME",
+        initialCategory: "EGG_SALE",
+        onSaved: () {
+          ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+          ref.read(eggProvider.notifier).loadData(showLoading: false);
+        },
+      ),
+      onRecordMovement: () => RecordMovementModal.show(
+        context,
+        onSaved: () {
+          ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+        },
+      ),
+      onRecordIncome: () => RecordTransactionModal.show(
+        context,
+        initialType: "INCOME",
+        onSaved: () {
+          ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+        },
+      ),
+      onRecordExpense: () => RecordTransactionModal.show(
+        context,
+        initialType: "EXPENSE",
+        onSaved: () {
+          ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+        },
+      ),
     );
   }
 
@@ -175,6 +267,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       return;
     }
 
+    _refreshModuleData(key);
+
     final rightIdx = rightDestinations.indexWhere((d) => d.key == key);
     if (rightIdx != -1) {
       setState(() {
@@ -238,6 +332,16 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           onOpenMenu: _openDrawer,
           onBack: _closeSecondaryModule,
         );
+      case 'contacts':
+        return ContactsScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
+      case 'farm_settings':
+        return FarmSettingsScreen(
+          onOpenMenu: _openDrawer,
+          onBack: _closeSecondaryModule,
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -245,6 +349,23 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      final prevFarmId = previous?.activeFarm?.id;
+      final nextFarmId = next.activeFarm?.id;
+      if (prevFarmId != nextFarmId) {
+        if (_activeSecondaryKey != null) {
+          setState(() => _activeSecondaryKey = null);
+        }
+        ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
+        ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+        ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
+        ref.read(inventoryProvider.notifier).loadMovements(showLoading: false);
+        ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+        ref.read(eggProvider.notifier).loadData(showLoading: false);
+        ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
+      }
+    });
+
     final authState = ref.watch(authProvider);
     final farm = authState.activeFarm;
 

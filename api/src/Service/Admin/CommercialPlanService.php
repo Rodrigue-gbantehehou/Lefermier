@@ -13,6 +13,12 @@ use App\Repository\OrganizationRepository;
 use App\Repository\SubscriptionPlanRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Ulid;
+use App\Entity\Building;
+use App\Entity\User;
+use App\Enum\FlockStatus;
+use App\Exception\PlanModuleNotAllowedException;
+use App\Exception\PlanQuotaExceededException;
+
 
 /**
  * Service de gouvernance des Formules Commerciales, Licences et Quotas de la plateforme Lefermier.
@@ -120,6 +126,156 @@ class CommercialPlanService
 
         return $this->isModuleAllowedForFarm($farm, $module);
     }
+
+    /**
+     * Valide qu'un utilisateur peut créer une nouvelle exploitation au regard des quotas de son organisation.
+     *
+     * @throws PlanQuotaExceededException
+     */
+    public function assertCanCreateFarm(User $user): void
+    {
+        $organization = null;
+        foreach ($user->getFarmMemberships() as $membership) {
+            $existingOrg = $membership->getFarm()->getOrganization();
+            if ($existingOrg !== null) {
+                $organization = $existingOrg;
+                break;
+            }
+        }
+
+        // Première ferme : l'organisation sera créée avec son 1er quota
+        if ($organization === null) {
+            return;
+        }
+
+        $planSku = strtoupper($organization->getSubscriptionPlan());
+        $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
+        $maxFarms = (int) ($plan['quotas']['maxFarms'] ?? $plan['quotas']['max_farms'] ?? 1);
+
+        if ($maxFarms >= 9999) {
+            return;
+        }
+
+        $currentCount = count($organization->getFarms());
+        if ($currentCount >= $maxFarms) {
+            throw new PlanQuotaExceededException('max_farms', $currentCount, $maxFarms, $plan['name']);
+        }
+    }
+
+    /**
+     * Valide qu'une bande active supplémentaire peut être créée dans l'exploitation.
+     *
+     * @throws PlanQuotaExceededException
+     */
+    public function assertCanCreateFlock(Farm $farm): void
+    {
+        $org = $farm->getOrganization();
+        $planSku = strtoupper($org->getSubscriptionPlan());
+        $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
+        $maxFlocks = (int) ($plan['quotas']['maxFlocks'] ?? $plan['quotas']['max_flocks'] ?? 2);
+
+        if ($maxFlocks >= 9999) {
+            return;
+        }
+
+        $farmIds = array_map(fn (Farm $f) => $f->getId(), $org->getFarms()->toArray());
+        $activeFlocksCount = 0;
+        if (!empty($farmIds)) {
+            $activeFlocksCount = (int) $this->flockRepository->createQueryBuilder('fl')
+                ->select('COUNT(fl.id)')
+                ->where('fl.farm IN (:farms)')
+                ->andWhere('fl.status = :status')
+                ->setParameter('farms', $farmIds)
+                ->setParameter('status', FlockStatus::ACTIVE)
+                ->getQuery()
+                ->getSingleScalarResult();
+        }
+
+        if ($activeFlocksCount >= $maxFlocks) {
+            throw new PlanQuotaExceededException('max_flocks', $activeFlocksCount, $maxFlocks, $plan['name']);
+        }
+    }
+
+    /**
+     * Valide qu'un bâtiment supplémentaire peut être créé dans l'exploitation.
+     *
+     * @throws PlanQuotaExceededException
+     */
+    public function assertCanCreateBuilding(Farm $farm): void
+    {
+        $org = $farm->getOrganization();
+        $planSku = strtoupper($org->getSubscriptionPlan());
+        $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
+        $maxBuildings = (int) ($plan['quotas']['maxBuildings'] ?? $plan['quotas']['max_buildings'] ?? 2);
+
+        if ($maxBuildings >= 9999) {
+            return;
+        }
+
+        $farmIds = array_map(fn (Farm $f) => $f->getId(), $org->getFarms()->toArray());
+        $buildingsCount = 0;
+        if (!empty($farmIds)) {
+            $buildingsCount = (int) $this->entityManager->createQueryBuilder()
+                ->select('COUNT(b.id)')
+                ->from(Building::class, 'b')
+                ->where('b.farm IN (:farms)')
+                ->setParameter('farms', $farmIds)
+                ->getQuery()
+                ->getSingleScalarResult();
+        }
+
+        if ($buildingsCount >= $maxBuildings) {
+            throw new PlanQuotaExceededException('max_buildings', $buildingsCount, $maxBuildings, $plan['name']);
+        }
+    }
+
+    /**
+     * Valide qu'un collaborateur supplémentaire peut être rattaché à l'organisation.
+     *
+     * @throws PlanQuotaExceededException
+     */
+    public function assertCanAddMember(Farm $farm): void
+    {
+        $org = $farm->getOrganization();
+        $planSku = strtoupper($org->getSubscriptionPlan());
+        $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
+        $maxMembers = (int) ($plan['quotas']['maxMembers'] ?? $plan['quotas']['max_members'] ?? 2);
+
+        if ($maxMembers >= 9999) {
+            return;
+        }
+
+        $membersSet = [];
+        foreach ($org->getFarms() as $f) {
+            foreach ($f->getFarmMemberships() as $m) {
+                if ($m->isActive() && $m->getUser()) {
+                    $userId = (string) $m->getUser()->getId();
+                    $membersSet[$userId] = true;
+                }
+            }
+        }
+        $membersCount = count($membersSet);
+
+        if ($membersCount >= $maxMembers) {
+            throw new PlanQuotaExceededException('max_members', $membersCount, $maxMembers, $plan['name']);
+        }
+    }
+
+    /**
+     * Valide qu'un module applicatif est inclus dans la formule souscrite.
+     *
+     * @throws PlanModuleNotAllowedException
+     */
+    public function assertModuleAllowed(Farm $farm, string $moduleKey): void
+    {
+        if (!$this->isModuleAllowedForFarm($farm, $moduleKey)) {
+            $org = $farm->getOrganization();
+            $planSku = strtoupper($org->getSubscriptionPlan());
+            $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
+            throw new PlanModuleNotAllowedException($moduleKey, $plan['name']);
+        }
+    }
+
 
     /**
      * Crée une nouvelle formule commerciale dans la table subscription_plans.
@@ -553,8 +709,262 @@ class CommercialPlanService
     /**
      * Initialise les 4 plans système par défaut si la table subscription_plans est vide.
      */
+
+    /**
+     * Réaligne et synchronise les 4 formules système de référence dans la base de données.
+     */
+    public function syncSystemPlans(): void
+    {
+        $defaults = $this->getDefaultPlansConfig();
+        foreach ($defaults as $def) {
+            $sku = $def['sku'];
+            $plan = $this->planRepository->findBySku($sku);
+            if ($plan === null) {
+                $plan = new SubscriptionPlan(
+                    sku: $def['sku'],
+                    name: $def['name'],
+                    tier: $def['tier'],
+                    priceMonthly: $def['priceMonthly'],
+                    priceAnnually: $def['priceAnnually'],
+                    quotas: $def['quotas'],
+                    features: $def['features'],
+                    flags: $def['flags'],
+                    badge: $def['badge'],
+                    description: $def['description'],
+                    isPopular: $def['isPopular'],
+                    isRecommended: $def['isRecommended'],
+                    isSystem: true,
+                    currency: 'XOF',
+                    status: 'PUBLISHED',
+                    availableFrom: null,
+                    availableTo: null,
+                    isVisibilityPublic: $def['isVisibilityPublic'] ?? true,
+                    trialDays: $def['trialDays'] ?? 0,
+                    allowedBillingCycles: $def['allowedBillingCycles'] ?? ['MONTHLY', 'ANNUALLY'],
+                    modules: $def['modules'] ?? [],
+                    version: 1,
+                );
+                $this->entityManager->persist($plan);
+            } else {
+                $plan->setName($def['name']);
+                $plan->setTier($def['tier']);
+                $plan->setPriceMonthly($def['priceMonthly']);
+                $plan->setPriceAnnually($def['priceAnnually']);
+                $plan->setQuotas($def['quotas']);
+                $plan->setFeatures($def['features']);
+                $plan->setFlags($def['flags']);
+                $plan->setBadge($def['badge']);
+                $plan->setDescription($def['description']);
+                $plan->setModules($def['modules']);
+                $plan->setIsSystem(true);
+                $plan->setStatus('PUBLISHED');
+            }
+        }
+        $this->entityManager->flush();
+    }
+
+    /**
+     * Configuration officielle de référence des 4 formules commerciales Lefermier.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getDefaultPlansConfig(): array
+    {
+        return [
+            [
+                'sku' => 'FREE',
+                'name' => 'Starter (Découverte)',
+                'tier' => 'Découverte',
+                'badge' => 'Gratuit',
+                'description' => 'Pour les éleveurs individuels qui démarrent leur première exploitation avicole.',
+                'priceMonthly' => 0,
+                'priceAnnually' => 0,
+                'quotas' => ['max_farms' => 1, 'max_flocks' => 2, 'max_members' => 2, 'max_buildings' => 2, 'retention_months' => 3],
+                'features' => [
+                    '1 exploitation avicole',
+                    'Jusqu\'à 2 bandes simultanées',
+                    '2 comptes collaborateurs',
+                    'Saisie quotidienne ponte & mortalités',
+                    'Calcul des alvéoles de 30 œufs',
+                    'Support communautaire',
+                ],
+                'flags' => [
+                    'accounting_exports' => false,
+                    'health_alerts' => false,
+                    'iot_sensors' => false,
+                    'api_access' => false,
+                    'priority_support' => false,
+                ],
+                'isPopular' => false,
+                'isRecommended' => false,
+                'trialDays' => 0,
+                'allowedBillingCycles' => ['MONTHLY'],
+                'modules' => ['flocks', 'eggs', 'inventory', 'health', 'finance', 'contacts', 'buildings', 'team'],
+                'isVisibilityPublic' => true,
+            ],
+            [
+                'sku' => 'STANDARD',
+                'name' => 'Standard (Éleveur Pro)',
+                'tier' => 'Professionnel',
+                'badge' => 'Populaire',
+                'description' => 'Pour les fermes structurées nécessitant un pilotage rigoureux des stocks et de la ponte.',
+                'priceMonthly' => 15000,
+                'priceAnnually' => 153000,
+                'quotas' => ['max_farms' => 3, 'max_flocks' => 10, 'max_members' => 5, 'max_buildings' => 6, 'retention_months' => 12],
+                'features' => [
+                    'Jusqu\'à 3 exploitations avicoles',
+                    'Jusqu\'à 10 bandes actives',
+                    '5 comptes collaborateurs',
+                    'Gestion des stocks d\'aliments et intrants',
+                    'Calcul automatique du taux de ponte standardisé',
+                    'Rapports de marge brute en FCFA',
+                    'Alertes automatiques de mortalité',
+                    'Support email sous 24h',
+                ],
+                'flags' => [
+                    'accounting_exports' => false,
+                    'health_alerts' => true,
+                    'iot_sensors' => false,
+                    'api_access' => false,
+                    'priority_support' => false,
+                ],
+                'isPopular' => true,
+                'isRecommended' => false,
+                'trialDays' => 14,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'finance',
+                    'finance_margin',
+                    'sales_receipts',
+                    'contacts',
+                    'buildings',
+                    'team',
+                    'dashboard_advanced',
+                ],
+                'isVisibilityPublic' => true,
+            ],
+            [
+                'sku' => 'PRO',
+                'name' => 'Professionnel (Coopérative)',
+                'tier' => 'Multi-Sites',
+                'badge' => 'Recommandé',
+                'description' => 'Pour les coopératives, exploitations multi-sites et groupements d\'éleveurs.',
+                'priceMonthly' => 35000,
+                'priceAnnually' => 357000,
+                'quotas' => ['max_farms' => 10, 'max_flocks' => 50, 'max_members' => 20, 'max_buildings' => 25, 'retention_months' => 36],
+                'features' => [
+                    'Jusqu\'à 10 exploitations avicoles',
+                    'Jusqu\'à 50 bandes simultanées',
+                    '20 comptes collaborateurs avec permissions fines',
+                    'Exports comptables SYSCOHADA (Grand livre & Journaux)',
+                    'Génération automatique des programmes prophylactiques',
+                    'Comparatifs de performances inter-bâtiments',
+                    'Support téléphonique & WhatsApp prioritaire',
+                ],
+                'flags' => [
+                    'accounting_exports' => true,
+                    'health_alerts' => true,
+                    'iot_sensors' => false,
+                    'api_access' => false,
+                    'priority_support' => true,
+                ],
+                'isPopular' => false,
+                'isRecommended' => true,
+                'trialDays' => 14,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'prophylaxis_program',
+                    'finance',
+                    'finance_margin',
+                    'credit_debt',
+                    'sales_receipts',
+                    'reports_accounting',
+                    'contacts',
+                    'buildings',
+                    'performance_benchmark',
+                    'team',
+                    'custom_roles',
+                    'dashboard_advanced',
+                    'priority_support',
+                ],
+                'isVisibilityPublic' => true,
+            ],
+            [
+                'sku' => 'ENTERPRISE',
+                'name' => 'Entreprise & Réseau Industriel',
+                'tier' => 'Grand Compte',
+                'badge' => 'Sur-Mesure',
+                'description' => 'Pour les intégrateurs avicoles industriels, accouveurs et fabricants d\'aliments.',
+                'priceMonthly' => 85000,
+                'priceAnnually' => 867000,
+                'quotas' => ['max_farms' => 9999, 'max_flocks' => 9999, 'max_members' => 9999, 'max_buildings' => 9999, 'retention_months' => 120],
+                'features' => [
+                    'Nombre d\'exploitations illimité',
+                    'Nombre de bandes et de bâtiments illimité',
+                    'Nombre de collaborateurs illimité',
+                    'Intégration capteurs connectés IoT (Température/Hygrométrie)',
+                    'Accès API REST complète pour ERP tiers',
+                    'Archivage légal et historique décennal',
+                    'Accompagnement zootechnique dédié & SLA 99.9%',
+                ],
+                'flags' => [
+                    'accounting_exports' => true,
+                    'health_alerts' => true,
+                    'iot_sensors' => true,
+                    'api_access' => true,
+                    'priority_support' => true,
+                ],
+                'isPopular' => false,
+                'isRecommended' => false,
+                'trialDays' => 30,
+                'allowedBillingCycles' => ['MONTHLY', 'ANNUALLY'],
+                'modules' => [
+                    'flocks',
+                    'eggs',
+                    'inventory',
+                    'inventory_valuation',
+                    'feed_rationing',
+                    'health',
+                    'health_alerts',
+                    'prophylaxis_program',
+                    'finance',
+                    'finance_margin',
+                    'credit_debt',
+                    'sales_receipts',
+                    'reports_accounting',
+                    'contacts',
+                    'buildings',
+                    'performance_benchmark',
+                    'team',
+                    'custom_roles',
+                    'dashboard_advanced',
+                    'api_iot',
+                    'priority_support',
+                ],
+                'isVisibilityPublic' => false,
+            ],
+        ];
+    }
+
     public function seedDefaultPlans(): void
     {
+        $this->syncSystemPlans();
+        return;
+        // Legacy code below
         $defaults = [
             [
                 'sku' => 'FREE',

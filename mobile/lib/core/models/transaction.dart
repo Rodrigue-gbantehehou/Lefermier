@@ -12,6 +12,11 @@ class Transaction {
   final String? reference;
   final String? flockName;
 
+  final String paymentStatus; // PAID, PARTIAL, UNPAID
+  final int? paidAmount;
+  final String? dueDate;
+  final int? remainingAmount;
+
   const Transaction({
     required this.id,
     required this.type,
@@ -19,11 +24,32 @@ class Transaction {
     required this.date,
     required this.category,
     this.paymentMethod = "CASH",
+    this.paymentStatus = "PAID",
+    this.paidAmount,
+    this.dueDate,
+    this.remainingAmount,
     this.note,
     this.contactName,
     this.reference,
     this.flockName,
   });
+
+  bool get isPaid => paymentStatus == "PAID";
+  bool get isPartial => paymentStatus == "PARTIAL";
+  bool get isUnpaid => paymentStatus == "UNPAID";
+
+  String get paymentStatusLabel {
+    switch (paymentStatus) {
+      case "PARTIAL":
+        final rest = remainingAmount ?? (amount - (paidAmount ?? 0));
+        return "Acompte (Reste: ${CurrencyFormatter.formatFcfa(rest)})";
+      case "UNPAID":
+        return "À crédit (Non réglé)";
+      case "PAID":
+      default:
+        return "Payé";
+    }
+  }
 
   bool get isIncome => type == "INCOME";
   bool get isExpense => type == "EXPENSE";
@@ -97,6 +123,10 @@ class Transaction {
       contactName: json['contact']?['name'] as String?,
       reference: json['reference'] as String?,
       flockName: json['flock']?['name'] as String?,
+      paymentStatus: json['paymentStatus'] as String? ?? "PAID",
+      paidAmount: (json['paidAmount'] as num?)?.toInt(),
+      dueDate: json['dueDate'] as String?,
+      remainingAmount: (json['remainingAmount'] as num?)?.toInt(),
     );
   }
 
@@ -107,6 +137,9 @@ class Transaction {
         'transactionDate': date,
         'category': category,
         'paymentMethod': paymentMethod,
+        'paymentStatus': paymentStatus,
+        if (paidAmount != null) 'paidAmount': paidAmount,
+        if (dueDate != null) 'dueDate': dueDate,
         'description': note,
       };
 }

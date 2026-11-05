@@ -75,6 +75,16 @@ class FarmController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[IsGranted(FarmVoter::DELETE, subject: 'farm')]
+    public function delete(
+        Farm $farm,
+    ): JsonResponse {
+        $this->farmService->deleteFarm($farm);
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
     #[Route('/{id}/buildings', name: 'buildings_list', methods: ['GET'])]
     #[IsGranted(FarmVoter::VIEW, subject: 'farm')]
     public function listBuildings(

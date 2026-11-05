@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/models/health_treatment.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/sync/offline_cache_service.dart';
 import '../auth/auth_provider.dart';
 
 class HealthSummary {
@@ -78,7 +80,34 @@ class HealthNotifier extends StateNotifier<HealthState> {
       return;
     }
 
-    if (showLoading) {
+    // 1. Restitution instantanée depuis le cache hors-ligne
+    if (state.treatments.isEmpty) {
+      final cachedTreatments = await OfflineCacheService().getListCache(
+        farmId: activeFarm.id,
+        category: 'health_treatments',
+      );
+      final cachedMeta = await OfflineCacheService().getMapCache(
+        farmId: activeFarm.id,
+        category: 'health_meta',
+      );
+      if (cachedTreatments != null && cachedTreatments.isNotEmpty) {
+        final treatments = cachedTreatments
+            .map((item) => HealthTreatment.fromJson(item as Map<String, dynamic>))
+            .toList();
+        final overdue = (cachedMeta?['overdueCount'] as num?)?.toInt() ?? 0;
+        final upcoming = (cachedMeta?['upcomingCount'] as num?)?.toInt() ?? 0;
+        state = state.copyWith(
+          treatments: treatments,
+          summary: HealthSummary(
+            totalTreatments: treatments.length,
+            overdueCount: overdue,
+            upcomingCount: upcoming,
+          ),
+        );
+      }
+    }
+
+    if (showLoading && state.treatments.isEmpty) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
 
@@ -92,11 +121,20 @@ class HealthNotifier extends StateNotifier<HealthState> {
           .map((item) => HealthTreatment.fromJson(item as Map<String, dynamic>))
           .toList();
 
-      int overdue = 0;
-      int upcoming = 0;
       final meta = response.data['meta'] as Map<String, dynamic>? ?? {};
-      overdue = (meta['overdueCount'] as num?)?.toInt() ?? 0;
-      upcoming = (meta['upcomingCount'] as num?)?.toInt() ?? 0;
+      final overdue = (meta['overdueCount'] as num?)?.toInt() ?? 0;
+      final upcoming = (meta['upcomingCount'] as num?)?.toInt() ?? 0;
+
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'health_treatments',
+        data: rawList,
+      );
+      await OfflineCacheService().setCache(
+        farmId: activeFarm.id,
+        category: 'health_meta',
+        data: meta,
+      );
 
       state = state.copyWith(
         isLoading: false,
@@ -108,16 +146,24 @@ class HealthNotifier extends StateNotifier<HealthState> {
         ),
       );
     } on DioException catch (e) {
-      String message = "Impossible de charger le carnet sanitaire.";
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        message = e.response!.data['message'] as String;
+      if (state.treatments.isEmpty) {
+        String message = "Impossible de charger le carnet sanitaire.";
+        if (e.response?.data is Map && e.response?.data['message'] != null) {
+          message = e.response!.data['message'] as String;
+        }
+        state = state.copyWith(isLoading: false, error: message);
+      } else {
+        state = state.copyWith(isLoading: false);
       }
-      state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: "Erreur de chargement: $e",
-      );
+      if (state.treatments.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: "Erreur de chargement: $e",
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
@@ -134,26 +180,51 @@ class HealthNotifier extends StateNotifier<HealthState> {
     required DateTime administeredDate,
     String? veterinarian,
     String? notes,
+    String? inventoryItemId,
+    String? quantityUsed,
+    int? costFcfa,
+    bool deductFromStock = true,
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr =
-          "${administeredDate.year.toString().padLeft(4, '0')}-${administeredDate.month.toString().padLeft(2, '0')}-${administeredDate.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${administeredDate.year.toString().padLeft(4, '0')}-${administeredDate.month.toString().padLeft(2, '0')}-${administeredDate.day.toString().padLeft(2, '0')}";
 
+    final payload = {
+      'administeredDate': dateStr,
+      if (veterinarian != null && veterinarian.trim().isNotEmpty) 'veterinarian': veterinarian.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (inventoryItemId != null && inventoryItemId.isNotEmpty) 'inventoryItemId': inventoryItemId,
+      if (quantityUsed != null && quantityUsed.trim().isNotEmpty) 'quantityUsed': quantityUsed.trim(),
+      if (costFcfa != null && costFcfa > 0) 'costFcfa': costFcfa,
+      'deductFromStock': deductFromStock,
+    };
+
+    try {
       await _apiClient.dio.put(
         ApiEndpoints.completeHealthTreatment(treatmentId),
-        data: {
-          'administeredDate': dateStr,
-          if (veterinarian != null && veterinarian.trim().isNotEmpty) 'veterinarian': veterinarian.trim(),
-          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadTreatments(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Validation soin sanitaire ($treatmentId)",
+          method: "PUT",
+          endpoint: ApiEndpoints.completeHealthTreatment(treatmentId),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
+
       String message = "Échec de la validation de l'administration.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;
@@ -180,27 +251,44 @@ class HealthNotifier extends StateNotifier<HealthState> {
 
     state = state.copyWith(isSubmitting: true, clearError: true);
 
-    try {
-      final dateStr =
-          "${scheduledDate.year.toString().padLeft(4, '0')}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}";
+    final dateStr =
+        "${scheduledDate.year.toString().padLeft(4, '0')}-${scheduledDate.month.toString().padLeft(2, '0')}-${scheduledDate.day.toString().padLeft(2, '0')}";
 
+    final payload = {
+      'flockId': flockId,
+      'title': title.trim(),
+      'type': type,
+      'administrationMethod': method,
+      'scheduledDate': dateStr,
+      if (targetAgeDays != null) 'targetAgeDays': targetAgeDays,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    };
+
+    try {
       await _apiClient.dio.post(
         ApiEndpoints.farmHealth(activeFarm.id),
-        data: {
-          'flockId': flockId,
-          'title': title.trim(),
-          'type': type,
-          'administrationMethod': method,
-          'scheduledDate': dateStr,
-          if (targetAgeDays != null) 'targetAgeDays': targetAgeDays,
-          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-        },
+        data: payload,
       );
 
       state = state.copyWith(isSubmitting: false);
       await loadTreatments(showLoading: false);
       return true;
     } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError ||
+          e.response == null) {
+        await SyncService(_apiClient).enqueueAction(
+          label: "Planification soin ($title)",
+          method: "POST",
+          endpoint: ApiEndpoints.farmHealth(activeFarm.id),
+          payload: payload,
+        );
+        state = state.copyWith(isSubmitting: false);
+        return true;
+      }
+
       String message = "Échec de la planification du traitement.";
       if (e.response?.data is Map && e.response?.data['message'] != null) {
         message = e.response!.data['message'] as String;

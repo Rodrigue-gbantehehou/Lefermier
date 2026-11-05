@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/models/health_treatment.dart';
 import '../flocks/flock_provider.dart';
+import '../inventory/inventory_provider.dart';
 import '../../core/widgets/brand_loader.dart';
 import 'health_provider.dart';
 
@@ -19,10 +20,22 @@ class HealthScreen extends ConsumerStatefulWidget {
 class _HealthScreenState extends ConsumerState<HealthScreen> {
   String _activeTabFilter = 'ALL'; // 'ALL', 'SCHEDULED', 'COMPLETED', 'OVERDUE'
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
+    });
+  }
+
   void _openCompleteDialog(HealthTreatment treatment) {
     DateTime administeredDate = DateTime.now();
     final vetController = TextEditingController(text: treatment.veterinarian ?? "");
     final notesController = TextEditingController(text: treatment.notes ?? "");
+    final qtyController = TextEditingController();
+    final costController = TextEditingController();
+    String? selectedInventoryId;
+    bool deductStock = true;
 
     showModalBottomSheet(
       context: context,
@@ -34,6 +47,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
           final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
           final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
           final healthState = ref.watch(healthProvider);
+          final inventoryState = ref.watch(inventoryProvider);
 
           return Container(
             decoration: BoxDecoration(
@@ -143,6 +157,100 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                   ),
                   const SizedBox(height: 12),
 
+                  // Liaison Médicament / Vaccin en stock (optionnel)
+                  if (inventoryState.items.isNotEmpty) ...[
+                    const Text("Médicament / Intrant en stock (optionnel)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: selectedInventoryId,
+                          isExpanded: true,
+                          hint: const Text("Sélectionner un produit en stock...", style: TextStyle(fontSize: 13)),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text("Non lié aux stocks", style: TextStyle(fontSize: 13)),
+                            ),
+                            ...inventoryState.items.map((item) {
+                              return DropdownMenuItem<String?>(
+                                value: item.id,
+                                child: Text(
+                                  "${item.name} (${item.currentStock.toStringAsFixed(1)} ${item.unit})",
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            setModalState(() {
+                              selectedInventoryId = val;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Quantité administrée & Coût
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: qtyController,
+                          decoration: InputDecoration(
+                            labelText: "Quantité / Dose",
+                            hintText: "Ex: 2 flacons",
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: costController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: "Coût engagé (FCFA)",
+                            hintText: "Ex: 5000",
+                            suffixText: "FCFA",
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Option déduire du stock
+                  if (selectedInventoryId != null) ...[
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: deductStock,
+                          activeColor: AppColors.primary,
+                          onChanged: (val) => setModalState(() => deductStock = val ?? true),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            "Déduire cette dose du stock d'intrants",
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
                   // Vétérinaire / Opérateur
                   TextField(
                     controller: vetController,
@@ -189,11 +297,17 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                                   final messenger = ScaffoldMessenger.of(context);
                                   final navigator = Navigator.of(ctx);
 
+                                  final rawCost = int.tryParse(costController.text.replaceAll(' ', ''));
+
                                   final success = await ref.read(healthProvider.notifier).completeTreatment(
                                     treatmentId: treatment.id,
                                     administeredDate: administeredDate,
                                     veterinarian: vetController.text,
                                     notes: notesController.text,
+                                    inventoryItemId: selectedInventoryId,
+                                    quantityUsed: qtyController.text.trim().isNotEmpty ? qtyController.text.trim() : null,
+                                    costFcfa: rawCost,
+                                    deductFromStock: deductStock,
                                   );
 
                                   if (ctx.mounted) {
@@ -596,6 +710,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
@@ -610,11 +725,17 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(color: borderColor),
             ),
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Center(
                   child: Container(
                     width: 40,
@@ -825,8 +946,9 @@ class _HealthScreenState extends ConsumerState<HealthScreen> {
                 ),
               ],
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
     );
   }

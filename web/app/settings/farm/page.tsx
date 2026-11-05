@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   Save,
@@ -10,15 +11,19 @@ import {
   Phone,
   Mail,
   FileText,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/context/auth-context";
 import { api } from "@/lib/api-client";
 
 export default function FarmSettingsPage() {
-  const { activeFarm, refreshMe } = useAuth();
+  const router = useRouter();
+  const { activeFarm, refreshMe, isOwner } = useAuth();
 
   // Farm Details Form
   const [name, setName] = useState("");
@@ -35,6 +40,12 @@ export default function FarmSettingsPage() {
   const [savingFarm, setSavingFarm] = useState(false);
   const [farmSuccessMsg, setFarmSuccessMsg] = useState<string | null>(null);
   const [farmErrorMsg, setFarmErrorMsg] = useState<string | null>(null);
+
+  // Suppression Exploitation
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deletingFarm, setDeletingFarm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Sync form with active farm
   useEffect(() => {
@@ -83,6 +94,27 @@ export default function FarmSettingsPage() {
       setFarmErrorMsg(err?.message || "Erreur lors de la mise à jour de l'exploitation.");
     } finally {
       setSavingFarm(false);
+    }
+  }
+
+  async function handleDeleteFarm() {
+    if (!activeFarm?.id) return;
+    if (deleteConfirmName.trim() !== activeFarm.name.trim()) {
+      setDeleteError("Le nom saisi ne correspond pas exactement au nom de l'exploitation.");
+      return;
+    }
+
+    setDeletingFarm(true);
+    setDeleteError(null);
+    try {
+      await api.farms.delete(activeFarm.id);
+      await refreshMe();
+      setDeleteModalOpen(false);
+      router.push("/");
+    } catch (err: any) {
+      setDeleteError(err?.message || "Erreur lors de la suppression de l'exploitation.");
+    } finally {
+      setDeletingFarm(false);
     }
   }
 
@@ -342,6 +374,92 @@ export default function FarmSettingsPage() {
               </div>
             </form>
           </div>
+
+          {/* Zone de Danger : Suppression de l'exploitation (Réservé au Propriétaire) */}
+          {isOwner && (
+            <div className="rounded-2xl border border-danger/30 bg-danger-soft p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-2 text-danger">
+                <AlertTriangle className="h-5 w-5" />
+                <h3 className="text-sm font-bold uppercase tracking-wider">
+                  Zone de danger • Suppression définitive
+                </h3>
+              </div>
+              <p className="text-xs text-muted max-w-xl leading-relaxed">
+                La suppression de l'exploitation avicole est irréversible. Toutes les données associées (bandes, ramassages d'œufs, mouvements de stock, finances, soins vétérinaires) seront définitivement effacées.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmName("");
+                    setDeleteError(null);
+                    setDeleteModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-danger px-4 py-2.5 text-xs font-bold text-white hover:bg-danger/90 transition-colors shadow-xs"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Supprimer cette exploitation</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Modale de Confirmation de Suppression */}
+          <Modal
+            isOpen={deleteModalOpen}
+            onClose={() => setDeleteModalOpen(false)}
+            title="Suppression définitive de l'exploitation"
+          >
+            <div className="space-y-4">
+              <div className="rounded-xl bg-danger/10 p-3.5 border border-danger/20 text-xs text-danger space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>Attention : cette action ne peut pas être annulée.</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-danger/90">
+                  Pour confirmer la destruction définitive de cette ferme et de toutes ses données, veuillez saisir le nom exact de la ferme : <strong className="font-bold underline">{activeFarm.name}</strong>
+                </p>
+              </div>
+
+              {deleteError && (
+                <div className="rounded-xl bg-danger/10 p-2.5 text-xs text-danger font-medium border border-danger/20">
+                  {deleteError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Nom de confirmation
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  placeholder={activeFarm.name}
+                  className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs font-semibold text-foreground focus:border-danger focus:bg-surface focus:outline-hidden transition-colors"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-muted hover:bg-surface-muted"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingFarm || deleteConfirmName.trim() !== activeFarm.name.trim()}
+                  onClick={handleDeleteFarm}
+                  className="inline-flex items-center gap-2 rounded-xl bg-danger px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-danger/90 disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>{deletingFarm ? "Suppression en cours..." : "Confirmer la suppression"}</span>
+                </button>
+              </div>
+            </div>
+          </Modal>
         </div>
       )}
     </Shell>

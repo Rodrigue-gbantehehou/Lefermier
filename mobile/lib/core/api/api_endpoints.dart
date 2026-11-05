@@ -3,10 +3,13 @@
 class ApiEndpoints {
   // Authentification & Session
   static const String login = "/api/auth/login";
+  static const String deviceSession = "/api/auth/device-session";
   static const String register = "/api/auth/register";
   static const String deviceRegister = "/api/auth/device/register";
-  static const String deviceRefresh = "/api/auth/device/refresh";
+  static const String deviceRefresh = "/api/auth/refresh";
+  static const String deviceLogout = "/api/auth/device-logout";
   static const String me = "/api/auth/me";
+  static const String changePassword = "/api/change-password";
 
   // Exploitations (Multi-Tenancy)
   static const String farms = "/api/farms";
@@ -27,6 +30,7 @@ class ApiEndpoints {
   static String farmTransactions(String farmId) => "/api/farms/$farmId/transactions";
   static String farmDashboard(String farmId) => "/api/farms/$farmId/dashboard";
   static String farmInventory(String farmId) => "/api/farms/$farmId/inventory";
+  static String farmInventoryMovements(String farmId) => "/api/farms/$farmId/inventory/movements";
   static String inventoryMovements(String itemId) => "/api/inventory/$itemId/movements";
   static String farmHealth(String farmId) => "/api/farms/$farmId/health-treatments";
   static String completeHealthTreatment(String treatmentId) => "/api/health-treatments/$treatmentId/complete";
@@ -38,6 +42,12 @@ class ApiEndpoints {
   // Synchronisation Hors-ligne
   static const String syncPull = "/api/sync/pull";
   static String farmSyncPull(String farmId) => "/api/farms/$farmId/sync/pull";
+
+  static String farmDetails(String farmId) => "/api/farms/$farmId";
+  static String farmContacts(String farmId) => "/api/farms/$farmId/contacts";
+  static String contactDetails(String contactId) => "/api/contacts/$contactId";
+  static String transactionReceiptPdf(String transactionId) => "/api/transactions/$transactionId/receipt/pdf";
+  static String flockReportPdf(String flockId) => "/api/flocks/$flockId/report/pdf";
 
   // Abonnements & Formules
   static const String subscriptionPlans = "/api/subscriptions/plans";

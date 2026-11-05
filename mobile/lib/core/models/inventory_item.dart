@@ -50,6 +50,33 @@ class InventoryItem {
     }
   }
 
+  bool get isMassFamily =>
+      ['BAG', 'BAG_50KG', 'BAG_25KG', 'KG', 'G', 'TON'].contains(unit);
+
+  bool get isVolumeFamily => ['LITER', 'ML'].contains(unit);
+
+  bool get isVetDoseFamily => ['DOSE', 'VIAL', 'SACHET'].contains(unit);
+
+  double get effectiveWeightPerUnitKg {
+    if (packageWeightKg != null && packageWeightKg! > 0) return packageWeightKg!;
+    if (unit == 'BAG_50KG') return 50.0;
+    if (unit == 'BAG_25KG') return 25.0;
+    if (unit == 'KG') return 1.0;
+    if (unit == 'TON') return 1000.0;
+    if (unit == 'G') return 0.001;
+    return 50.0; // Poids par défaut pour un sac standard
+  }
+
+  double get availableStockKg {
+    if (!isMassFamily) return currentStock;
+    return currentStock * effectiveWeightPerUnitKg;
+  }
+
+  double get availableStockVolumeLiters {
+    if (unit == 'ML') return currentStock / 1000.0;
+    return currentStock;
+  }
+
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
     return InventoryItem(
       id: json['id'] as String? ?? "",

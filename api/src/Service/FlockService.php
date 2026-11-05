@@ -19,6 +19,7 @@ use App\Exception\InsufficientFlockQuantityException;
 use App\Repository\BuildingRepository;
 use App\Repository\FlockMovementRepository;
 use App\Repository\FlockRepository;
+use App\Service\Admin\CommercialPlanService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Ulid;
@@ -29,12 +30,16 @@ class FlockService
         private readonly FlockRepository $flockRepository,
         private readonly FlockMovementRepository $movementRepository,
         private readonly BuildingRepository $buildingRepository,
+        private readonly CommercialPlanService $commercialPlanService,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
     public function createFlock(Farm $farm, CreateFlockRequestDto $dto): Flock
     {
+        // 0. Contrôle d'accès et des quotas de la formule commerciale
+        $this->commercialPlanService->assertCanCreateFlock($farm);
+
         // 1. Vérification de l'unicité du code de bande dans la ferme
         $existing = $this->flockRepository->findOneBy(['farm' => $farm, 'code' => $dto->code]);
         if ($existing !== null) {

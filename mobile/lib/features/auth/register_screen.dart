@@ -123,19 +123,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(7),
+                                  width: 48,
+                                  height: 48,
+                                  padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.18),
+                                    color: Colors.white,
                                     shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.35),
-                                      width: 1.5,
-                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.15),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Icon(
-                                    Icons.egg_alt_rounded,
-                                    size: 22,
-                                    color: AppColors.accent,
+                                  child: Image.asset(
+                                    'assets/images/logo.png',
+                                    fit: BoxFit.contain,
                                   ),
                                 ),
                                 const SizedBox(height: 5),

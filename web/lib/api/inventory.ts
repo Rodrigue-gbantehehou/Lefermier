@@ -197,4 +197,37 @@ export const inventoryApi = {
       createdAt: m.createdAt,
     }));
   },
+
+  listFarmMovements: async (
+    farmId: string,
+    params?: { type?: string; itemId?: string; flockId?: string; sort?: string; limit?: number }
+  ): Promise<StockMovement[]> => {
+    const q = new URLSearchParams();
+    if (params?.type && params.type !== "ALL") q.append("type", params.type);
+    if (params?.itemId) q.append("itemId", params.itemId);
+    if (params?.flockId) q.append("flockId", params.flockId);
+    if (params?.sort) q.append("sort", params.sort);
+    if (params?.limit) q.append("limit", String(params.limit));
+
+    const res = await apiRequest<any>(`/farms/${farmId}/inventory/movements?${q.toString()}`);
+    const rawList = Array.isArray(res) ? res : res?.data || [];
+    return rawList.map((m: any) => ({
+      id: m.id,
+      itemId: m.itemId,
+      itemName: m.itemName || "Article",
+      itemCategory: m.itemCategory || "FEED",
+      type: m.type,
+      quantity: Number(m.quantity || 0),
+      unit: m.unit,
+      unitLabel: m.unitLabel,
+      unitShortLabel: m.unitShortLabel,
+      unitPriceFcfa: Number(m.unitPrice || 0),
+      totalCostFcfa: Number(m.totalCost || 0),
+      reason: m.reason,
+      date: m.movementDate || m.date,
+      flock: m.flock,
+      recordedBy: m.recordedBy,
+      createdAt: m.createdAt,
+    }));
+  },
 };
