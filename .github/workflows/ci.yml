@@ -14,6 +14,21 @@ jobs:
       run:
         working-directory: api
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ""
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: db_lefermier_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,7 +38,7 @@ jobs:
         with:
           php-version: '8.4'
           ini-values: zend.assertions=1
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql
           coverage: none
 
       - name: Get Composer cache directory
@@ -37,6 +52,9 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('api/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
+      - name: Prepare environment file
+        run: cp .env.example .env
+
       - name: Install Composer dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
@@ -46,12 +64,21 @@ jobs:
           openssl genrsa -out config/jwt/private.pem 4096
           openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem
 
+      - name: Run Doctrine migrations
+        run: php bin/console doctrine:migrations:migrate --no-interaction
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_long_val
+          JWT_PASSPHRASE: test_passphrase
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+
       - name: Lint Symfony container
         run: php bin/console lint:container
         env:
           APP_ENV: test
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
 
       - name: Validate Doctrine mapping
         run: php bin/console doctrine:schema:validate --skip-sync
@@ -59,13 +86,23 @@ jobs:
           APP_ENV: test
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
 
-      - name: Run Backend Audit Verification Suite (P0/P1/P2)
+      - name: Run Backend Audit Verification Suite (27 tests P0/P1/P2)
         run: php bin/console app:audit:verify
         env:
           APP_ENV: test
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+
+      - name: Run MySQL Integration Tests (InnoDB locks, fencing, rollback, quotas)
+        run: php bin/console app:audit:integration
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_long_val
+          JWT_PASSPHRASE: test_passphrase
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
 
   mobile-checks:
     name: Mobile Flutter Analysis & Tests
@@ -93,3 +130,4 @@ jobs:
 
       - name: Run Flutter Unit Tests
         run: flutter test
+

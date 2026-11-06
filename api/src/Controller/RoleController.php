@@ -8,16 +8,20 @@ use App\Dto\Role\CreateRoleRequestDto;
 use App\Dto\Role\UpdateRoleRequestDto;
 use App\Entity\Farm;
 use App\Entity\Role;
+use App\Entity\User;
 use App\Repository\RoleRepository;
 use App\Security\Permission;
 use App\Security\Voter\FarmVoter;
 use App\Service\Admin\CommercialPlanService;
+use App\Service\IdempotencyService;
 use App\Service\RoleService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api', name: 'api_roles_')]
@@ -27,6 +31,7 @@ class RoleController extends AbstractController
         private readonly RoleService $roleService,
         private readonly RoleRepository $roleRepository,
         private readonly CommercialPlanService $commercialPlanService,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -60,16 +65,28 @@ class RoleController extends AbstractController
     public function createFarmRole(
         Farm $farm,
         #[MapRequestPayload] CreateRoleRequestDto $dto,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $this->commercialPlanService->assertModuleAllowed($farm, 'custom_roles');
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer un rôle personnalisé');
 
-        $role = $this->roleService->createRole($farm, $dto);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto): JsonResponse {
+                $this->commercialPlanService->assertModuleAllowed($farm, 'custom_roles');
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'Rôle créé avec succès dans la matrice de l\'agence.',
-            'data' => $this->roleService->serializeRole($role),
-        ], Response::HTTP_CREATED);
+                $role = $this->roleService->createRole($farm, $dto);
+
+                return $this->json([
+                    'status' => 'success',
+                    'message' => 'Rôle créé avec succès dans la matrice de l\'agence.',
+                    'data' => $this->roleService->serializeRole($role),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/farms/{id}/roles/{roleId}', name: 'farm_roles_update', methods: ['PUT'])]

@@ -170,7 +170,7 @@ export interface EggProduction {
  * Inventory
  */
 export type InventoryCategory = "FEED" | "VACCINE" | "MEDICINE" | "EQUIPMENT" | "OTHER";
-export type StockMovementType = "INCOMING" | "FEEDING" | "LOSS" | "ADJUSTMENT" | "IN" | "OUT";
+export type StockMovementType = "INCOMING" | "FEEDING" | "HEALTH_CONSUMPTION" | "LOSS" | "ADJUSTMENT" | "IN" | "OUT";
 
 export interface InventoryItem {
   id: string;

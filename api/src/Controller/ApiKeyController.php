@@ -11,8 +11,10 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Security\Voter\ApiKeyVoter;
 use App\Service\ApiKeyService;
+use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -25,6 +27,7 @@ class ApiKeyController extends AbstractController
     public function __construct(
         private readonly ApiKeyService $apiKeyService,
         private readonly ApiKeyRepository $apiKeyRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -45,16 +48,39 @@ class ApiKeyController extends AbstractController
     #[IsGranted(ApiKeyVoter::MANAGE, subject: 'farm')]
     public function create(
         Farm $farm,
+        Request $request,
         #[CurrentUser] User $user,
         #[MapRequestPayload] CreateApiKeyRequestDto $dto,
-    ): JsonResponse {
-        $result = $this->apiKeyService->createApiKey($farm, $user, $dto);
+    ): Response {
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer une clé API');
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'Clé API générée avec succès.',
-            'data' => $this->apiKeyService->serializeApiKey($result['apiKey'], $result['rawKey']),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $user, $dto): JsonResponse {
+                $result = $this->apiKeyService->createApiKey($farm, $user, $dto);
+
+                return $this->json([
+                    'status' => 'success',
+                    'message' => 'Clé API générée avec succès.',
+                    'data' => $this->apiKeyService->serializeApiKey($result['apiKey'], $result['rawKey']),
+                ], Response::HTTP_CREATED);
+            },
+            responseFilter: function (string $jsonContent): string {
+                $data = json_decode($jsonContent, true);
+                if (is_array($data) && isset($data['data']['rawKey'])) {
+                    $data['data']['rawKey'] = null;
+                    $data['data']['secretAlreadyIssued'] = true;
+                    $data['data']['warning'] = 'Cette clé API a déjà été générée lors d\'une requête précédente. Pour des raisons de sécurité, le secret n\'est affiché qu\'une seule fois.';
+
+                    return (string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                }
+
+                return $jsonContent;
+            }
+        );
     }
 
     #[Route('/{keyId}', name: 'revoke', methods: ['DELETE'])]

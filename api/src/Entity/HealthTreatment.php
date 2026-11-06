@@ -224,10 +224,75 @@ class HealthTreatment
         return $this->status;
     }
 
-    public function setStatus(HealthTreatmentStatus $status): static
+    /**
+     * Indique si le soin est dans un état terminal (plus aucune transition possible).
+     */
+    public function isFinalized(): bool
     {
-        $this->status = $status;
+        return $this->status === HealthTreatmentStatus::COMPLETED
+            || $this->status === HealthTreatmentStatus::CANCELLED;
+    }
+
+    /**
+     * Transition SCHEDULED|MISSED → COMPLETED. Ne doit être appelée que par HealthService::completeTreatment(),
+     * qui garantit la consommation de stock associée.
+     */
+    public function markCompleted(\DateTimeImmutable $administeredDate): static
+    {
+        $this->assertTransitionAllowed(HealthTreatmentStatus::COMPLETED);
+        $this->status = HealthTreatmentStatus::COMPLETED;
+        $this->administeredDate = $administeredDate;
+
         return $this;
+    }
+
+    /**
+     * Transition SCHEDULED|MISSED → CANCELLED (aucun effet sur le stock).
+     */
+    public function cancel(): static
+    {
+        $this->assertTransitionAllowed(HealthTreatmentStatus::CANCELLED);
+        $this->status = HealthTreatmentStatus::CANCELLED;
+
+        return $this;
+    }
+
+    /**
+     * Transition SCHEDULED → MISSED (soin non administré à temps).
+     */
+    public function markMissed(): static
+    {
+        $this->assertTransitionAllowed(HealthTreatmentStatus::MISSED);
+        $this->status = HealthTreatmentStatus::MISSED;
+
+        return $this;
+    }
+
+    public function canTransitionTo(HealthTreatmentStatus $target): bool
+    {
+        return match ($this->status) {
+            HealthTreatmentStatus::SCHEDULED => in_array($target, [
+                HealthTreatmentStatus::COMPLETED,
+                HealthTreatmentStatus::CANCELLED,
+                HealthTreatmentStatus::MISSED,
+            ], true),
+            HealthTreatmentStatus::MISSED => in_array($target, [
+                HealthTreatmentStatus::COMPLETED,
+                HealthTreatmentStatus::CANCELLED,
+            ], true),
+            HealthTreatmentStatus::COMPLETED, HealthTreatmentStatus::CANCELLED => false,
+        };
+    }
+
+    private function assertTransitionAllowed(HealthTreatmentStatus $target): void
+    {
+        if (!$this->canTransitionTo($target)) {
+            throw new \LogicException(sprintf(
+                'Transition de statut sanitaire interdite : %s → %s.',
+                $this->status->value,
+                $target->value
+            ));
+        }
     }
 
     public function getQuantityUsed(): ?string

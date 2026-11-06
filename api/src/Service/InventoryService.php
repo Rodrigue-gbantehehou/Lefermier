@@ -22,6 +22,7 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Ulid;
 
 class InventoryService
@@ -175,8 +176,15 @@ class InventoryService
             // Conversion automatique vers l'unité de stockage avec le poids de sac spécifique de l'article si défini
             $effectiveQtyInItemUnit = round($movementUnit->convertTo($qty, $itemUnit, $bagWeight), 2);
 
+            if (in_array($dto->type, StockMovementType::systemOnly(), true)) {
+                throw new UnprocessableEntityHttpException(sprintf(
+                    "Le type de mouvement %s ne peut pas être saisi directement. Il est réservé aux processus métiers automatisés (ex: administration d'un soin sanitaire).",
+                    $dto->type->value
+                ));
+            }
+
             // Règle métier : décompte ou ajout
-            if (in_array($dto->type, [StockMovementType::FEEDING, StockMovementType::LOSS], true)) {
+            if ($dto->type->isOutgoing()) {
                 if ($effectiveQtyInItemUnit > $currentStock) {
                     throw new InsufficientStockException(
                         $qty,

@@ -8,16 +8,19 @@ use App\Dto\Contact\CreateContactRequestDto;
 use App\Dto\Contact\UpdateContactRequestDto;
 use App\Entity\Contact;
 use App\Entity\Farm;
+use App\Entity\User;
 use App\Enum\ContactType;
 use App\Repository\ContactRepository;
 use App\Security\Voter\ContactVoter;
 use App\Service\ContactService;
+use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 class ContactController extends AbstractController
@@ -25,6 +28,7 @@ class ContactController extends AbstractController
     public function __construct(
         private readonly ContactService $contactService,
         private readonly ContactRepository $contactRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -56,12 +60,24 @@ class ContactController extends AbstractController
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateContactRequestDto $dto,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $contact = $this->contactService->createContact($farm, $dto);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer un contact');
 
-        return $this->json([
-            'data' => $this->contactService->serializeContact($contact),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto): JsonResponse {
+                $contact = $this->contactService->createContact($farm, $dto);
+
+                return $this->json([
+                    'data' => $this->contactService->serializeContact($contact),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/api/contacts/{id}', name: 'api_contacts_show', methods: ['GET'])]

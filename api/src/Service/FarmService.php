@@ -130,18 +130,20 @@ class FarmService
 
     public function createBuilding(Farm $farm, CreateBuildingRequestDto $dto): Building
     {
-        // 0. Contrôle d'accès et des quotas de la formule commerciale
-        $this->commercialPlanService->assertCanCreateBuilding($farm);
+        return $this->entityManager->wrapInTransaction(function () use ($farm, $dto): Building {
+            // 0. Contrôle d'accès et des quotas de la formule commerciale sous verrou de l'organisation
+            $this->commercialPlanService->assertCanCreateBuilding($farm);
 
-        $building = new Building($farm, $dto->name, $dto->type, $dto->capacity);
-        if ($dto->surfaceArea !== null) {
-            $building->setSurfaceArea((string) $dto->surfaceArea);
-        }
+            $building = new Building($farm, $dto->name, $dto->type, $dto->capacity);
+            if ($dto->surfaceArea !== null) {
+                $building->setSurfaceArea((string) $dto->surfaceArea);
+            }
 
-        $this->entityManager->persist($building);
-        $this->entityManager->flush();
+            $this->entityManager->persist($building);
+            $this->entityManager->flush();
 
-        return $building;
+            return $building;
+        });
     }
 
     /**

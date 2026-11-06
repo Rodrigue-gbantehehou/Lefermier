@@ -71,13 +71,24 @@ class InventoryController extends AbstractController
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateInventoryItemRequestDto $dto,
-        #[CurrentUser] ?User $user,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $item = $this->inventoryService->createItem($farm, $dto, $user);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer un article de stock');
 
-        return $this->json([
-            'data' => $this->inventoryService->serializeItem($item),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto, $user): JsonResponse {
+                $item = $this->inventoryService->createItem($farm, $dto, $user);
+
+                return $this->json([
+                    'data' => $this->inventoryService->serializeItem($item),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/api/inventory/{id}', name: 'api_inventory_show', methods: ['GET'])]

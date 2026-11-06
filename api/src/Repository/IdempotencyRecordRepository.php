@@ -39,21 +39,23 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Tente d'acquérir ou renouveler le verrou atomiquement au niveau SQL.
+     * Tente d'acquérir ou renouveler le verrou atomiquement au niveau SQL avec un jeton de fencing.
      * Réussit uniquement si le verrou est expiré (ou null) et que l'opération n'est pas déjà complétée.
      * Élimine toute course concurrente lors des reprises après expiration.
      */
-    public function tryAcquireOrRenewLock(string $key, \DateTimeImmutable $newLockedUntil): bool
+    public function tryAcquireOrRenewLock(string $key, \DateTimeImmutable $newLockedUntil, string $newLockToken): bool
     {
         $now = new \DateTimeImmutable();
         $updated = $this->createQueryBuilder('r')
             ->update()
             ->set('r.lockedUntil', ':newLockedUntil')
+            ->set('r.lockToken', ':newLockToken')
             ->set('r.status', ':pendingStatus')
             ->andWhere('r.idempotencyKey = :key')
             ->andWhere('(r.lockedUntil IS NULL OR r.lockedUntil <= :now)')
             ->andWhere('r.status != :completedStatus')
             ->setParameter('newLockedUntil', $newLockedUntil)
+            ->setParameter('newLockToken', $newLockToken)
             ->setParameter('pendingStatus', IdempotencyRecord::STATUS_PENDING)
             ->setParameter('completedStatus', IdempotencyRecord::STATUS_COMPLETED)
             ->setParameter('key', $key)
@@ -65,19 +67,27 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Enregistre l'échec de l'opération et libère le verrou immédiatement via DQL direct.
+     * Enregistre l'échec de l'opération et libère le verrou immédiatement via DQL direct,
+     * sous réserve stricte que le jeton de fencing corresponde toujours et que l'opération ne soit pas complétée.
      */
-    public function markFailed(mixed $id, ?string $errorMessage = null): int
+    public function markFailed(mixed $id, ?string $lockToken = null, ?string $errorMessage = null): int
     {
-        return $this->createQueryBuilder('r')
+        $qb = $this->createQueryBuilder('r')
             ->update()
             ->set('r.status', ':status')
             ->set('r.lockedUntil', ':now')
             ->andWhere('r.id = :id')
+            ->andWhere('r.status != :completedStatus')
             ->setParameter('status', IdempotencyRecord::STATUS_FAILED)
+            ->setParameter('completedStatus', IdempotencyRecord::STATUS_COMPLETED)
             ->setParameter('now', new \DateTimeImmutable())
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->execute();
+            ->setParameter('id', $id);
+
+        if ($lockToken !== null) {
+            $qb->andWhere('r.lockToken = :token')
+               ->setParameter('token', $lockToken);
+        }
+
+        return $qb->getQuery()->execute();
     }
 }

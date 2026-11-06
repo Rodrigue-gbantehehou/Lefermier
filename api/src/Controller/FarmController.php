@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
 use App\Security\Voter\FarmVoter;
 use App\Service\FarmService;
+use App\Service\IdempotencyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +29,7 @@ class FarmController extends AbstractController
     public function __construct(
         private readonly FarmService $farmService,
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -44,12 +46,23 @@ class FarmController extends AbstractController
     public function create(
         #[CurrentUser] User $user,
         #[MapRequestPayload] CreateFarmRequestDto $dto,
+        Request $request,
     ): JsonResponse {
-        $farm = $this->farmService->createFarm($user, $dto);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer une exploitation');
 
-        return $this->json([
-            'data' => $this->farmService->serializeFarm($farm, 'OWNER'),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            null,
+            function () use ($user, $dto): JsonResponse {
+                $farm = $this->farmService->createFarm($user, $dto);
+
+                return $this->json([
+                    'data' => $this->farmService->serializeFarm($farm, 'OWNER'),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'])]
@@ -122,12 +135,24 @@ class FarmController extends AbstractController
     public function createBuilding(
         Farm $farm,
         #[MapRequestPayload] CreateBuildingRequestDto $dto,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $building = $this->farmService->createBuilding($farm, $dto);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer un bâtiment');
 
-        return $this->json([
-            'data' => $this->farmService->serializeBuilding($building),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto): JsonResponse {
+                $building = $this->farmService->createBuilding($farm, $dto);
+
+                return $this->json([
+                    'data' => $this->farmService->serializeBuilding($building),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/{id}/buildings/{buildingId}', name: 'buildings_update', methods: ['PUT'])]

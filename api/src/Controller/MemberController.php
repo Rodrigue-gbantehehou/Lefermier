@@ -8,14 +8,18 @@ use App\Dto\Member\CreateMemberRequestDto;
 use App\Dto\Member\UpdateMemberRequestDto;
 use App\Entity\Farm;
 use App\Entity\FarmMembership;
+use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
 use App\Security\Voter\FarmVoter;
+use App\Service\IdempotencyService;
 use App\Service\MemberService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/farms/{id}/members', name: 'api_farm_members_')]
@@ -24,6 +28,7 @@ class MemberController extends AbstractController
     public function __construct(
         private readonly MemberService $memberService,
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly IdempotencyService $idempotencyService,
     ) {
     }
 
@@ -44,14 +49,26 @@ class MemberController extends AbstractController
     public function add(
         Farm $farm,
         #[MapRequestPayload] CreateMemberRequestDto $dto,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $membership = $this->memberService->addMember($farm, $dto);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'ajouter un collaborateur');
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'Collaborateur ajouté avec succès à l\'exploitation.',
-            'data' => $this->memberService->serializeMember($membership),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto): JsonResponse {
+                $membership = $this->memberService->addMember($farm, $dto);
+
+                return $this->json([
+                    'status' => 'success',
+                    'message' => 'Collaborateur ajouté avec succès à l\'exploitation.',
+                    'data' => $this->memberService->serializeMember($membership),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/{membershipId}', name: 'update', methods: ['PUT'])]

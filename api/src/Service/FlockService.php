@@ -39,50 +39,52 @@ class FlockService
 
     public function createFlock(Farm $farm, CreateFlockRequestDto $dto): Flock
     {
-        // 0. Contrôle d'accès et des quotas de la formule commerciale
-        $this->commercialPlanService->assertCanCreateFlock($farm);
+        return $this->entityManager->wrapInTransaction(function () use ($farm, $dto): Flock {
+            // 0. Contrôle d'accès et des quotas de la formule commerciale sous verrou de l'organisation
+            $this->commercialPlanService->assertCanCreateFlock($farm);
 
-        // 1. Vérification de l'unicité du code de bande dans la ferme
-        $existing = $this->flockRepository->findOneBy(['farm' => $farm, 'code' => $dto->code]);
-        if ($existing !== null) {
-            throw new DuplicateFlockCodeException($dto->code);
-        }
-
-        // 2. Vérification du bâtiment s'il est spécifié
-        $building = null;
-        if ($dto->buildingId !== null) {
-            $building = $this->buildingRepository->find(Ulid::fromString($dto->buildingId));
-            if ($building === null || $building->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
-                throw new NotFoundHttpException("Le bâtiment spécifié n'existe pas dans cette exploitation.");
+            // 1. Vérification de l'unicité du code de bande dans la ferme
+            $existing = $this->flockRepository->findOneBy(['farm' => $farm, 'code' => $dto->code]);
+            if ($existing !== null) {
+                throw new DuplicateFlockCodeException($dto->code);
             }
-            if (!$building->isActive()) {
-                throw new UnprocessableEntityHttpException("Le bâtiment sélectionné est inactif.");
+
+            // 2. Vérification du bâtiment s'il est spécifié
+            $building = null;
+            if ($dto->buildingId !== null) {
+                $building = $this->buildingRepository->find(Ulid::fromString($dto->buildingId));
+                if ($building === null || $building->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("Le bâtiment spécifié n'existe pas dans cette exploitation.");
+                }
+                if (!$building->isActive()) {
+                    throw new UnprocessableEntityHttpException("Le bâtiment sélectionné est inactif.");
+                }
             }
-        }
 
-        $startDate = new \DateTimeImmutable($dto->startDate);
-        $flock = new Flock(
-            $farm,
-            $dto->code,
-            $dto->name,
-            $dto->initialQuantity,
-            $startDate,
-            $dto->poultryType,
-        );
+            $startDate = new \DateTimeImmutable($dto->startDate);
+            $flock = new Flock(
+                $farm,
+                $dto->code,
+                $dto->name,
+                $dto->initialQuantity,
+                $startDate,
+                $dto->poultryType,
+            );
 
-        $flock->setStrain($dto->strain);
-        $flock->setInitialAgeDays($dto->initialAgeDays);
-        $flock->setBuilding($building);
-        $flock->setNotes($dto->notes);
+            $flock->setStrain($dto->strain);
+            $flock->setInitialAgeDays($dto->initialAgeDays);
+            $flock->setBuilding($building);
+            $flock->setNotes($dto->notes);
 
-        if ($dto->estimatedEndDate !== null) {
-            $flock->setEstimatedEndDate(new \DateTimeImmutable($dto->estimatedEndDate));
-        }
+            if ($dto->estimatedEndDate !== null) {
+                $flock->setEstimatedEndDate(new \DateTimeImmutable($dto->estimatedEndDate));
+            }
 
-        $this->entityManager->persist($flock);
-        $this->entityManager->flush();
+            $this->entityManager->persist($flock);
+            $this->entityManager->flush();
 
-        return $flock;
+            return $flock;
+        });
     }
 
     public function updateFlock(Flock $flock, UpdateFlockRequestDto $dto): Flock
@@ -91,6 +93,11 @@ class FlockService
             $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
             if ($this->entityManager->contains($flock)) {
                 $this->entityManager->refresh($flock, LockMode::PESSIMISTIC_WRITE);
+            }
+
+            // Contrôle strict des quotas si tentative de réouverture d'une bande vers ACTIVE
+            if ($dto->status === FlockStatus::ACTIVE && $flock->getStatus() !== FlockStatus::ACTIVE) {
+                $this->commercialPlanService->assertCanCreateFlock($flock->getFarm());
             }
 
             $flock->setName($dto->name);
@@ -186,12 +193,32 @@ class FlockService
                     $flock->setCurrentQuantity($currentQty - $qty);
 
                     // 2. Création d'une bande scindée dans le bâtiment cible
-                    // Vérification préalable stricte des quotas du forfait d'abonnement
+                    // Vérification préalable stricte des quotas du forfait d'abonnement sous verrou organisation
                     $this->commercialPlanService->assertCanCreateFlock($flock->getFarm());
 
-                    $suffix = strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
-                    $splitCode = sprintf('%s-S%s', substr($flock->getCode(), 0, 40), $suffix);
-                    $splitName = $flock->getName() . ' (' . $targetBuilding->getName() . ')';
+                    // Génération d'un code sans collision (max 50 chars) avec boucle de retry
+                    $splitCode = null;
+                    for ($attempt = 0; $attempt < 5; $attempt++) {
+                        $suffix = strtoupper(bin2hex(random_bytes(4))); // 8 hex chars (32 bits d'entropie)
+                        $candidate = sprintf('%s-S%s', substr($flock->getCode(), 0, 38), $suffix);
+                        $existing = $this->flockRepository->findOneBy([
+                            'farm' => $flock->getFarm(),
+                            'code' => $candidate,
+                        ]);
+                        if ($existing === null) {
+                            $splitCode = $candidate;
+                            break;
+                        }
+                    }
+                    if ($splitCode === null) {
+                        $splitCode = sprintf('%s-S%s', substr($flock->getCode(), 0, 36), strtoupper(bin2hex(random_bytes(6))));
+                    }
+
+                    // Tronquer proprement le nom pour ne jamais dépasser la limite VARCHAR(100)
+                    $suffixName = ' (' . $targetBuilding->getName() . ')';
+                    $maxBaseLength = max(10, 100 - mb_strlen($suffixName));
+                    $splitName = mb_substr($flock->getName(), 0, $maxBaseLength) . $suffixName;
+
                     $splitFlock = new Flock(
                         $flock->getFarm(),
                         $splitCode,

@@ -47,77 +47,79 @@ class MemberService
 
     public function addMember(Farm $farm, CreateMemberRequestDto $dto): FarmMembership
     {
-        // 0. Contrôle d'accès et des quotas de la formule commerciale
-        $this->commercialPlanService->assertCanAddMember($farm);
+        return $this->entityManager->wrapInTransaction(function () use ($farm, $dto): FarmMembership {
+            // 0. Contrôle d'accès et des quotas de la formule commerciale sous verrou de l'organisation
+            $this->commercialPlanService->assertCanAddMember($farm);
 
-        $normalizedEmail = mb_strtolower(trim($dto->email));
+            $normalizedEmail = mb_strtolower(trim($dto->email));
 
-        // 1. Rechercher si l'utilisateur existe déjà ou le créer
-        $user = $this->userRepository->findOneBy(['email' => $normalizedEmail]);
-        if ($user === null) {
-            $user = new User(
-                $normalizedEmail,
-                trim($dto->firstName),
-                trim($dto->lastName)
-            );
-            if ($dto->phone !== null && trim($dto->phone) !== '') {
-                $user->setPhone(trim($dto->phone));
-            }
-
-            $rawPassword = $dto->password ?? 'Lefermier@' . date('Y');
-            $hashed = $this->passwordHasher->hashPassword($user, $rawPassword);
-            $user->setPassword($hashed);
-
-            $this->entityManager->persist($user);
-        }
-
-        // 2. Vérifier si l'utilisateur est déjà rattaché à cette exploitation
-        $existing = $this->membershipRepository->findOneBy([
-            'farm' => $farm,
-            'user' => $user,
-        ]);
-        if ($existing !== null) {
-            throw new BadRequestHttpException('Cet utilisateur est déjà collaborateur de cette exploitation.');
-        }
-
-        // 3. Déterminer le rôle
-        $roleEnum = FarmRole::MANAGER;
-        if ($dto->role !== null) {
-            $parsed = FarmRole::tryFrom(strtoupper(trim($dto->role)));
-            if ($parsed !== null && $parsed !== FarmRole::OWNER) {
-                $roleEnum = $parsed;
-            }
-        }
-
-        $roleDefinition = null;
-        if ($dto->roleId !== null) {
-            $foundRole = $this->roleRepository->find($dto->roleId);
-            if ($foundRole instanceof Role && $foundRole->getFarm()->getId()?->toRfc4122() === $farm->getId()?->toRfc4122()) {
-                $roleDefinition = $foundRole;
-            }
-        }
-
-        // 4. Créer l'association FarmMembership
-        $membership = new FarmMembership($farm, $user, $roleEnum, $roleDefinition);
-
-        if (!empty($dto->buildingIds)) {
-            foreach ($dto->buildingIds as $bId) {
-                try {
-                    $ulid = Ulid::fromString((string) $bId);
-                    $building = $this->buildingRepository->find($ulid);
-                } catch (\Throwable) {
-                    $building = $this->buildingRepository->find($bId);
+            // 1. Rechercher si l'utilisateur existe déjà ou le créer
+            $user = $this->userRepository->findOneBy(['email' => $normalizedEmail]);
+            if ($user === null) {
+                $user = new User(
+                    $normalizedEmail,
+                    trim($dto->firstName),
+                    trim($dto->lastName)
+                );
+                if ($dto->phone !== null && trim($dto->phone) !== '') {
+                    $user->setPhone(trim($dto->phone));
                 }
-                if ($building instanceof Building && $building->getFarm()->getId()?->toRfc4122() === $farm->getId()?->toRfc4122()) {
-                    $membership->addAssignedBuilding($building);
+
+                $rawPassword = $dto->password ?? 'Lefermier@' . date('Y');
+                $hashed = $this->passwordHasher->hashPassword($user, $rawPassword);
+                $user->setPassword($hashed);
+
+                $this->entityManager->persist($user);
+            }
+
+            // 2. Vérifier si l'utilisateur est déjà rattaché à cette exploitation
+            $existing = $this->membershipRepository->findOneBy([
+                'farm' => $farm,
+                'user' => $user,
+            ]);
+            if ($existing !== null) {
+                throw new BadRequestHttpException('Cet utilisateur est déjà collaborateur de cette exploitation.');
+            }
+
+            // 3. Déterminer le rôle
+            $roleEnum = FarmRole::MANAGER;
+            if ($dto->role !== null) {
+                $parsed = FarmRole::tryFrom(strtoupper(trim($dto->role)));
+                if ($parsed !== null && $parsed !== FarmRole::OWNER) {
+                    $roleEnum = $parsed;
                 }
             }
-        }
 
-        $this->entityManager->persist($membership);
-        $this->entityManager->flush();
+            $roleDefinition = null;
+            if ($dto->roleId !== null) {
+                $foundRole = $this->roleRepository->find($dto->roleId);
+                if ($foundRole instanceof Role && $foundRole->getFarm()->getId()?->toRfc4122() === $farm->getId()?->toRfc4122()) {
+                    $roleDefinition = $foundRole;
+                }
+            }
 
-        return $membership;
+            // 4. Créer l'association FarmMembership
+            $membership = new FarmMembership($farm, $user, $roleEnum, $roleDefinition);
+
+            if (!empty($dto->buildingIds)) {
+                foreach ($dto->buildingIds as $bId) {
+                    try {
+                        $ulid = Ulid::fromString((string) $bId);
+                        $building = $this->buildingRepository->find($ulid);
+                    } catch (\Throwable) {
+                        $building = $this->buildingRepository->find($bId);
+                    }
+                    if ($building instanceof Building && $building->getFarm()->getId()?->toRfc4122() === $farm->getId()?->toRfc4122()) {
+                        $membership->addAssignedBuilding($building);
+                    }
+                }
+            }
+
+            $this->entityManager->persist($membership);
+            $this->entityManager->flush();
+
+            return $membership;
+        });
     }
 
     public function updateMember(FarmMembership $membership, UpdateMemberRequestDto $dto): FarmMembership

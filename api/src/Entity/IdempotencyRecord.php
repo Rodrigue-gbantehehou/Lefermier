@@ -20,6 +20,7 @@ class IdempotencyRecord
     public const STATUS_PENDING = 'PENDING';
     public const STATUS_COMPLETED = 'COMPLETED';
     public const STATUS_FAILED = 'FAILED';
+    public const DEFAULT_LOCK_DURATION_SECONDS = 60;
 
     #[ORM\Id]
     #[ORM\Column(type: UlidType::NAME, unique: true)]
@@ -44,6 +45,9 @@ class IdempotencyRecord
 
     #[ORM\Column(type: Types::STRING, length: 64)]
     private string $requestHash;
+
+    #[ORM\Column(name: 'lock_token', type: Types::STRING, length: 64, nullable: true)]
+    private ?string $lockToken = null;
 
     #[ORM\Column(type: Types::STRING, length: 20)]
     private string $status = self::STATUS_PENDING;
@@ -73,7 +77,8 @@ class IdempotencyRecord
         string $requestMethod,
         string $requestHash,
         ?Farm $farm = null,
-        int $lockDurationSeconds = 30
+        ?string $lockToken = null,
+        int $lockDurationSeconds = self::DEFAULT_LOCK_DURATION_SECONDS
     ) {
         $this->id = new Ulid();
         $this->idempotencyKey = $idempotencyKey;
@@ -82,6 +87,7 @@ class IdempotencyRecord
         $this->requestPath = $requestPath;
         $this->requestMethod = strtoupper($requestMethod);
         $this->requestHash = $requestHash;
+        $this->lockToken = $lockToken ?? bin2hex(random_bytes(32));
         $this->status = self::STATUS_PENDING;
         $this->createdAt = new \DateTimeImmutable();
         $this->lockedUntil = $this->createdAt->modify(sprintf('+%d seconds', $lockDurationSeconds));
@@ -177,6 +183,17 @@ class IdempotencyRecord
         return $this->createdAt;
     }
 
+    public function getLockToken(): ?string
+    {
+        return $this->lockToken;
+    }
+
+    public function setLockToken(?string $lockToken): self
+    {
+        $this->lockToken = $lockToken;
+        return $this;
+    }
+
     public function getLockedUntil(): \DateTimeImmutable
     {
         return $this->lockedUntil;
@@ -193,11 +210,17 @@ class IdempotencyRecord
     }
 
     /**
-     * Renouvelle le verrou concurrentiel pour une nouvelle tentative d'exécution.
+     * Renouvelle le verrou concurrentiel pour une nouvelle tentative d'exécution avec un nouveau jeton de fencing.
      */
-    public function renewLock(int $lockDurationSeconds = 30): self
+    public function renewLock(string|int|null $newLockToken = null, int $lockDurationSeconds = self::DEFAULT_LOCK_DURATION_SECONDS): self
     {
+        if (is_int($newLockToken)) {
+            $lockDurationSeconds = $newLockToken;
+            $newLockToken = null;
+        }
+
         $this->status = self::STATUS_PENDING;
+        $this->lockToken = $newLockToken ?? bin2hex(random_bytes(32));
         $this->lockedUntil = (new \DateTimeImmutable())->modify(sprintf('+%d seconds', $lockDurationSeconds));
 
         return $this;

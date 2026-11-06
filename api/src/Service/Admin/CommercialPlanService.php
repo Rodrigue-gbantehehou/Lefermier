@@ -11,6 +11,7 @@ use App\Enum\OrganizationStatus;
 use App\Repository\FlockRepository;
 use App\Repository\OrganizationRepository;
 use App\Repository\SubscriptionPlanRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Ulid;
 use App\Entity\Building;
@@ -170,6 +171,16 @@ class CommercialPlanService
     public function assertCanCreateFlock(Farm $farm): void
     {
         $org = $farm->getOrganization();
+
+        // Sérialisation des créations de bandes au niveau de l'organisation pour éliminer
+        // les dépassements concurrents de quotas
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            $this->entityManager->lock($org, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($org)) {
+                $this->entityManager->refresh($org, LockMode::PESSIMISTIC_WRITE);
+            }
+        }
+
         $planSku = strtoupper($org->getSubscriptionPlan());
         $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
         $maxFlocks = (int) ($plan['quotas']['maxFlocks'] ?? $plan['quotas']['max_flocks'] ?? 2);
@@ -204,6 +215,14 @@ class CommercialPlanService
     public function assertCanCreateBuilding(Farm $farm): void
     {
         $org = $farm->getOrganization();
+
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            $this->entityManager->lock($org, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($org)) {
+                $this->entityManager->refresh($org, LockMode::PESSIMISTIC_WRITE);
+            }
+        }
+
         $planSku = strtoupper($org->getSubscriptionPlan());
         $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
         $maxBuildings = (int) ($plan['quotas']['maxBuildings'] ?? $plan['quotas']['max_buildings'] ?? 2);
@@ -237,6 +256,14 @@ class CommercialPlanService
     public function assertCanAddMember(Farm $farm): void
     {
         $org = $farm->getOrganization();
+
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            $this->entityManager->lock($org, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($org)) {
+                $this->entityManager->refresh($org, LockMode::PESSIMISTIC_WRITE);
+            }
+        }
+
         $planSku = strtoupper($org->getSubscriptionPlan());
         $plan = $this->getPlan($planSku) ?? $this->getPlan('FREE');
         $maxMembers = (int) ($plan['quotas']['maxMembers'] ?? $plan['quotas']['max_members'] ?? 2);

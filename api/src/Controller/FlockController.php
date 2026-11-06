@@ -81,12 +81,24 @@ class FlockController extends AbstractController
     public function create(
         Farm $farm,
         #[MapRequestPayload] CreateFlockRequestDto $dto,
+        #[CurrentUser] User $user,
+        Request $request,
     ): JsonResponse {
-        $flock = $this->flockService->createFlock($farm, $dto);
+        $idempotencyKey = IdempotencyService::requireKey($request, 'créer une bande');
 
-        return $this->json([
-            'data' => $this->flockService->serializeFlock($flock),
-        ], Response::HTTP_CREATED);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $dto): JsonResponse {
+                $flock = $this->flockService->createFlock($farm, $dto);
+
+                return $this->json([
+                    'data' => $this->flockService->serializeFlock($flock),
+                ], Response::HTTP_CREATED);
+            }
+        );
     }
 
     #[Route('/api/flocks/{id}', name: 'api_flocks_show', methods: ['GET'])]

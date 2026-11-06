@@ -255,6 +255,37 @@ class HealthController extends AbstractController
         ]);
     }
 
+    #[Route('/api/health-treatments/{id}/cancel', name: 'api_health_treatments_cancel', methods: ['POST'])]
+    #[IsGranted(HealthTreatmentVoter::EDIT, subject: 'treatment')]
+    public function cancel(
+        HealthTreatment $treatment,
+        #[CurrentUser] User $user,
+        Request $request
+    ): JsonResponse {
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour annuler un traitement.");
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        $reason = is_array($payload) && isset($payload['reason']) ? (string) $payload['reason'] : null;
+
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $treatment->getFarm(),
+            function () use ($treatment, $reason, $user): JsonResponse {
+                $cancelled = $this->healthService->cancelTreatment($treatment, $reason, $user);
+
+                return $this->json([
+                    'data' => $this->healthService->serializeTreatment($cancelled),
+                    'message' => 'Soin / vaccin annulé avec succès.',
+                ]);
+            }
+        );
+    }
+
     #[Route('/api/health-treatments/{id}', name: 'api_health_treatments_delete', methods: ['DELETE'])]
     #[IsGranted(HealthTreatmentVoter::DELETE, subject: 'treatment')]
     public function delete(HealthTreatment $treatment): JsonResponse

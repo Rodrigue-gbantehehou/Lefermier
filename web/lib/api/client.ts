@@ -53,6 +53,18 @@ export async function apiRequest<T = any>(
     }
   }
 
+  // Inject idempotency key for mutating requests (POST, PUT, PATCH) if not already provided
+  const method = (options.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH"].includes(method)) {
+    if (!headers["Idempotency-Key"] && !headers["X-Idempotency-Key"]) {
+      const generatedKey =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      headers["Idempotency-Key"] = generatedKey;
+    }
+  }
+
   const response = await fetch(url, {
     ...options,
     headers,

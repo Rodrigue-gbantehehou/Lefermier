@@ -41,10 +41,12 @@ class StockMovement {
   bool get isFeeding => type == 'FEEDING' || type == 'OUT';
   bool get isLoss => type == 'LOSS';
   bool get isAdjustment => type == 'ADJUSTMENT';
+  bool get isHealthConsumption => type == 'HEALTH_CONSUMPTION';
 
   String get typeLabel {
     if (isIncoming) return "Approvisionnement";
     if (isFeeding) return "Utilisation / Nourri";
+    if (isHealthConsumption) return "Soin / Vaccin";
     if (isLoss) return "Perte / Avarie";
     if (isAdjustment) return "Ajustement";
     return type;

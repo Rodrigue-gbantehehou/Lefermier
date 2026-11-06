@@ -147,7 +147,7 @@ class HealthService
 
                     $movement = new StockMovement(
                         item: $item,
-                        type: StockMovementType::FEEDING,
+                        type: StockMovementType::HEALTH_CONSUMPTION,
                         quantity: $qty,
                         unit: $item->getUnit(),
                         movementDate: $administeredDate,
@@ -165,8 +165,7 @@ class HealthService
                 $treatment->setInventoryItem($item);
             }
 
-            $treatment->setStatus(HealthTreatmentStatus::COMPLETED);
-            $treatment->setAdministeredDate($administeredDate);
+            $treatment->markCompleted($administeredDate);
 
             if ($dto->quantityUsed !== null) {
                 $treatment->setQuantityUsed($dto->quantityUsed);
@@ -194,73 +193,135 @@ class HealthService
 
     public function updateTreatment(HealthTreatment $treatment, UpdateHealthTreatmentRequestDto $dto): HealthTreatment
     {
-        if ($dto->title !== null) {
-            $treatment->setTitle($dto->title);
-        }
-
-        if ($dto->type !== null) {
-            $treatment->setType($dto->type);
-        }
-
-        if ($dto->administrationMethod !== null) {
-            $treatment->setAdministrationMethod($dto->administrationMethod);
-        }
-
-        if ($dto->targetAgeDays !== null) {
-            $treatment->setTargetAgeDays($dto->targetAgeDays);
-        }
-
-        if ($dto->scheduledDate !== null) {
-            $treatment->setScheduledDate(new \DateTimeImmutable($dto->scheduledDate));
-        }
-
-        if ($dto->administeredDate !== null) {
-            $treatment->setAdministeredDate(new \DateTimeImmutable($dto->administeredDate));
-        }
-
+        // Validations immédiates avant toute transaction pour préserver l'état de l'EntityManager
+        // Interdiction formelle de modifier le statut via PUT /api/health-treatments/{id}
         if ($dto->status !== null) {
-            $treatment->setStatus($dto->status);
+            throw new UnprocessableEntityHttpException(
+                "Le statut d'un soin ne peut pas être modifié directement. Utilisez les actions dédiées d'administration (/complete) ou d'annulation (/cancel)."
+            );
         }
 
-        if ($dto->quantityUsed !== null) {
-            $treatment->setQuantityUsed($dto->quantityUsed);
+        // La date d'administration ne peut être fixée que lors de l'administration effective
+        if ($dto->administeredDate !== null) {
+            throw new UnprocessableEntityHttpException(
+                "La date d'administration ne peut être renseignée que lors de l'administration effective du soin (/complete)."
+            );
         }
 
-        if ($dto->costFcfa !== null) {
-            $treatment->setCostFcfa($dto->costFcfa);
-        }
-
-        if ($dto->veterinarian !== null) {
-            $treatment->setVeterinarian($dto->veterinarian);
-        }
-
-        if ($dto->notes !== null) {
-            $treatment->setNotes($dto->notes);
-        }
-
-        if ($dto->inventoryItemId !== null) {
-            $trimmedItemId = trim($dto->inventoryItemId);
-            if ($trimmedItemId === '') {
-                $treatment->setInventoryItem(null);
-            } else {
-                if (!Ulid::isValid($trimmedItemId)) {
-                    throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable.");
-                }
-                $item = $this->itemRepository->find(Ulid::fromString($trimmedItemId));
-                if ($item === null || $item->getFarm()->getId()?->toBase32() !== $treatment->getFarm()->getId()?->toBase32()) {
-                    throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable ou n'appartient pas à cette exploitation.");
-                }
-                $treatment->setInventoryItem($item);
+        return $this->entityManager->wrapInTransaction(function () use ($treatment, $dto): HealthTreatment {
+            $this->entityManager->lock($treatment, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($treatment)) {
+                $this->entityManager->refresh($treatment, LockMode::PESSIMISTIC_WRITE);
             }
-        }
 
-        $this->entityManager->flush();
+            // Si le soin est déjà clôturé (COMPLETED ou CANCELLED), interdire la modification des champs impactant le stock ou le planning
+            if ($treatment->isFinalized()) {
+                if ($dto->quantityUsed !== null || $dto->inventoryItemId !== null || $dto->scheduledDate !== null || $dto->type !== null || $dto->administrationMethod !== null || $dto->targetAgeDays !== null) {
+                    throw new ConflictHttpException(sprintf(
+                        "Ce soin est déjà clôturé (statut : %s). Seuls les champs informatifs (titre, notes, vétérinaire, coût) peuvent être modifiés pour préserver l'intégrité des stocks.",
+                        $treatment->getStatus()->value
+                    ));
+                }
+            }
 
-        return $treatment;
+            if ($dto->title !== null) {
+                $treatment->setTitle($dto->title);
+            }
+
+            if ($dto->type !== null) {
+                $treatment->setType($dto->type);
+            }
+
+            if ($dto->administrationMethod !== null) {
+                $treatment->setAdministrationMethod($dto->administrationMethod);
+            }
+
+            if ($dto->targetAgeDays !== null) {
+                $treatment->setTargetAgeDays($dto->targetAgeDays);
+            }
+
+            if ($dto->scheduledDate !== null) {
+                $treatment->setScheduledDate(new \DateTimeImmutable($dto->scheduledDate));
+            }
+
+            if ($dto->quantityUsed !== null) {
+                $treatment->setQuantityUsed($dto->quantityUsed);
+            }
+
+            if ($dto->costFcfa !== null) {
+                $treatment->setCostFcfa($dto->costFcfa);
+            }
+
+            if ($dto->veterinarian !== null) {
+                $treatment->setVeterinarian($dto->veterinarian);
+            }
+
+            if ($dto->notes !== null) {
+                $treatment->setNotes($dto->notes);
+            }
+
+            if ($dto->inventoryItemId !== null) {
+                $trimmedItemId = trim($dto->inventoryItemId);
+                if ($trimmedItemId === '') {
+                    $treatment->setInventoryItem(null);
+                } else {
+                    if (!Ulid::isValid($trimmedItemId)) {
+                        throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable.");
+                    }
+                    $item = $this->itemRepository->find(Ulid::fromString($trimmedItemId));
+                    if ($item === null || $item->getFarm()->getId()?->toBase32() !== $treatment->getFarm()->getId()?->toBase32()) {
+                        throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable ou n'appartient pas à cette exploitation.");
+                    }
+                    $treatment->setInventoryItem($item);
+                }
+            }
+
+            $this->entityManager->flush();
+
+            return $treatment;
+        });
+    }
+
+    public function cancelTreatment(HealthTreatment $treatment, ?string $reason = null, ?User $user = null): HealthTreatment
+    {
+        return $this->entityManager->wrapInTransaction(function () use ($treatment, $reason, $user): HealthTreatment {
+            $this->entityManager->lock($treatment, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($treatment)) {
+                $this->entityManager->refresh($treatment, LockMode::PESSIMISTIC_WRITE);
+            }
+
+            if ($treatment->isFinalized()) {
+                throw new ConflictHttpException(sprintf(
+                    "Ce soin ne peut plus être annulé car il est déjà clôturé (statut actuel : %s).",
+                    $treatment->getStatus()->value
+                ));
+            }
+
+            $treatment->cancel();
+
+            if ($reason !== null && trim($reason) !== '') {
+                $existingNotes = $treatment->getNotes() ? $treatment->getNotes() . "\n" : '';
+                $treatment->setNotes($existingNotes . '[Annulation] ' . trim($reason));
+            }
+
+            if ($user !== null) {
+                $treatment->setRecordedBy($user);
+            }
+
+            $this->entityManager->flush();
+
+            return $treatment;
+        });
     }
 
     public function deleteTreatment(HealthTreatment $treatment): void
     {
+        if ($treatment->getStatus() === HealthTreatmentStatus::COMPLETED) {
+            throw new ConflictHttpException(
+                "Impossible de supprimer un soin déjà administré afin de préserver la traçabilité des consommations de stock et des dépenses. Vous pouvez l'annuler avant réalisation ou ajuster les notes."
+            );
+        }
+
         $this->entityManager->remove($treatment);
         $this->entityManager->flush();
     }

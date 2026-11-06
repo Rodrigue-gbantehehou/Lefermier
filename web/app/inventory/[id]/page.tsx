@@ -89,6 +89,12 @@ const MOVEMENT_CONFIG: Record<
     sign: "-",
     color: "text-warning",
   },
+  HEALTH_CONSUMPTION: {
+    label: "Soin / Traitement sanitaire",
+    badge: "info",
+    sign: "-",
+    color: "text-info",
+  },
   LOSS: {
     label: "Perte / Avarie",
     badge: "danger",
