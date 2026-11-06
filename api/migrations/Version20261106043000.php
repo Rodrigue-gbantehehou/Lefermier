@@ -24,12 +24,26 @@ final class Version20261106043000 extends AbstractMigration
         // ce qui permet au down() de ne détruire QUE ce que cette migration a ajouté,
         // et de ne jamais toucher aux colonnes/tables qui préexistaient.
         //
-        // TRUNCATE immédiat après CREATE : garantit un état propre même en cas de
-        // relance après une exécution interrompue. Les entrées de la tentative
-        // précédente sont effacées ; la nouvelle exécution repart d'une ardoise vierge
-        // et enregistre uniquement les éléments qu'elle crée réellement.
+        // Stratégie d'accumulation idempotente (sans TRUNCATE) :
+        //
+        // MySQL effectue des commits implicites sur toutes les opérations DDL.
+        // Une migration interrompue laisse donc les DDL déjà exécutés en base,
+        // même si Doctrine ne l'enregistre pas comme terminée.
+        //
+        // Lors d'une relance :
+        //   - Les éléments créés par la tentative précédente sont toujours dans
+        //     _mig_43000_state (la table persiste entre les tentatives).
+        //   - INSERT IGNORE garantit qu'aucune entrée n'est doublée.
+        //   - Le code vérifie information_schema avant chaque CREATE/ALTER :
+        //     si l'objet existe déjà, @sql reste 'SELECT 1' et rien n'est inséré.
+        //
+        // Résultat : _mig_43000_state accumule fidèlement tout ce que les
+        // tentatives successives ont réellement créé. down() peut ainsi supprimer
+        // exactement ces éléments, sans en toucher d'autres.
+        //
+        // NE PAS ajouter TRUNCATE ici : cela effacerait les créations antérieures
+        // et priverait down() des informations nécessaires au rollback.
         $this->addSql('CREATE TABLE IF NOT EXISTS _mig_43000_state (item VARCHAR(255) NOT NULL, PRIMARY KEY (item)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-        $this->addSql('TRUNCATE TABLE _mig_43000_state');
 
         // ── Tables : CREATE TABLE IF NOT EXISTS ──────────────────────────────────
         // On note dans _mig_43000_state uniquement les tables qui n'existaient PAS.
@@ -207,6 +221,50 @@ final class Version20261106043000 extends AbstractMigration
             $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
         }
 
+        // ── FK FK_1483A5E9123FA025 sur users (avant DROP TABLE admin_roles) ───
+        // Cette FK doit être supprimée AVANT admin_roles car elle la référence.
+        $this->addSql("
+            SET @check_stmt = IF(
+                @state_exists > 0,
+                'SELECT COUNT(*) INTO @was_created FROM _mig_43000_state WHERE item = ''fk:users:FK_1483A5E9123FA025''',
+                'SELECT 0 INTO @was_created'
+            )
+        ");
+        $this->addSql('PREPARE chk FROM @check_stmt; EXECUTE chk; DEALLOCATE PREPARE chk');
+        $this->addSql("
+            SELECT IF(
+                @was_created > 0 AND EXISTS (
+                    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users'
+                      AND CONSTRAINT_NAME = 'FK_1483A5E9123FA025' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                ),
+                'ALTER TABLE users DROP FOREIGN KEY FK_1483A5E9123FA025',
+                'SELECT 1'
+            ) INTO @sql
+        ");
+        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+
+        // ── Index IDX_1483A5E9123FA025 sur users (avant DROP TABLE admin_roles) ─
+        $this->addSql("
+            SET @check_stmt = IF(
+                @state_exists > 0,
+                'SELECT COUNT(*) INTO @was_created FROM _mig_43000_state WHERE item = ''idx:users:IDX_1483A5E9123FA025''',
+                'SELECT 0 INTO @was_created'
+            )
+        ");
+        $this->addSql('PREPARE chk FROM @check_stmt; EXECUTE chk; DEALLOCATE PREPARE chk');
+        $this->addSql("
+            SELECT IF(
+                @was_created > 0 AND EXISTS (
+                    SELECT 1 FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND INDEX_NAME = 'IDX_1483A5E9123FA025'
+                ),
+                'DROP INDEX IDX_1483A5E9123FA025 ON users',
+                'SELECT 1'
+            ) INTO @sql
+        ");
+        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+
         // ── Tables : détruites seulement si CETTE migration les a créées ──────
         // La vérification dans _mig_43000_state passe par PREPARE pour éviter
         // l'erreur "table not found" si _mig_43000_state n'existe pas.
@@ -233,49 +291,6 @@ final class Version20261106043000 extends AbstractMigration
             ");
             $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
         }
-
-        // ── Index IDX_1483A5E9123FA025 sur users ─────────────────────────────
-        $this->addSql("
-            SET @check_stmt = IF(
-                @state_exists > 0,
-                'SELECT COUNT(*) INTO @was_created FROM _mig_43000_state WHERE item = ''idx:users:IDX_1483A5E9123FA025''',
-                'SELECT 0 INTO @was_created'
-            )
-        ");
-        $this->addSql('PREPARE chk FROM @check_stmt; EXECUTE chk; DEALLOCATE PREPARE chk');
-        $this->addSql("
-            SELECT IF(
-                @was_created > 0 AND EXISTS (
-                    SELECT 1 FROM information_schema.STATISTICS
-                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND INDEX_NAME = 'IDX_1483A5E9123FA025'
-                ),
-                'DROP INDEX IDX_1483A5E9123FA025 ON users',
-                'SELECT 1'
-            ) INTO @sql
-        ");
-        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
-
-        // ── FK FK_1483A5E9123FA025 sur users ─────────────────────────────────
-        $this->addSql("
-            SET @check_stmt = IF(
-                @state_exists > 0,
-                'SELECT COUNT(*) INTO @was_created FROM _mig_43000_state WHERE item = ''fk:users:FK_1483A5E9123FA025''',
-                'SELECT 0 INTO @was_created'
-            )
-        ");
-        $this->addSql('PREPARE chk FROM @check_stmt; EXECUTE chk; DEALLOCATE PREPARE chk');
-        $this->addSql("
-            SELECT IF(
-                @was_created > 0 AND EXISTS (
-                    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
-                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users'
-                      AND CONSTRAINT_NAME = 'FK_1483A5E9123FA025' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
-                ),
-                'ALTER TABLE users DROP FOREIGN KEY FK_1483A5E9123FA025',
-                'SELECT 1'
-            ) INTO @sql
-        ");
-        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
 
         // ── Colonnes : uniquement si enregistrées dans _mig_43000_state ──────
         $allColumns = [
