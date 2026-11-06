@@ -155,11 +155,20 @@ class SyncNotifier extends StateNotifier<SyncState> {
       _ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
       _ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
 
-      // 3. Curseur de synchronisation : avancé seulement si toutes les actions
-      // locales ont été transmises sans échec définitif.
-      // Sémantique : "mes actions locales sont sur le serveur", pas "l'UI est à jour".
-      // Les providers UI sont best-effort et ne doivent pas bloquer ce curseur.
-      if (flushResult.failedCount == 0) {
+      // 3. Curseur de synchronisation.
+      //
+      // Condition exacte : le flush n'a pas été ignoré (skipped), aucune action
+      // n'est encore en attente (pendingCount == 0) et aucune n'a échoué de
+      // façon définitive (failedCount == 0).
+      //
+      // On n'avance PAS le curseur si :
+      //   - _flushInProgress était déjà vrai (skipped = true) ;
+      //   - des actions sont restées en attente après un 401 / 409 / erreur réseau ;
+      //   - des actions sont en échec définitif.
+      //
+      // Sémantique du curseur : "toutes mes actions locales connues au début du
+      // flush ont été transmises et accusées réception par le serveur".
+      if (flushResult.allDispatched) {
         await _syncService.setLastSyncTime(activeFarm.id, DateTime.now().toIso8601String());
       }
 

@@ -8,16 +8,33 @@ import '../api/api_client.dart';
 import '../api/api_endpoints.dart';
 import '../models/sync_item.dart';
 
+/// Résultat d'un appel à [SyncService.flushQueue].
+///
+/// [skipped] est vrai quand un autre flush était déjà en cours au moment de
+/// l'appel. Dans ce cas, les trois compteurs sont à zéro mais cela NE signifie
+/// PAS que la file était vide ou que toutes les actions ont été transmises.
+/// Un appelant ne doit PAS avancer le curseur de synchronisation sur [skipped].
+///
+/// [sentCount]   : actions transmises avec succès (HTTP 2xx ou cache-idempotency HIT).
+/// [pendingCount]: actions encore en attente (erreur réseau, 401, 409, Retry-After…).
+/// [failedCount] : actions en échec définitif (400 / 403 / 404 / 422 / orphelines).
 class FlushResult {
   final int sentCount;
   final int pendingCount;
   final int failedCount;
+  final bool skipped;
 
   const FlushResult({
     this.sentCount = 0,
     this.pendingCount = 0,
     this.failedCount = 0,
+    this.skipped = false,
   });
+
+  /// Vrai quand TOUTES les actions du snapshot initial ont été traitées sans
+  /// rester en attente ni en erreur définitive. C'est la seule condition sous
+  /// laquelle le curseur de synchronisation peut être avancé.
+  bool get allDispatched => !skipped && pendingCount == 0 && failedCount == 0;
 }
 
 /// Verrou asynchrone minimaliste sans dépendance externe.
@@ -187,7 +204,9 @@ class SyncService {
   ///     et on sauvegarde [résultats du traitement + nouvelles entrées].
   Future<FlushResult> flushQueue() async {
     // Guard contre les appels simultanés : un seul flush actif à la fois.
-    if (_flushInProgress) return const FlushResult();
+    // Retourne skipped:true (et non un résultat vide) pour que l'appelant
+    // puisse distinguer "file vide" de "flush ignoré car déjà en cours".
+    if (_flushInProgress) return const FlushResult(skipped: true);
     _flushInProgress = true;
     try {
     // ── Phase A : lecture sous verrou ──────────────────────────────────────────
