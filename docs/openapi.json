@@ -1,4 +1,4 @@
-﻿{
+{
     "openapi": "3.1.0",
     "info": {
         "title": "Poulvia API — Logiciel de Gestion Avicole Professionnel",
@@ -6,22 +6,22 @@
         "description": "API REST haute performance pour la gestion intégrale d'exploitations avicoles modernes au Bénin et en Afrique de l'Ouest.\n\n### Caractéristiques Principales\n* **Devises régionales** : Tous les montants financiers sont exprimés en Francs CFA (XOF) sous forme d'entiers stricts (`BIGINT`, sans décimales).\n* **Identifiants ULID** : Clés primaires en Crockford Base32 de 26 caractères (ordonnancement chronologique naturel, indexation B-Tree optimisée sous MySQL 8.4).\n* **Isolation Multi-Tenant** : Cloisonnement strict des données par exploitation (`Farm`) avec contrôle d'accès basé sur les rôles (`FarmRole`: `OWNER`, `FARM_MANAGER`, `PRODUCTION_LEAD`, `STOCK_KEEPER`, `ACCOUNTANT`, `VET_CONSULTANT`).\n* **Paiements Locaux** : Prise en charge native de MTN Mobile Money (`MTN_MOMO`), Moov Money (`MOOV_MONEY`), Celtiis Cash (`CELTIIS_CASH`), Espèces (`CASH`), Virements bancaires et Chèques.\n* **Standard Zootechnique Ouest-Africain** : Conversion automatique des œufs en plateaux/alvéoles standard de 30 unités (`traysCount = goodEggs / 30`) et calcul du taux de ponte journalier en temps réel.",
         "contact": {
             "name": "Équipe Technique Poulvia",
-            "email": "tech@Poulvia.bj",
-            "url": "https://Poulvia.bj"
+            "email": "tech@poulvia.com",
+            "url": "https://poulvia.com"
         },
         "license": {
             "name": "Propriétaire — Tous droits réservés",
-            "url": "https://Poulvia.bj/legal"
+            "url": "https://poulvia.com/legal"
         }
     },
     "servers": [
         {
-            "url": "http://127.0.0.1:8000",
-            "description": "Serveur Local de Développement (Symfony 8)"
+            "url": "https://api.poulvia.com",
+            "description": "Serveur de Production Officiel (poulvia.com)"
         },
         {
-            "url": "https://api.Poulvia.bj",
-            "description": "Serveur de Production (Bénin & UEMOA)"
+            "url": "http://127.0.0.1:8000",
+            "description": "Serveur Local de Developpement"
         }
     ],
     "tags": [
@@ -1374,7 +1374,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Compte utilisateur créé avec succès",
+                        "description": "Compte et exploitation créés avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
