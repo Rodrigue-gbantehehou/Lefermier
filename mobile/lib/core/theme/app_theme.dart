@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Brand Official Colors (Tirés fidèlement du logo Lefermier)
+  // Brand Official Colors (Tirés fidèlement du logo poulvia)
   // Vert Forêt Principal (Corps du coq & feuille)
   static const Color primary = Color(0xFF154632);
   static const Color primaryHover = Color(0xFF113828);

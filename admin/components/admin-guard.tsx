@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -40,7 +40,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
             <ShieldAlert className="h-7 w-7" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">Console Centrale Lefermier</h2>
+            <h2 className="text-base font-bold text-foreground">Console Centrale Poulvia</h2>
             <p className="text-xs text-muted mt-1">
               Contrôle cryptographique des privilèges d&apos;administration...
             </p>
@@ -63,7 +63,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
           <div>
             <h1 className="text-lg font-bold text-foreground">Accès Administration Requis</h1>
             <p className="text-xs text-muted mt-1.5 leading-relaxed">
-              Cette console d&apos;administration est strictement réservée au personnel habilité de la plateforme Lefermier.
+              Cette console d&apos;administration est strictement réservée au personnel habilité de la plateforme Poulvia.
               Les comptes éleveurs sont confinés à l&apos;application d&apos;exploitation.
             </p>
           </div>

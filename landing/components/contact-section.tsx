@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { Send, CheckCircle2, Phone, Mail, MapPin, MessageSquare, AlertCircle } from "lucide-react";
@@ -52,7 +52,7 @@ export function ContactSection() {
             </div>
 
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground leading-tight">
-              Parlons de votre élevage et découvrez Lefermier
+              Parlons de votre élevage et découvrez Poulvia
             </h2>
 
             <p className="text-sm text-muted leading-relaxed">
@@ -78,8 +78,8 @@ export function ContactSection() {
                 </div>
                 <div>
                   <span className="text-[10px] text-muted block">Email officiel</span>
-                  <a href="mailto:contact@lefermier.app" className="font-bold hover:text-primary transition-colors">
-                    contact@lefermier.app
+                  <a href="mailto:contact@Poulvia.app" className="font-bold hover:text-primary transition-colors">
+                    contact@Poulvia.app
                   </a>
                 </div>
               </div>
@@ -108,7 +108,7 @@ export function ContactSection() {
                     Demande transmise avec succès !
                   </h3>
                   <p className="text-xs sm:text-sm text-muted max-w-md mx-auto leading-relaxed">
-                    Merci {name}. Un conseiller Lefermier a bien reçu vos informations et prendra contact avec vous sur votre numéro {phone || email} pour planifier votre accompagnement.
+                    Merci {name}. Un conseiller Poulvia a bien reçu vos informations et prendra contact avec vous sur votre numéro {phone || email} pour planifier votre accompagnement.
                   </p>
                   <button
                     type="button"

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.lefermier" "\0"
-            VALUE "FileDescription", "lefermier" "\0"
+            VALUE "CompanyName", "com.poulvia" "\0"
+            VALUE "FileDescription", "poulvia" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "lefermier" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.lefermier. All rights reserved." "\0"
-            VALUE "OriginalFilename", "lefermier.exe" "\0"
-            VALUE "ProductName", "lefermier" "\0"
+            VALUE "InternalName", "poulvia" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.poulvia. All rights reserved." "\0"
+            VALUE "OriginalFilename", "poulvia.exe" "\0"
+            VALUE "ProductName", "poulvia" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

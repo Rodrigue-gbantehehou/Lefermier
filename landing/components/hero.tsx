@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   CheckCircle2,
   ArrowRight,
@@ -28,7 +28,7 @@ export function Hero() {
 
             {/* Subtitle in plain, human French */}
             <p className="text-base sm:text-lg text-muted max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Finis les cahiers raturés ou perdus. Lefermier vous aide à noter vos ramassages d'œufs,
+              Finis les cahiers raturés ou perdus. Poulvia vous aide à noter vos ramassages d'œufs,
               surveiller vos sacs d'aliments et protéger la santé de vos volailles en quelques clics.
             </p>
 

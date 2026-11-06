@@ -1,4 +1,4 @@
-# ARCHITECTURE — LOGICIEL DE GESTION AVICOLE
+﻿# ARCHITECTURE — LOGICIEL DE GESTION AVICOLE
 
 **Fichier :** `ARCHITECTURE.md`  
 **Statut :** Référence technique obligatoire  
@@ -104,7 +104,7 @@ Flutter ne doit pas devenir une seconde implémentation du backend.
 L'organisation suivante constitue la structure cible si le dépôt peut raisonnablement l'adopter.
 
 ```text
-Lefermier/
+Poulvia/
 ├── PROJECT_RULES.md
 ├── ARCHITECTURE.md
 ├── docs/
@@ -409,7 +409,7 @@ Vérifier qu'un utilisateur ne peut ni lire, ni modifier, ni supprimer les donn�
 
 ## 9. Authentification et Contrôle d'Accès (Dual-Scope RBAC)
 
-L'architecture de sécurité de Lefermier applique un cloisonnement strict entre les opérations quotidiennes des éleveurs et la gouvernance globale de la plateforme, selon un modèle d'autorisation granulaire inspiré de Microsoft Entra / Azure RBAC.
+L'architecture de sécurité de Poulvia applique un cloisonnement strict entre les opérations quotidiennes des éleveurs et la gouvernance globale de la plateforme, selon un modèle d'autorisation granulaire inspiré de Microsoft Entra / Azure RBAC.
 
 ### 9.1. Mécanisme d'Authentification
 - **Standard** : JSON Web Token (JWT) asymétrique RSA 4096-bit généré par le bundle Lexik via `POST /api/auth/login`.

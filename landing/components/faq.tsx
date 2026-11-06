@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -9,11 +9,11 @@ export function FAQ() {
   const faqs = [
     {
       q: "Est-ce que l'application est facile à utiliser ?",
-      a: "Oui, très facile. Si vous savez envoyer un message sur WhatsApp ou composer un numéro sur votre téléphone, vous saurez utiliser Lefermier. Les boutons sont gros, les mots sont simples et il suffit de quelques secondes pour noter vos œufs ou vos sacs d'aliments.",
+      a: "Oui, très facile. Si vous savez envoyer un message sur WhatsApp ou composer un numéro sur votre téléphone, vous saurez utiliser Poulvia. Les boutons sont gros, les mots sont simples et il suffit de quelques secondes pour noter vos œufs ou vos sacs d'aliments.",
     },
     {
       q: "Est-ce que cela fonctionne sur mon téléphone portable ?",
-      a: "Oui. Lefermier fonctionne sur tous les smartphones, qu'il s'agisse d'un téléphone Android ou d'un iPhone. L'application s'adapte automatiquement à votre écran.",
+      a: "Oui. Poulvia fonctionne sur tous les smartphones, qu'il s'agisse d'un téléphone Android ou d'un iPhone. L'application s'adapte automatiquement à votre écran.",
     },
     {
       q: "Faut-il payer quelque chose pour démarrer ?",
@@ -28,7 +28,7 @@ export function FAQ() {
       a: "L'application a été allégée au maximum pour fonctionner même dans les zones rurales où le réseau Internet est parfois lent.",
     },
     {
-      q: "Mon vétérinaire peut-il m'aider avec Lefermier ?",
+      q: "Mon vétérinaire peut-il m'aider avec Poulvia ?",
       a: "Oui. Vous pouvez donner un accès spécial à votre vétérinaire. Il pourra voir la santé de vos poules et vos vaccins directement sur son téléphone pour mieux vous conseiller, sans voir vos finances privées.",
     },
   ];

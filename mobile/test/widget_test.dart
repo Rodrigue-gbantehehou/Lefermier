@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lefermier/features/welcome/welcome_screen.dart';
-import 'package:lefermier/features/auth/login_screen.dart';
-import 'package:lefermier/features/auth/register_screen.dart';
-import 'package:lefermier/features/auth/farm_onboarding_screen.dart';
-import 'package:lefermier/features/navigation/bottom_nav_scaffold.dart';
-import 'package:lefermier/core/models/stock_movement.dart';
+import 'package:poulvia/features/welcome/welcome_screen.dart';
+import 'package:poulvia/features/auth/login_screen.dart';
+import 'package:poulvia/features/auth/register_screen.dart';
+import 'package:poulvia/features/auth/farm_onboarding_screen.dart';
+import 'package:poulvia/features/navigation/bottom_nav_scaffold.dart';
+import 'package:poulvia/core/models/stock_movement.dart';
 
 void main() {
   testWidgets('WelcomeScreen smoke test - renders hero and action buttons', (WidgetTester tester) async {

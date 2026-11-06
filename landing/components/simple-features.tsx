@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Egg, Utensils, HeartPulse, Wallet, Check } from "lucide-react";
 
 export function SimpleFeatures() {
@@ -12,7 +12,7 @@ export function SimpleFeatures() {
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Les 4 choses simples que Lefermier fait pour vous
+            Les 4 choses simples que Poulvia fait pour vous
           </h2>
 
           <p className="text-sm sm:text-base text-muted">
@@ -34,7 +34,7 @@ export function SimpleFeatures() {
 
             <p className="text-sm text-muted leading-relaxed">
               Après le ramassage du matin ou du soir, entrez simplement le nombre d'œufs ramassés.
-              Lefermier calcule automatiquement le nombre de plateaux de 30 alvéoles complets et
+              Poulvia calcule automatiquement le nombre de plateaux de 30 alvéoles complets et
               les œufs restants en vrac.
             </p>
 

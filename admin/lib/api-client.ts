@@ -1,5 +1,5 @@
-/**
- * Client API unifié et modulaire pour Lefermier Admin
+﻿/**
+ * Client API unifié et modulaire pour Poulvia Admin
  * Découpage par domaine métier situé dans @/lib/api/
  */
 export * from "./api/index";

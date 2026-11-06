@@ -11,7 +11,7 @@ use Symfony\Bridge\Doctrine\Types\UlidType;
 use Symfony\Component\Uid\Ulid;
 
 /**
- * Entité représentant une formule d'abonnement commercial Lefermier (SKU & Quotas).
+ * Entité représentant une formule d'abonnement commercial Poulvia (SKU & Quotas).
  *
  * Modèle distinguant :
  * 1. La validité de l'offre (disponibilité à la souscription, dates début/fin, statut de publication).

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { Farm } from "@/lib/types";
@@ -144,7 +144,7 @@ export function PrintableDocument({
             <div className="space-y-1 sm:max-w-[55%]">
               <div className="flex items-center gap-2">
                 <span className="text-base sm:text-lg font-black tracking-tight text-emerald-800 uppercase">
-                  {farm?.name || "Lefermier - Exploitation Avicole"}
+                  {farm?.name || "Poulvia - Exploitation Avicole"}
                 </span>
               </div>
 
@@ -286,7 +286,7 @@ export function PrintableDocument({
               ========================================================================= */}
           <div className="mt-8 pt-3 border-t border-zinc-200 text-[10px] text-zinc-400 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 page-break-avoid">
             <div>
-              Édité le {generationTimestamp} via <strong>Lefermier ERP</strong> • Système avicole certifié
+              Édité le {generationTimestamp} via <strong>Poulvia ERP</strong> • Système avicole certifié
             </div>
             <div className="font-mono text-zinc-500">
               Page 1 / 1

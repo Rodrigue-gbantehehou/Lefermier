@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { UserCheck, Shield, Stethoscope, Users } from "lucide-react";
 
 export function WhoIsItFor() {
@@ -40,7 +40,7 @@ export function WhoIsItFor() {
             Une solution adaptée à toute l'équipe avicole
           </h2>
           <p className="text-sm sm:text-base text-muted leading-relaxed">
-            Du propriétaire au soigneur avicole, Lefermier simplifie le quotidien de chacun
+            Du propriétaire au soigneur avicole, Poulvia simplifie le quotidien de chacun
             avec des interfaces claires et adaptées à chaque responsabilité.
           </p>
         </div>

@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = lefermier
+PRODUCT_NAME = poulvia
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.lefermier.lefermier
+PRODUCT_BUNDLE_IDENTIFIER = com.poulvia.poulvia
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.lefermier. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.poulvia. All rights reserved.

@@ -19,13 +19,13 @@ void main() async {
   await ApiClient().init();
   runApp(
     const ProviderScope(
-      child: LeFermierApp(),
+      child: PoulviaApp(),
     ),
   );
 }
 
-class LeFermierApp extends ConsumerWidget {
-  const LeFermierApp({super.key});
+class PoulviaApp extends ConsumerWidget {
+  const PoulviaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

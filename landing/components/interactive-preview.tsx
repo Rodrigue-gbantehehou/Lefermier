@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import {
@@ -45,7 +45,7 @@ export function InteractivePreview() {
             <span className="text-accent-hover">plateaux de 30</span>
           </h2>
           <p className="text-sm sm:text-base text-muted leading-relaxed">
-            Modifiez le nombre d'œufs récoltés ci-dessous pour voir comment Lefermier
+            Modifiez le nombre d'œufs récoltés ci-dessous pour voir comment Poulvia
             convertit instantanément vos chiffres et calcule votre taux de ponte.
           </p>
         </div>
@@ -136,7 +136,7 @@ export function InteractivePreview() {
               <div className="flex items-center justify-between pb-3 border-b border-border">
                 <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Egg className="h-4 w-4 text-accent" />
-                  Résultat instantané Lefermier
+                  Résultat instantané Poulvia
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-soft text-accent">
                   Session du {session}

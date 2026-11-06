@@ -1837,7 +1837,7 @@ final class AuditFixesVerificationTest
     {
         $farm = self::createTestFarm('Ferme Santé Transition');
         $flock = new Flock($farm, 'LOT-SANTE', 'Bande Santé', 500, new \DateTimeImmutable('2026-05-01'), PoultryType::BROILER);
-        $user = new User('veto@lefermier.com', 'Dr', 'Veto');
+        $user = new User('veto@Poulvia.com', 'Dr', 'Veto');
         $item = new InventoryItem($farm, 'Vaccin Gumboro', InventoryCategory::VACCINE, InventoryUnit::VIAL);
         $item->setCurrentStock(20.0);
 

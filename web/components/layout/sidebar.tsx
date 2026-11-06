@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -147,7 +147,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-base font-extrabold text-white tracking-tight">
-                Lefermier
+                Poulvia
               </span>
               <span className="text-[10px] font-semibold tracking-wider uppercase text-white/60">
                 Bénin & Ouest-Afrik

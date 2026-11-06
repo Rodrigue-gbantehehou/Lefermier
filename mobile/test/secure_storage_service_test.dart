@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lefermier/core/security/secure_storage_service.dart';
+import 'package:poulvia/core/security/secure_storage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -130,7 +130,7 @@ void main() {
     test('Migrates legacy plain token to secure storage and purges SharedPreferences', () async {
       final prefs = await SharedPreferences.getInstance();
       const token = 'jwt_token_from_plain';
-      await prefs.setString('lefermier_jwt_token', token);
+      await prefs.setString('poulvia_jwt_token', token);
 
       SecureStorageService().resetForTesting();
       final storage = SecureStorageService();
@@ -139,7 +139,7 @@ void main() {
       expect(storage.token, token);
       expect(secureStorageData['lf_jwt_token'], token);
 
-      expect(prefs.containsKey('lefermier_jwt_token'), isFalse);
+      expect(prefs.containsKey('poulvia_jwt_token'), isFalse);
     });
 
     test('Migrates refresh token independently when JWT token is already present in secure storage', () async {

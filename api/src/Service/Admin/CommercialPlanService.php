@@ -22,7 +22,7 @@ use App\Exception\PlanQuotaExceededException;
 
 
 /**
- * Service de gouvernance des Formules Commerciales, Licences et Quotas de la plateforme Lefermier.
+ * Service de gouvernance des Formules Commerciales, Licences et Quotas de la plateforme Poulvia.
  *
  * Gère la persistance en base de données (table subscription_plans) et l'attribution des licences.
  * Modèle inspiré de Microsoft 365 Billing & Licensing / Azure Subscriptions.
@@ -38,7 +38,7 @@ class CommercialPlanService
     }
 
     /**
-     * Catalogue des formules commerciales Lefermier (SKUs) stockées en base de données.
+     * Catalogue des formules commerciales Poulvia (SKUs) stockées en base de données.
      * Initialise automatiquement les 4 plans système par défaut si la table est vide.
      *
      * @return array<string, array<string, mixed>>
@@ -820,7 +820,7 @@ class CommercialPlanService
     }
 
     /**
-     * Configuration officielle de référence des 4 formules commerciales Lefermier.
+     * Configuration officielle de référence des 4 formules commerciales Poulvia.
      *
      * @return array<int, array<string, mixed>>
      */

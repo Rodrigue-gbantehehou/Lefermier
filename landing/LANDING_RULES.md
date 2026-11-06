@@ -1,8 +1,8 @@
-# Règles de conception — Landing page Lefermier
+﻿# Règles de conception — Landing page Poulvia
 
 ## 1. Objectif
 
-L'application `landing/` est le site public de présentation de Lefermier.
+L'application `landing/` est le site public de présentation de Poulvia.
 
 Son rôle est de présenter le logiciel, expliquer sa valeur, rassurer les visiteurs et les orienter vers une action pertinente : demander une démonstration, créer un compte ou contacter l'équipe.
 
@@ -22,7 +22,7 @@ Ce site est indépendant de l'application de gestion des fermes et du back-offic
 
 ## 3. Public cible
 
-Le contenu doit être adapté aux utilisateurs que Lefermier souhaite réellement servir, notamment :
+Le contenu doit être adapté aux utilisateurs que Poulvia souhaite réellement servir, notamment :
 
 - les propriétaires de fermes ;
 - les responsables d'exploitation ;
@@ -41,7 +41,7 @@ La structure suivante constitue une base à adapter au produit.
 
 Présenter immédiatement :
 
-- le nom Lefermier ;
+- le nom Poulvia ;
 - une proposition de valeur claire ;
 - les principaux problèmes auxquels le logiciel répond ;
 - les bénéfices essentiels ;
@@ -99,7 +99,7 @@ Prévoir les mentions légales, la politique de confidentialité et les informat
 
 Cette formulation doit être adaptée aux fonctionnalités effectivement disponibles :
 
-« Lefermier vous aide à organiser le suivi de votre ferme, centraliser vos informations et mieux comprendre les résultats de votre exploitation. »
+« Poulvia vous aide à organiser le suivi de votre ferme, centraliser vos informations et mieux comprendre les résultats de votre exploitation. »
 
 Ne pas conserver une promesse qui ne correspond pas encore aux capacités réelles du logiciel.
 
@@ -238,7 +238,7 @@ Avant de modifier le code :
 
 1. Lire ce document et les règles générales du projet.
 2. Examiner le framework, les composants et les dépendances existants.
-3. Vérifier les fonctionnalités réellement disponibles dans Lefermier.
+3. Vérifier les fonctionnalités réellement disponibles dans Poulvia.
 4. Identifier l'objectif de la page et son appel à l'action principal.
 5. Proposer un plan limité avant une refonte importante.
 

@@ -1,4 +1,4 @@
-# 📐 Spécification Officielle des Unités de Mesure — Lefermier
+﻿# 📐 Spécification Officielle des Unités de Mesure — Poulvia
 *Document de référence normatif pour l'API Symfony, la base de données et l'application web frontend.*
 
 ---
@@ -6,7 +6,7 @@
 ## 1. Principe Directeur Fondamental
 
 > [!IMPORTANT]
-> **Règle d'or de traçabilité et d'ergonomie Lefermier :**
+> **Règle d'or de traçabilité et d'ergonomie Poulvia :**
 > **Aucune valeur numérique quantitative ne doit être affichée à l'écran, ni traitée dans le système sans son unité de mesure explicite.**
 > Une valeur brute comme `50`, `14` ou `1250000` est formellement proscrite sans son suffixe ou badge explicite : `50 sacs (50 kg)`, `14 plateaux (420 œufs)`, `1 250 000 FCFA`.
 

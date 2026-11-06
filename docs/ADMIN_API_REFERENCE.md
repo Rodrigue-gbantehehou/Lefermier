@@ -1,13 +1,13 @@
-# 🛡️ Lefermier API — Guide de Référence Administration Plateforme (Back-Office)
+﻿# 🛡️ Poulvia API — Guide de Référence Administration Plateforme (Back-Office)
 
 *Documentation technique officielle de l'API d'administration centrale (Super-Admin) pour l'application `admin/`.*  
-*Référence obligatoire alignée sur [ADMIN_RULES.md](file:///c:/projets/Lefermier/admin/ADMIN_RULES.md) et [ARCHITECTURE.md](file:///c:/projets/Lefermier/docs/ARCHITECTURE.md).*
+*Référence obligatoire alignée sur [ADMIN_RULES.md](file:///c:/projets/Poulvia/admin/ADMIN_RULES.md) et [ARCHITECTURE.md](file:///c:/projets/Poulvia/docs/ARCHITECTURE.md).*
 
 ---
 
 ## 1. Vue d'Ensemble & Périmètre Architectural
 
-L'API Lefermier sépare strictement deux périmètres fonctionnels et sécuritaires :
+L'API Poulvia sépare strictement deux périmètres fonctionnels et sécuritaires :
 
 ```text
                                   API SYMFONY CENTRALE
@@ -70,7 +70,7 @@ L'API Lefermier sépare strictement deux périmètres fonctionnels et sécuritai
 ### 3.1. Obtenir les statistiques globales de la plateforme
 - **Méthode** : `GET`
 - **Route** : `/api/admin/stats`
-- **Description** : Retourne les indicateurs macro-économiques et zootechniques consolidés sur l'ensemble de la plateforme Lefermier.
+- **Description** : Retourne les indicateurs macro-économiques et zootechniques consolidés sur l'ensemble de la plateforme Poulvia.
 
 #### Exemple de réponse (`200 OK`) :
 ```json
@@ -883,7 +883,7 @@ Conforme au modèle Microsoft Entra RBAC (Scope Platform). Permet de créer, éd
 
 ## 7. Modules d'Administration Futurs (Roadmap Back-Office)
 
-Conformément aux responsabilités identifiées dans [ADMIN_RULES.md (Section 3)](file:///c:/projets/Lefermier/admin/ADMIN_RULES.md) :
+Conformément aux responsabilités identifiées dans [ADMIN_RULES.md (Section 3)](file:///c:/projets/Poulvia/admin/ADMIN_RULES.md) :
 
 | Module | Route cible | Statut | Responsabilité |
 |---|---|---|---|

@@ -4,10 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
-import 'package:lefermier/core/api/api_client.dart';
-import 'package:lefermier/core/models/sync_item.dart';
-import 'package:lefermier/core/security/secure_storage_service.dart';
-import 'package:lefermier/core/sync/sync_service.dart';
+import 'package:poulvia/core/api/api_client.dart';
+import 'package:poulvia/core/models/sync_item.dart';
+import 'package:poulvia/core/security/secure_storage_service.dart';
+import 'package:poulvia/core/sync/sync_service.dart';
 
 String _createMockJwt(String username) {
   final header = base64Url.encode(utf8.encode(jsonEncode({'alg': 'none', 'typ': 'JWT'}))).replaceAll('=', '');
@@ -205,7 +205,7 @@ void main() {
         status: SyncItemStatus.failed,
         lastError: 'Quarantaine de sécurité',
       );
-      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(orphanItem.toJson())]);
+      await prefs.setStringList('poulvia_sync_queue', [jsonEncode(orphanItem.toJson())]);
 
       final success = await syncService.retryFailedItem('orphan_retry_test');
       expect(success, isFalse);
@@ -310,7 +310,7 @@ void main() {
         createdAt: DateTime.now(),
         ownerKey: null,
       );
-      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(orphanItem.toJson())]);
+      await prefs.setStringList('poulvia_sync_queue', [jsonEncode(orphanItem.toJson())]);
 
       final result = await syncService.flushQueue();
 
@@ -335,7 +335,7 @@ void main() {
         createdAt: DateTime.now(),
         ownerKey: 'user_alice',
       );
-      await prefs.setStringList('lefermier_sync_queue', [jsonEncode(aliceItem.toJson())]);
+      await prefs.setStringList('poulvia_sync_queue', [jsonEncode(aliceItem.toJson())]);
 
       final result = await syncService.flushQueue();
 

@@ -1,11 +1,11 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { ToastProvider } from "@/context/toast-context";
 
 export const metadata: Metadata = {
-  title: "Lefermier — Gestion Avicole",
+  title: "Poulvia — Gestion Avicole",
   description:
     "Solution professionnelle de gestion d'exploitations avicoles africaine. Suivi des bandes, ponte, stocks et finances.",
   icons: {
@@ -15,9 +15,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Lefermier",
+    title: "Poulvia",
   },
-  applicationName: "Lefermier",
+  applicationName: "Poulvia",
   formatDetection: {
     telephone: false,
   },

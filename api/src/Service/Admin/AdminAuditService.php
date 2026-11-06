@@ -46,7 +46,7 @@ class AdminAuditService
         $clientIp = $request?->getClientIp() ?? '127.0.0.1';
 
         $actorId = $actor?->getId()?->toBase32();
-        $actorEmail = $actor?->getEmail() ?? $fallbackActorEmail ?? 'system@lefermier.bj';
+        $actorEmail = $actor?->getEmail() ?? $fallbackActorEmail ?? 'system@Poulvia.bj';
         $actorName = $actor?->getFullName() ?? $fallbackActorEmail ?? 'Système';
         $actorRole = $actor?->getAdminRole()?->getName()
             ?? ($actor !== null

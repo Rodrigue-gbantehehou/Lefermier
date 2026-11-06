@@ -138,7 +138,7 @@ class WelcomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 36),
 
-                  // Logo Officiel Lefermier
+                  // Logo Officiel poulvia
                   Row(
                     children: [
                       Container(

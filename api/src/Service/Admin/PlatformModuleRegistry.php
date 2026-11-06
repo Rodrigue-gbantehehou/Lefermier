@@ -7,7 +7,7 @@ namespace App\Service\Admin;
 use App\Security\Permission;
 
 /**
- * Référentiel officiel des modules applicatifs réels du backend Lefermier.
+ * Référentiel officiel des modules applicatifs réels du backend Poulvia.
  *
  * Tous les modules déclarés ici correspondent à des fonctionnalités et entités existantes du projet.
  * Utilisé pour la configuration granulaire des formules commerciales dans le back-office admin/.

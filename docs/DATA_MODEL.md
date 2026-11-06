@@ -1,4 +1,4 @@
-# MODÈLE DE DONNÉES — LOGICIEL DE GESTION AVICOLE
+﻿# MODÈLE DE DONNÉES — LOGICIEL DE GESTION AVICOLE
 
 **Fichier :** `docs/DATA_MODEL.md`  
 **Statut :** Référence obligatoire de modélisation  
@@ -9,7 +9,7 @@
 
 ## 1. Principes directeurs de modélisation
 
-Conformément à [ARCHITECTURE.md](file:///c:/projets/Lefermier/docs/ARCHITECTURE.md) et [PROJECT_RULES.md](file:///c:/projets/Lefermier/docs/PROJECT_RULES.md) :
+Conformément à [ARCHITECTURE.md](file:///c:/projets/Poulvia/docs/ARCHITECTURE.md) et [PROJECT_RULES.md](file:///c:/projets/Poulvia/docs/PROJECT_RULES.md) :
 
 1. **Isolation stricte multi-tenants :**
    - Chaque exploitation (`Farm`) appartient à une organisation cliente (`Organization`).
@@ -128,7 +128,7 @@ Représente un compte utilisateur authentifiable sur la plateforme.
 | `updated_at` | `DATETIME_IMMUTABLE` | NOT NULL | Dernière mise à jour |
 
 ### 2.3. AdminRole (`admin_roles`)
-Représente un rôle d'administration de la plateforme Lefermier (Scope Admin / Modèle Microsoft RBAC dynamique).
+Représente un rôle d'administration de la plateforme Poulvia (Scope Admin / Modèle Microsoft RBAC dynamique).
 
 | Champ | Type | Contraintes | Description |
 |---|---|---|---|
@@ -502,7 +502,7 @@ L'ensemble du cœur de métier avicole est désormais opérationnel sur l'API Sy
 
 ## 9. Clés API Développeur & Intégrations Machine (`api_keys`)
 
-Ce module permet aux machines, automates de régulation (capteurs de température/humidité), systèmes de pesée automatique et logiciels partenaires (cabinets vétérinaires, couvoirs, comptabilité) d'interagir directement avec l'API Lefermier 24h/24 sans nécessiter de session utilisateur interactive.
+Ce module permet aux machines, automates de régulation (capteurs de température/humidité), systèmes de pesée automatique et logiciels partenaires (cabinets vétérinaires, couvoirs, comptabilité) d'interagir directement avec l'API Poulvia 24h/24 sans nécessiter de session utilisateur interactive.
 
 ### 9.1. Attributs de l'entité `ApiKey` :
 - `id` : Identifiant unique ULID (26 caractères Crockford Base32).

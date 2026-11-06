@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authApi, SuperAdminUser } from "@/lib/api/auth";
@@ -30,7 +30,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = async () => {
     setIsLoading(true);
-    const token = typeof window !== "undefined" ? localStorage.getItem("lefermier_admin_jwt") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("Poulvia_admin_jwt") : null;
     if (!token) {
       setUser(null);
       setIsLoading(false);
@@ -40,13 +40,13 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = await authApi.me();
       if (!isAllowedPlatformUser(profile)) {
-        localStorage.removeItem("lefermier_admin_jwt");
+        localStorage.removeItem("Poulvia_admin_jwt");
         setUser(null);
       } else {
         setUser(profile);
       }
     } catch {
-      localStorage.removeItem("lefermier_admin_jwt");
+      localStorage.removeItem("Poulvia_admin_jwt");
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -72,12 +72,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Stockage temporaire pour valider le profil via /api/auth/me
-      localStorage.setItem("lefermier_admin_jwt", res.token);
+      localStorage.setItem("Poulvia_admin_jwt", res.token);
       const profile = await authApi.me();
 
       // Vérification des privilèges plateforme (Super-Admin ou Collaborateur avec rôle assigné)
       if (!isAllowedPlatformUser(profile)) {
-        localStorage.removeItem("lefermier_admin_jwt");
+        localStorage.removeItem("Poulvia_admin_jwt");
         setUser(null);
         throw new Error(
           "Accès refusé : Votre compte ne possède pas les habilitations d'administration de la plateforme."
@@ -86,7 +86,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(profile);
     } catch (err: unknown) {
-      localStorage.removeItem("lefermier_admin_jwt");
+      localStorage.removeItem("Poulvia_admin_jwt");
       setUser(null);
       throw err;
     } finally {
@@ -96,7 +96,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("lefermier_admin_jwt");
+      localStorage.removeItem("Poulvia_admin_jwt");
       window.location.href = "/login";
     }
     setUser(null);

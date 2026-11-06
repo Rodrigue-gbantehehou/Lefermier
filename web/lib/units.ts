@@ -1,5 +1,5 @@
-/**
- * Système de Gestion Centralisé et Normatif des Unités de Mesure — Lefermier
+﻿/**
+ * Système de Gestion Centralisé et Normatif des Unités de Mesure — Poulvia
  * Conforme à la spécification docs/UNITS_AND_MEASUREMENTS.md
  */
 

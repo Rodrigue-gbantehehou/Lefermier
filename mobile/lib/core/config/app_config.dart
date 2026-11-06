@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// - Injection possible au build via `--dart-define=API_BASE_URL=https://...`
 /// - Sauvegarde dynamique de l'adresse du serveur dans SharedPreferences
 class AppConfig {
-  static const String _serverUrlKey = "lefermier_api_base_url";
+  static const String _serverUrlKey = "poulvia_api_base_url";
 
   /// URL injectée via variable d'environnement Flutter (--dart-define=API_BASE_URL=...)
   static const String envApiUrl = String.fromEnvironment('API_BASE_URL');

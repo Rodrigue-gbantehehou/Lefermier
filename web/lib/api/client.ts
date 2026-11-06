@@ -1,4 +1,4 @@
-export function getApiBaseUrl(): string {
+﻿export function getApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
@@ -47,7 +47,7 @@ export async function apiRequest<T = any>(
 
   // Inject token if available on client-side
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("lefermier_token");
+    const token = localStorage.getItem("Poulvia_token");
     if (token && !headers["Authorization"]) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -88,7 +88,7 @@ export async function apiRequest<T = any>(
     if (response.status === 401) {
       errorMsg = "Votre session a expiré. Veuillez vous reconnecter.";
       if (typeof window !== "undefined") {
-        localStorage.removeItem("lefermier_token");
+        localStorage.removeItem("Poulvia_token");
         if (
           !window.location.pathname.startsWith("/login") &&
           !window.location.pathname.startsWith("/register")
@@ -154,7 +154,7 @@ export async function apiRequestFull<T = any>(
   };
 
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("lefermier_token");
+    const token = localStorage.getItem("Poulvia_token");
     if (token && !headers["Authorization"]) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -188,7 +188,7 @@ export async function apiRequestFull<T = any>(
     if (response.status === 401) {
       errorMsg = "Votre session a expiré. Veuillez vous reconnecter.";
       if (typeof window !== "undefined") {
-        localStorage.removeItem("lefermier_token");
+        localStorage.removeItem("Poulvia_token");
         if (
           !window.location.pathname.startsWith("/login") &&
           !window.location.pathname.startsWith("/register")
@@ -230,7 +230,7 @@ export async function downloadApiFile(
   };
 
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("lefermier_token");
+    const token = localStorage.getItem("Poulvia_token");
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }

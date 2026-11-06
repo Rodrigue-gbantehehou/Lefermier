@@ -3,10 +3,10 @@ import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lefermier/core/api/api_client.dart';
-import 'package:lefermier/core/api/api_endpoints.dart';
-import 'package:lefermier/core/security/secure_storage_service.dart';
-import 'package:lefermier/features/auth/auth_provider.dart';
+import 'package:poulvia/core/api/api_client.dart';
+import 'package:poulvia/core/api/api_endpoints.dart';
+import 'package:poulvia/core/security/secure_storage_service.dart';
+import 'package:poulvia/features/auth/auth_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

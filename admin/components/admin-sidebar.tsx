@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -91,7 +91,7 @@ export function AdminSidebar() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-base tracking-tight text-foreground">Lefermier</span>
+                <span className="font-bold text-base tracking-tight text-foreground">Poulvia</span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                   Admin
                 </span>

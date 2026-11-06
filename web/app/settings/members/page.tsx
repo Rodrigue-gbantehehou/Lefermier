@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import {
@@ -515,7 +515,7 @@ export default function MembersManagementPage() {
               required
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="koffi.mensah@lefermier.bj"
+              placeholder="koffi.mensah@Poulvia.bj"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
           </div>
@@ -571,7 +571,7 @@ export default function MembersManagementPage() {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Par défaut : Lefermier@2026"
+              placeholder="Par défaut : Poulvia@2026"
               className="w-full rounded-xl border border-border bg-surface-muted p-2.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
             />
             <p className="mt-1 text-[11px] text-muted">

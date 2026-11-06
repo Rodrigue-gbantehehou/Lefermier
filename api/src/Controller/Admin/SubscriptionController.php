@@ -372,7 +372,7 @@ class SubscriptionController extends AbstractController
             if ($planDef === null) {
                 return $this->json([
                     'status' => 'error',
-                    'message' => sprintf('Plan "%s" non reconnu dans le catalogue Lefermier.', $newPlan),
+                    'message' => sprintf('Plan "%s" non reconnu dans le catalogue Poulvia.', $newPlan),
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $organization->setSubscriptionPlan($newPlan);

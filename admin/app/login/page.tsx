@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
           <div>
             <div className="flex items-center justify-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Lefermier
+                Poulvia
               </h1>
              
             </div>
@@ -82,7 +82,7 @@ export default function AdminLoginPage() {
                 <Input
                   type="email"
                   required
-                  placeholder="admin@lefermier.bj"
+                  placeholder="admin@Poulvia.bj"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-9 text-xs"

@@ -49,7 +49,7 @@ final class DocsController extends AbstractController
 <!doctype html>
 <html lang="fr">
   <head>
-    <title>Lefermier API — Référence Officielle des Développeurs</title>
+    <title>Poulvia API — Référence Officielle des Développeurs</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -188,7 +188,7 @@ final class DocsController extends AbstractController
   <body>
     <header class="custom-header">
       <div class="brand-title">
-        <span>🐔 Lefermier API</span>
+        <span>🐔 Poulvia API</span>
         <span class="badge-tag">v1.0 • OpenAPI 3.1</span>
         <span class="brand-subtitle">Bénin & Afrique de l'Ouest (XOF)</span>
       </div>
@@ -233,7 +233,7 @@ HTML;
 <!DOCTYPE html>
 <html lang="fr">
   <head>
-    <title>Lefermier API — Redoc Enterprise Documentation</title>
+    <title>Poulvia API — Redoc Enterprise Documentation</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -262,7 +262,7 @@ HTML;
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Lefermier API — Swagger UI</title>
+  <title>Poulvia API — Swagger UI</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
   <style>

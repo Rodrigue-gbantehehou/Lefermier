@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -456,7 +456,7 @@ export default function SubscriptionPage() {
               </p>
               <p className="text-xs text-muted mt-1 leading-relaxed">
                 Lorsque vous demandez un changement de formule, une notification est envoyée à l'équipe
-                administratrice de Lefermier. Votre abonnement sera activé sans interruption de vos activités.
+                administratrice de Poulvia. Votre abonnement sera activé sans interruption de vos activités.
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -60,13 +60,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         <Link
           href="/"
           className="flex items-center gap-2 rounded-xl p-1 hover:opacity-90 transition-opacity"
-          title="Lefermier"
+          title="Poulvia"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white shadow-xs border border-white/25">
             <span className="text-xs font-black tracking-tighter">LF</span>
           </div>
           <span className="text-sm font-extrabold tracking-tight text-white hidden xs:inline">
-            Lefermier
+            Poulvia
           </span>
         </Link>
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize from localStorage on client-side
   useEffect(() => {
-    const storedToken = localStorage.getItem("lefermier_token");
+    const storedToken = localStorage.getItem("Poulvia_token");
     if (storedToken) {
       setToken(storedToken);
       loadCurrentUser();
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
       setFarms(mappedFarms);
 
-      const storedFarmId = localStorage.getItem("lefermier_active_farm_id");
+      const storedFarmId = localStorage.getItem("Poulvia_active_farm_id");
       const currentFarm =
         mappedFarms.find((f) => f.id === storedFarmId) || mappedFarms[0] || null;
       setActiveFarm(currentFarm);
@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const res = await api.auth.login(credentials);
-      localStorage.setItem("lefermier_token", res.token);
+      localStorage.setItem("Poulvia_token", res.token);
       setToken(res.token);
       await loadCurrentUser();
     } finally {
@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const res = await api.auth.register(data);
-      localStorage.setItem("lefermier_token", res.token);
+      localStorage.setItem("Poulvia_token", res.token);
       setToken(res.token);
       await loadCurrentUser();
     } finally {
@@ -175,8 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function logout() {
-    localStorage.removeItem("lefermier_token");
-    localStorage.removeItem("lefermier_active_farm_id");
+    localStorage.removeItem("Poulvia_token");
+    localStorage.removeItem("Poulvia_active_farm_id");
     setToken(null);
     setUser(null);
     setActiveFarm(null);
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function switchFarm(farmId: string) {
-    localStorage.setItem("lefermier_active_farm_id", farmId);
+    localStorage.setItem("Poulvia_active_farm_id", farmId);
     const target = farms.find((f) => f.id === farmId);
     if (target) {
       setActiveFarm(target);

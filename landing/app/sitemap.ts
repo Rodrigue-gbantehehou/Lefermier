@@ -1,7 +1,7 @@
-import { MetadataRoute } from "next";
+﻿import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://lefermier.app";
+  const baseUrl = "https://Poulvia.app";
   const now = new Date();
 
   return [

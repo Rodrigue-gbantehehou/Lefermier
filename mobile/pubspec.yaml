@@ -1,5 +1,5 @@
-name: lefermier
-description: "Application mobile native Lefermier - Gestion d'exploitations avicoles"
+name: poulvia
+description: "Application mobile native Poulvia - Gestion d'exploitations avicoles"
 publish_to: 'none'
 
 version: 1.0.0+1

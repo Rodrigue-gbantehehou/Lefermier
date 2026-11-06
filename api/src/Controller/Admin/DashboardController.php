@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Tableau de bord d'administration globale de la plateforme Lefermier.
+ * Tableau de bord d'administration globale de la plateforme Poulvia.
  *
  * Protégé par les permissions granulaires du modèle Microsoft RBAC.
  */

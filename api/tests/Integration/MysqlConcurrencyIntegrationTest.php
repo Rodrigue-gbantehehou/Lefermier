@@ -103,7 +103,7 @@ final class MysqlConcurrencyIntegrationTest
         CommercialPlanService $commercialPlanService,
         IdempotencyRecordRepository $recordRepository
     ): void {
-        $user = self::getOrCreateTestUser($em, 'test-idem-user@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'test-idem-user@Poulvia.com');
         $farm = self::createTestFarmHierarchy($em, 'Ferme Idem MySQL');
 
         $key = 'mysql-idem-' . bin2hex(random_bytes(8));
@@ -155,7 +155,7 @@ final class MysqlConcurrencyIntegrationTest
         CommercialPlanService $commercialPlanService,
         IdempotencyRecordRepository $recordRepository
     ): void {
-        $user = self::getOrCreateTestUser($em, 'test-fencing@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'test-fencing@Poulvia.com');
         $farm = self::createTestFarmHierarchy($em, 'Ferme Fencing MySQL');
 
         $key = 'mysql-fencing-' . bin2hex(random_bytes(8));
@@ -197,7 +197,7 @@ final class MysqlConcurrencyIntegrationTest
         CommercialPlanService $commercialPlanService,
         IdempotencyRecordRepository $recordRepository
     ): void {
-        $user = self::getOrCreateTestUser($em, 'test-rollback@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'test-rollback@Poulvia.com');
         $farm = self::createTestFarmHierarchy($em, 'Ferme Rollback MySQL');
 
         $key = 'mysql-rollback-' . bin2hex(random_bytes(8));
@@ -325,7 +325,7 @@ final class MysqlConcurrencyIntegrationTest
         CommercialPlanService $commercialPlanService,
         IdempotencyRecordRepository $recordRepository
     ): void {
-        $user = self::getOrCreateTestUser($em, 'veto-mysql@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'veto-mysql@Poulvia.com');
         $farm = self::createTestFarmHierarchy($em, 'Ferme Sante MySQL');
         $flock = new Flock($farm, 'FLOCK-SANTE-' . bin2hex(random_bytes(4)), 'Bande Sante', 500, new \DateTimeImmutable('2026-06-01'), PoultryType::BROILER);
         $em->persist($flock);
@@ -502,7 +502,7 @@ final class MysqlConcurrencyIntegrationTest
 
         // Créer une ligne de test isolée (idempotency_record)
         $farm = self::createTestFarmHierarchy($em, 'Ferme Lock2Cx');
-        $user = self::getOrCreateTestUser($em, 'lock2cx@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'lock2cx@Poulvia.com');
 
         $uniqueKey = 'lock2cx-' . bin2hex(random_bytes(8));
         $record = new IdempotencyRecord(
@@ -587,7 +587,7 @@ final class MysqlConcurrencyIntegrationTest
         IdempotencyRecordRepository $recordRepository
     ): void {
         $farm = self::createTestFarmHierarchy($em, 'Ferme DelVsComplete');
-        $user = self::getOrCreateTestUser($em, 'del-vs-complete@lefermier.com');
+        $user = self::getOrCreateTestUser($em, 'del-vs-complete@Poulvia.com');
 
         $item = new InventoryItem($farm, 'Vaccin Test DelVs', InventoryCategory::VACCINE, InventoryUnit::VIAL);
         $item->setCurrentStock(10.0);
@@ -636,7 +636,7 @@ final class MysqlConcurrencyIntegrationTest
     {
         // Convertit DATABASE_URL (mysql://user:pass@host:port/dbname) en DSN PDO
         $parsed = parse_url($dsn);
-        $dbName = ltrim($parsed['path'] ?? '/db_lefermier_test', '/');
+        $dbName = ltrim($parsed['path'] ?? '/db_Poulvia_test', '/');
         $dbName = explode('?', $dbName)[0];
         return sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
             $parsed['host'] ?? '127.0.0.1',

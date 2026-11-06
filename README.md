@@ -1,4 +1,4 @@
-# 🐔 Lefermier — Logiciel de Gestion Avicole Moderne
+﻿# 🐔 Poulvia — Logiciel de Gestion Avicole Moderne
 
 > **Solution professionnelle de pilotage d'exploitations avicoles (Poules pondeuses, Poulets de chair et Élevages mixtes) conçue africaine.**
 
@@ -32,7 +32,7 @@
 ## 🏗️ Architecture du Projet
 
 ```text
-Lefermier/
+Poulvia/
 ├── api/                # Backend Symfony 8.1 RESTful API
 │   ├── config/         # Configuration des services, routes et JWT
 │   ├── src/
@@ -80,7 +80,7 @@ cd api
 composer install
 
 # Configurer l'environnement dans .env.local
-# DATABASE_URL="mysql://user:password@127.0.0.1:3306/lefermier?serverVersion=8.4.0"
+# DATABASE_URL="mysql://user:password@127.0.0.1:3306/Poulvia?serverVersion=8.4.0"
 
 # Générer les clés cryptographiques JWT RSA-4096
 php bin/console lexik:jwt:generate-keypair
@@ -129,4 +129,4 @@ Pour plus de détails techniques, consultez le dossier [`docs/`](docs/) :
 ## 📄 Licence
 
 Propriété exclusive — Tous droits réservés.
-Projet développé pour **Lefermier Bénin**.
+Projet développé pour **Poulvia Bénin**.

@@ -1,4 +1,4 @@
-package com.lefermier.lefermier
+package com.poulvia.poulvia
 
 import io.flutter.embedding.android.FlutterActivity
 

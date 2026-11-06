@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 import { AdminAuthProvider } from "@/context/admin-auth-context";
 import { AdminGuard } from "@/components/admin-guard";
 
 export const metadata: Metadata = {
-  title: "Lefermier — Console d'Administration Centrale",
-  description: "Back-office privé de supervision et gouvernance de la plateforme avicole Lefermier.",
+  title: "Poulvia — Console d'Administration Centrale",
+  description: "Back-office privé de supervision et gouvernance de la plateforme avicole Poulvia.",
 };
 
 export default function RootLayout({

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useMemo } from "react";
 import {
@@ -471,7 +471,7 @@ export default function AdminRolesPage() {
                         <p className="font-semibold text-sm">Privilèges Absolus (Wildcard `*`)</p>
                         <p className="text-xs opacity-90 mt-0.5">
                           Ce rôle détient l&apos;ensemble des permissions présentes et futures de la
-                          console Lefermier sans restriction.
+                          console Poulvia sans restriction.
                         </p>
                       </div>
                     </div>

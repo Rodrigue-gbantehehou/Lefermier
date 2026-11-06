@@ -1,6 +1,6 @@
-{
-  "name": "Lefermier — Gestion Avicole",
-  "short_name": "Lefermier",
+﻿{
+  "name": "Poulvia — Gestion Avicole",
+  "short_name": "Poulvia",
   "description": "Application professionnelle de gestion avicole ouest-africaine. Suivi des bandes, pontes, stocks et finances.",
   "start_url": "/",
   "display": "standalone",

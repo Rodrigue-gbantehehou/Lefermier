@@ -1,5 +1,5 @@
-/**
- * Définition des types et interfaces TypeScript du domaine Administration Lefermier.
+﻿/**
+ * Définition des types et interfaces TypeScript du domaine Administration Poulvia.
  * Conforme à docs/ADMIN_API_REFERENCE.md et admin/ADMIN_RULES.md.
  */
 

@@ -31,8 +31,8 @@ class ApiClient {
   /// Client dédié au renouvellement : aucun intercepteur, donc aucune récursion possible.
   late final Dio _authDio;
 
-  static const String _activeFarmKey = "lefermier_active_farm_id";
-  static const String _hasSeenWelcomeKey = "lefermier_has_seen_welcome";
+  static const String _activeFarmKey = "poulvia_active_farm_id";
+  static const String _hasSeenWelcomeKey = "poulvia_has_seen_welcome";
   static const String _retriedFlag = "_lf_retried_after_refresh";
 
   /// Routes publiques pour lesquelles un 401 signifie « identifiants invalides »,

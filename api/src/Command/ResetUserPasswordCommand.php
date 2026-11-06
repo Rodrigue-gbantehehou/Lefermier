@@ -32,7 +32,7 @@ class ResetUserPasswordCommand extends Command
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Adresse e-mail de l\'utilisateur')
-            ->addArgument('password', InputArgument::OPTIONAL, 'Nouveau mot de passe (défaut: Lefermier@2026)', 'Lefermier@2026');
+            ->addArgument('password', InputArgument::OPTIONAL, 'Nouveau mot de passe (défaut: Poulvia@2026)', 'Poulvia@2026');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

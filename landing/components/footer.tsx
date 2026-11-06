@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import Link from "next/link";
 import { Bird, ShieldCheck, Heart } from "lucide-react";
 
@@ -91,7 +91,7 @@ export function Footer() {
                 href={`${appUrl}/login`}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2 font-bold text-primary hover:bg-primary/10 transition-colors"
               >
-                <span>Accéder à l'application Lefermier →</span>
+                <span>Accéder à l'application Poulvia →</span>
               </a>
             </div>
           </div>
@@ -100,7 +100,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-muted">
           <div>
-            © {currentYear} Lefermier. Tous droits réservés. Développé pour l'aviculture ouest-africaine.
+            © {currentYear} Poulvia. Tous droits réservés. Développé pour l'aviculture ouest-africaine.
           </div>
           <div className="flex items-center gap-4">
             <span className="hover:text-foreground cursor-pointer">Mentions Légales</span>

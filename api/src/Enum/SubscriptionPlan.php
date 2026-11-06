@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Enum;
 
 /**
- * Formules et SKUs d'abonnement commercial Lefermier.
+ * Formules et SKUs d'abonnement commercial Poulvia.
  *
  * Aligné sur docs/DATA_MODEL.md et docs/ADMIN_API_REFERENCE.md.
  */

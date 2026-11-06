@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Security;
 
 /**
- * Catalogue exhaustif des permissions applicables à la console centrale d'administration Lefermier.
+ * Catalogue exhaustif des permissions applicables à la console centrale d'administration Poulvia.
  *
  * Modèle inspiré de Microsoft RBAC (Scope Platform vs Scope Farm).
  */

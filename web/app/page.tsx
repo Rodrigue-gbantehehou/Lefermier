@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -290,7 +290,7 @@ export default function DashboardPage() {
             <Building2 className="h-8 w-8 text-primary" />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-            Bienvenue sur Lefermier !
+            Bienvenue sur Poulvia !
           </h2>
           <p className="mt-2 text-xs sm:text-sm text-muted max-w-md mx-auto leading-relaxed">
             Créez votre première exploitation pour commencer le suivi de votre élevage.

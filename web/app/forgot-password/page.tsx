@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -124,7 +124,7 @@ export default function ForgotPasswordPage() {
             <Bird className="h-8 w-8" />
           </div>
           <h1 className="mt-4 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-            Lefermier
+            Poulvia
           </h1>
           <p className="mt-1 text-xs font-semibold text-primary uppercase tracking-wider">
             Récupération de compte & mot de passe

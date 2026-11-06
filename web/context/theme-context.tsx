@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("lefermier_theme") as Theme | null;
+    const stored = localStorage.getItem("Poulvia_theme") as Theme | null;
     // Only apply dark mode if the user EXPLICITLY clicked toggleTheme and saved "dark"
     if (stored === "dark") {
       setTheme("dark");
@@ -40,7 +40,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   function toggleTheme() {
     const nextTheme = theme === "light" ? "dark" : "light";
     setTheme(nextTheme);
-    localStorage.setItem("lefermier_theme", nextTheme);
+    localStorage.setItem("Poulvia_theme", nextTheme);
     applyTheme(nextTheme);
   }
 

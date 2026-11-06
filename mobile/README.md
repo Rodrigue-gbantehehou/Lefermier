@@ -1,4 +1,4 @@
-# Application Mobile Flutter — Le Fermier 🐔📱
+﻿# Application Mobile Flutter — Le Fermier 🐔📱
 
 Application mobile native moderne pour la gestion d'exploitations avicoles en Afrique de l'Ouest (Bénin, Côte d'Ivoire, Togo, Sénégal, etc.). Conçue pour fonctionner de manière fluide sur le terrain avec prise en charge hors-ligne, calculs instantanés en plateaux d'œufs de 30 et flux de caisse en FCFA.
 
@@ -84,7 +84,7 @@ flutter test
   flutter run
   ```
 - **Via Android Studio** :
-  Ouvrir le dossier `c:\projets\Lefermier\mobile` dans Android Studio et cliquer sur le bouton vert **Run**.
+  Ouvrir le dossier `c:\projets\Poulvia\mobile` dans Android Studio et cliquer sur le bouton vert **Run**.
 
 ---
 

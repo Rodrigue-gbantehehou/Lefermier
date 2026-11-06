@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Building2, Bird, CheckCircle, ArrowRight } from "lucide-react";
 
 export function HowItWorks() {
@@ -36,7 +36,7 @@ export function HowItWorks() {
             <span>Prise en main Terrain</span>
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-            Comment démarrer avec Lefermier en{" "}
+            Comment démarrer avec Poulvia en{" "}
             <span className="text-primary">3 étapes simples</span>
           </h2>
           <p className="text-sm sm:text-base text-muted leading-relaxed">

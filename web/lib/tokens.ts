@@ -1,5 +1,5 @@
-/**
- * DESIGN TOKENS — LOGICIEL DE GESTION AVICOLE LEFERMIER
+﻿/**
+ * DESIGN TOKENS — LOGICIEL DE GESTION AVICOLE Poulvia
  * 
  * Référence centrale des tokens du design system (docs/DESIGN_SYSTEM.md).
  * Tous les styles visuels, palettes, typographies et élévations sont centralisés ici.

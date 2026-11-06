@@ -61,8 +61,8 @@ class _AsyncMutex {
 }
 
 class SyncService {
-  static const String _queueKey = "lefermier_sync_queue";
-  static const String _lastSyncPrefix = "lefermier_last_sync_";
+  static const String _queueKey = "poulvia_sync_queue";
+  static const String _lastSyncPrefix = "poulvia_last_sync_";
 
   /// Verrou partagé par toutes les opérations qui mutent la file.
   /// Statique : garantit l'exclusion mutuelle même si plusieurs instances

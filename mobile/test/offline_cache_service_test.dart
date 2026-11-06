@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lefermier/core/sync/offline_cache_service.dart';
+import 'package:poulvia/core/sync/offline_cache_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

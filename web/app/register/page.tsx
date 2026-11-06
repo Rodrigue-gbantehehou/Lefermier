@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -66,7 +66,7 @@ export default function RegisterPage() {
             <Bird className="h-8 w-8 text-accent" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-            Lefermier
+            Poulvia
           </h1>
           <p className="mt-1 text-xs text-muted">
             Gestion avicole moderne & pilotage d'élevages

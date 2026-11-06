@@ -1,5 +1,5 @@
-/**
- * Client API unifié et modulaire pour LeFermier
+﻿/**
+ * Client API unifié et modulaire pour Poulvia
  * Découpage par domaine métier situé dans @/lib/api/
  */
 export * from "./api";

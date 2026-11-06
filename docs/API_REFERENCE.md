@@ -1,11 +1,11 @@
-# 🐔 Lefermier API — Guide Officiel de Référence Développeur
+﻿# 🐔 Poulvia API — Guide Officiel de Référence Développeur
 *Documentation technique de niveau entreprise (Standard Stripe / GitHub / Plaid) pour le marché béninois et ouest-africain.*
 
 ---
 
 ## 1. Vue d'Ensemble & Accès Interactif
 
-L'API Lefermier est une API RESTful haute performance développée sous **Symfony 8.1**, conçue pour piloter des élevages avicoles modernes (poulets de chair, pondeuses, reproducteurs).
+L'API Poulvia est une API RESTful haute performance développée sous **Symfony 8.1**, conçue pour piloter des élevages avicoles modernes (poulets de chair, pondeuses, reproducteurs).
 
 Trois portails interactifs de documentation sont servis directement par l'application :
 
@@ -17,7 +17,7 @@ Trois portails interactifs de documentation sont servis directement par l'applic
 | **Spécification Brute OpenAPI 3.1** | [`http://127.0.0.1:8000/api/openapi.json`](http://127.0.0.1:8000/api/openapi.json) | JSON Schema OpenAPI 3.1 | Fichier machine-readable importable dans Postman, Insomnia, ou pour la génération de SDKs. |
 
 > [!NOTE]
-> Ce guide documente l'**API Métier & Éleveurs** (`/api/farms/*`). Pour l'**API d'Administration Plateforme (Back-Office)** réservée aux super-administrateurs (`/api/admin/*`), consultez le guide dédié : [ADMIN_API_REFERENCE.md](file:///c:/projets/Lefermier/docs/ADMIN_API_REFERENCE.md).
+> Ce guide documente l'**API Métier & Éleveurs** (`/api/farms/*`). Pour l'**API d'Administration Plateforme (Back-Office)** réservée aux super-administrateurs (`/api/admin/*`), consultez le guide dédié : [ADMIN_API_REFERENCE.md](file:///c:/projets/Poulvia/docs/ADMIN_API_REFERENCE.md).
 
 ---
 
@@ -76,7 +76,7 @@ Chaque ressource zootechnique ou financière est rattachée à une exploitation 
 ```
 
 ### 3.3. Matrice des Codes HTTP
-| Code HTTP | Signification | Contexte dans Lefermier |
+| Code HTTP | Signification | Contexte dans Poulvia |
 | :--- | :--- | :--- |
 | `200 OK` | Succès | Consultation ou mise à jour réussie. |
 | `201 Created` | Ressource créée | Création d'une bande, collecte, mouvement, article ou transaction. |
@@ -92,7 +92,7 @@ Chaque ressource zootechnique ou financière est rattachée à une exploitation 
 
 ## 4. Authentification & Sécurité
 
-L'API Lefermier prend en charge deux modes d'authentification complémentaires selon le type de consommateur :
+L'API Poulvia prend en charge deux modes d'authentification complémentaires selon le type de consommateur :
 
 ### 4.1. Canal Utilisateur : Jetons JWT (Applications Web & Mobile)
 Pour les humains connectés via l'application Web ou Mobile :
@@ -108,7 +108,7 @@ Authorization: Bearer <votre_jeton_jwt>
 curl -X POST http://127.0.0.1:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "eleveur@lefermier.bj",
+    "email": "eleveur@Poulvia.bj",
     "password": "MonPassSecurise2026!"
   }'
 ```
@@ -333,7 +333,7 @@ Supprime le rôle personnalisé (rejet `400 Bad Request` sur les rôles système
 
 ## 7. Utilisation avec Postman & Outils Externes
 
-Deux fichiers prêts à l'emploi sont fournis dans [`docs/postman/`](file:///c:/projets/Lefermier/docs/postman) :
-1. [`Lefermier_API.postman_collection.json`](file:///c:/projets/Lefermier/docs/postman/Lefermier_API.postman_collection.json) : Contient l'ensemble des requêtes préconfigurées avec tests d'extraction automatique du token JWT et support des clés API.
-2. [`Lefermier_Local.postman_environment.json`](file:///c:/projets/Lefermier/docs/postman/Lefermier_Local.postman_environment.json) : Contient les variables locales pré-remplies.
+Deux fichiers prêts à l'emploi sont fournis dans [`docs/postman/`](file:///c:/projets/Poulvia/docs/postman) :
+1. [`Poulvia_API.postman_collection.json`](file:///c:/projets/Poulvia/docs/postman/Poulvia_API.postman_collection.json) : Contient l'ensemble des requêtes préconfigurées avec tests d'extraction automatique du token JWT et support des clés API.
+2. [`Poulvia_Local.postman_environment.json`](file:///c:/projets/Poulvia/docs/postman/Poulvia_Local.postman_environment.json) : Contient les variables locales pré-remplies.
 

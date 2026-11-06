@@ -1,4 +1,4 @@
-name: CI Suite Poulvia
+﻿name: CI Suite Poulvia
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: ""
           MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-          MYSQL_DATABASE: db_lefermier_test
+          MYSQL_DATABASE: db_Poulvia_test
         ports:
           - 3306:3306
         options: >-
@@ -70,7 +70,7 @@ jobs:
           APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
-          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_Poulvia_test?serverVersion=8.4.0&charset=utf8mb4"
 
       - name: Lint Symfony container
         run: php bin/console lint:container
@@ -78,7 +78,7 @@ jobs:
           APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
-          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_Poulvia_test?serverVersion=8.4.0&charset=utf8mb4"
 
       - name: Validate Doctrine mapping
         run: php bin/console doctrine:schema:validate --skip-sync
@@ -86,7 +86,7 @@ jobs:
           APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
-          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_Poulvia_test?serverVersion=8.4.0&charset=utf8mb4"
 
       - name: Run Backend Audit Verification Suite (28 tests P0/P1/P2)
         run: php bin/console app:audit:verify
@@ -94,7 +94,7 @@ jobs:
           APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
-          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_Poulvia_test?serverVersion=8.4.0&charset=utf8mb4"
 
       - name: Run MySQL Integration Tests (InnoDB locks, fencing, rollback, quotas)
         run: php bin/console app:audit:integration
@@ -102,7 +102,7 @@ jobs:
           APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
-          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
+          DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_Poulvia_test?serverVersion=8.4.0&charset=utf8mb4"
 
   mobile-checks:
     name: Mobile Flutter Analysis & Tests

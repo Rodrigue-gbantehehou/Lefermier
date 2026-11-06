@@ -47,7 +47,7 @@ class SecureStorageService {
   static const String _legacyBase64Token = "sec_vault_jwt_token";
   static const String _legacyBase64Refresh = "sec_vault_refresh_token";
   static const String _legacyDeviceId = "sec_vault_device_id";
-  static const String _legacyPlainToken = "lefermier_jwt_token";
+  static const String _legacyPlainToken = "poulvia_jwt_token";
   static const String _legacyEntropySeed = "lf_vault_entropy_seed";
 
   static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
@@ -293,7 +293,7 @@ class SecureStorageService {
   // Migration ascendante transparente des anciens formats vers FlutterSecureStorage
   // ---------------------------------------------------------------------------
 
-  static const String _appSalt = "LeFermier_Secure_Vault_v2_2026";
+  static const String _appSalt = "poulvia_Secure_Vault_v2_2026";
 
   Future<void> _migrateLegacyKeys(SharedPreferences prefs) async {
     // 1. Récupération éventuelle de l'ancien token

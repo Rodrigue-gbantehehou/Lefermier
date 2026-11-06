@@ -63,7 +63,7 @@ class MemberService
                     $user->setPhone(trim($dto->phone));
                 }
 
-                $rawPassword = $dto->password ?? 'Lefermier@' . date('Y');
+                $rawPassword = $dto->password ?? 'Poulvia@' . date('Y');
                 $hashed = $this->passwordHasher->hashPassword($user, $rawPassword);
                 $user->setPassword($hashed);
 

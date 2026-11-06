@@ -1,8 +1,8 @@
-# Règles de conception — Admin Lefermier
+﻿# Règles de conception — Admin Poulvia
 
 ## 1. Objectif
 
-L'application `admin/` est le back-office privé de la plateforme Lefermier. Elle est destinée aux créateurs du logiciel et aux membres autorisés de l'équipe technique ou opérationnelle.
+L'application `admin/` est le back-office privé de la plateforme Poulvia. Elle est destinée aux créateurs du logiciel et aux membres autorisés de l'équipe technique ou opérationnelle.
 
 Elle sert à piloter la plateforme dans son ensemble, et non à gérer les opérations quotidiennes d'une ferme.
 

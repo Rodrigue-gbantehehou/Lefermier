@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -27,7 +27,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Bird className="h-8 w-8 text-accent" />
           </div>
           <p className="text-xs font-semibold text-muted">
-            Chargement de Lefermier...
+            Chargement de Poulvia...
           </p>
         </div>
       </div>

@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Lefermier — Logiciel de Gestion Avicole en Afrique de l'Ouest",
+  title: "Poulvia — Logiciel de Gestion Avicole en Afrique de l'Ouest",
   description:
     "Organisez le suivi de votre ferme : enregistrez vos pontes en plateaux de 30 alvéoles, gérez vos stocks de provende en sacs ou kg, suivez vos vaccins et tenez votre trésorerie en FCFA.",
   keywords: [
@@ -18,24 +18,24 @@ export const metadata: Metadata = {
     "MTN MoMo",
     "Moov Money",
     "prophylaxie aviaire",
-    "Lefermier",
+    "Poulvia",
   ],
-  authors: [{ name: "Lefermier" }],
-  creator: "Lefermier",
-  publisher: "Lefermier",
-  metadataBase: new URL("https://lefermier.app"),
+  authors: [{ name: "Poulvia" }],
+  creator: "Poulvia",
+  publisher: "Poulvia",
+  metadataBase: new URL("https://Poulvia.app"),
   openGraph: {
-    title: "Lefermier — Logiciel de Gestion Avicole en Afrique de l'Ouest",
+    title: "Poulvia — Logiciel de Gestion Avicole en Afrique de l'Ouest",
     description:
       "Suivi complet des élevages de volailles : ponte, provende, prophylaxie et caisse en FCFA.",
-    url: "https://lefermier.app",
-    siteName: "Lefermier",
+    url: "https://Poulvia.app",
+    siteName: "Poulvia",
     locale: "fr_FR",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lefermier — Gestion Avicole Professionnelle",
+    title: "Poulvia — Gestion Avicole Professionnelle",
     description:
       "Le logiciel de suivi conçu pour les exploitations avicoles en Afrique de l'Ouest.",
   },
@@ -66,7 +66,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              name: "Lefermier",
+              name: "Poulvia",
               applicationCategory: "BusinessApplication",
               operatingSystem: "Web, Mobile (Android/iOS)",
               description:

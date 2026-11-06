@@ -1,4 +1,4 @@
-# 📱 Lefermier Web — Client Web & Application PWA
+﻿# 📱 Poulvia Web — Client Web & Application PWA
 
 > **Interface web et Progressive Web App (PWA) pour la gestion d'exploitations avicoles, conçue selon le Design System (`docs/DESIGN_SYSTEM.md`) et les règles fondamentales du projet (`docs/PROJECT_RULES.md`).**
 

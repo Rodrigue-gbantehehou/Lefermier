@@ -11,7 +11,7 @@ use App\Repository\OrganizationRepository;
 use App\Repository\UserRepository;
 
 /**
- * Service de calcul des statistiques globales de la plateforme Lefermier.
+ * Service de calcul des statistiques globales de la plateforme Poulvia.
  */
 class AdminStatsService
 {

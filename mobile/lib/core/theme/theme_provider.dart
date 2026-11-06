@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  static const String _themeKey = "lefermier_theme_mode";
+  static const String _themeKey = "poulvia_theme_mode";
 
   ThemeModeNotifier() : super(ThemeMode.light) {
     _loadSavedTheme();
