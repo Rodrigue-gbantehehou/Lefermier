@@ -1,4 +1,4 @@
-﻿name: CI Suite Poulvia
+name: CI Suite Poulvia
 
 on:
   push:
@@ -21,7 +21,8 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
+          ini-values: zend.assertions=1
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite
           coverage: none
 

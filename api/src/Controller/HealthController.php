@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -65,10 +66,6 @@ class HealthController extends AbstractController
         $from = $fromParam !== null ? new \DateTimeImmutable((string) $fromParam) : null;
         $to = $toParam !== null ? new \DateTimeImmutable((string) $toParam) : null;
 
-        $treatments = $this->treatmentRepository->findByFarm($farm, $flock, $status, $from, $to);
-        $overdueTreatments = $this->treatmentRepository->findOverdueTreatments($farm);
-        $upcomingTreatments = $this->treatmentRepository->findUpcomingTreatments($farm, 5);
-
         // Filtrage strict par bâtiments assignés si l'utilisateur a des restrictions
         $membership = $this->membershipRepository->findOneBy([
             'farm' => $farm,
@@ -76,12 +73,14 @@ class HealthController extends AbstractController
             'isActive' => true,
         ]);
 
+        $allowedBuildings = null;
         if ($membership instanceof FarmMembership && $membership->hasBuildingRestrictions()) {
-            $filterBuilding = fn (HealthTreatment $t) => $t->getFlock() === null || $membership->isBuildingAssigned($t->getFlock()->getBuilding());
-            $treatments = array_values(array_filter($treatments, $filterBuilding));
-            $overdueTreatments = array_values(array_filter($overdueTreatments, $filterBuilding));
-            $upcomingTreatments = array_values(array_filter($upcomingTreatments, $filterBuilding));
+            $allowedBuildings = $membership->getAssignedBuildings()->toArray();
         }
+
+        $treatments = $this->treatmentRepository->findByFarm($farm, $flock, $status, $from, $to, $allowedBuildings);
+        $overdueTreatments = $this->treatmentRepository->findOverdueTreatments($farm, $allowedBuildings);
+        $upcomingTreatments = $this->treatmentRepository->findUpcomingTreatments($farm, 5, $allowedBuildings);
 
         $serialized = array_map(
             fn (HealthTreatment $t) => $this->healthService->serializeTreatment($t),
@@ -124,19 +123,17 @@ class HealthController extends AbstractController
         }
 
         $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
-
-        if ($idempotencyKey !== null) {
-            /** @var JsonResponse */
-            return $this->idempotencyService->process(
-                $idempotencyKey,
-                $user,
-                $request,
-                $farm,
-                fn () => $this->doCreateTreatment($farm, $dto, $user)
-            );
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour planifier un traitement.");
         }
 
-        return $this->doCreateTreatment($farm, $dto, $user);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            fn () => $this->doCreateTreatment($farm, $dto, $user)
+        );
     }
 
     private function doCreateTreatment(Farm $farm, CreateHealthTreatmentRequestDto $dto, User $user): JsonResponse
@@ -154,7 +151,8 @@ class HealthController extends AbstractController
     public function generateProgram(
         Farm $farm,
         #[MapRequestPayload] GenerateProphylaxisProgramRequestDto $dto,
-        #[CurrentUser] User $user
+        #[CurrentUser] User $user,
+        Request $request
     ): JsonResponse {
         $flock = $this->flockRepository->find(Ulid::fromString($dto->flockId));
         if ($flock === null || $flock->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
@@ -173,17 +171,30 @@ class HealthController extends AbstractController
             }
         }
 
-        $treatments = $this->healthService->generateStandardProgram($farm, $flock, $user, $dto->programType);
+        $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour générer un programme prophylactique.");
+        }
 
-        $serialized = array_map(
-            fn (HealthTreatment $t) => $this->healthService->serializeTreatment($t),
-            $treatments
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $farm,
+            function () use ($farm, $flock, $user, $dto): JsonResponse {
+                $treatments = $this->healthService->generateStandardProgram($farm, $flock, $user, $dto->programType);
+
+                $serialized = array_map(
+                    fn (HealthTreatment $t) => $this->healthService->serializeTreatment($t),
+                    $treatments
+                );
+
+                return $this->json([
+                    'data' => $serialized,
+                    'message' => sprintf('Programme prophylactique généré avec succès (%d interventions planifiées).', count($treatments)),
+                ], Response::HTTP_CREATED);
+            }
         );
-
-        return $this->json([
-            'data' => $serialized,
-            'message' => sprintf('Programme prophylactique généré avec succès (%d interventions planifiées).', count($treatments)),
-        ], Response::HTTP_CREATED);
     }
 
     #[Route('/api/health-treatments/{id}', name: 'api_health_treatments_show', methods: ['GET'])]
@@ -218,19 +229,17 @@ class HealthController extends AbstractController
         Request $request
     ): JsonResponse {
         $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
-
-        if ($idempotencyKey !== null) {
-            /** @var JsonResponse */
-            return $this->idempotencyService->process(
-                $idempotencyKey,
-                $user,
-                $request,
-                $treatment->getFarm(),
-                fn () => $this->doCompleteTreatment($treatment, $dto, $user)
-            );
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour administrer un traitement.");
         }
 
-        return $this->doCompleteTreatment($treatment, $dto, $user);
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $treatment->getFarm(),
+            fn () => $this->doCompleteTreatment($treatment, $dto, $user)
+        );
     }
 
     private function doCompleteTreatment(

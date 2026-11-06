@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Enum\FlockStatus;
 use App\Repository\EggProductionRepository;
 use App\Repository\FlockRepository;
+use App\Repository\FarmMembershipRepository;
 use App\Repository\TransactionRepository;
 use App\Security\Voter\FarmVoter;
 use App\Security\Voter\FlockVoter;
@@ -22,9 +23,9 @@ use App\Service\PdfService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use App\Repository\FarmMembershipRepository;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -120,19 +121,22 @@ class FlockController extends AbstractController
         Request $request,
     ): JsonResponse {
         $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
-
-        if ($idempotencyKey !== null && $user !== null) {
-            /** @var JsonResponse */
-            return $this->idempotencyService->process(
-                $idempotencyKey,
-                $user,
-                $request,
-                $flock->getFarm(),
-                fn () => $this->doRecordMovement($flock, $dto, $user)
-            );
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour enregistrer un mouvement de cheptel.");
         }
 
-        return $this->doRecordMovement($flock, $dto, $user);
+        if ($user === null) {
+            throw new BadRequestHttpException("Utilisateur non authentifié.");
+        }
+
+        /** @var JsonResponse */
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $flock->getFarm(),
+            fn () => $this->doRecordMovement($flock, $dto, $user)
+        );
     }
 
     private function doRecordMovement(

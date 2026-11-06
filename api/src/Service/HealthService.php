@@ -22,6 +22,7 @@ use App\Exception\InsufficientStockException;
 use App\Repository\FlockRepository;
 use App\Repository\HealthTreatmentRepository;
 use App\Repository\InventoryItemRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -118,25 +119,31 @@ class HealthService
 
             // 2. Décompte de stock avec verrouillage pessimiste
             $quantityUsed = $dto->quantityUsed ?? $treatment->getQuantityUsed();
-            if ($item !== null && $dto->deductFromStock && $quantityUsed !== null) {
+            if ($item !== null && $dto->deductFromStock) {
+                if ($quantityUsed === null || trim((string) $quantityUsed) === '') {
+                    throw new UnprocessableEntityHttpException("Une quantité positive valide est requise pour déduire l'article de stock.");
+                }
                 $qty = round((float) $quantityUsed, 2);
-                if ($qty > 0.0) {
-                    $this->entityManager->lock($item, LockMode::PESSIMISTIC_WRITE);
-                    if ($this->entityManager->contains($item)) {
-                        $this->entityManager->refresh($item, LockMode::PESSIMISTIC_WRITE);
-                    }
+                if ($qty <= 0.0) {
+                    throw new UnprocessableEntityHttpException("Une quantité positive valide est requise pour déduire l'article de stock.");
+                }
 
-                    $currentStock = $item->getCurrentStock();
-                    if ($qty > $currentStock) {
-                        throw new InsufficientStockException(
-                            $qty,
-                            $currentStock,
-                            $item->getUnit()->getShortLabel()
-                        );
-                    }
+                $this->entityManager->lock($item, LockMode::PESSIMISTIC_WRITE);
+                if ($this->entityManager->contains($item)) {
+                    $this->entityManager->refresh($item, LockMode::PESSIMISTIC_WRITE);
+                }
 
-                    $newStock = round($currentStock - $qty, 2);
-                    $item->setCurrentStock($newStock);
+                $currentStock = $item->getCurrentStock();
+                if ($qty > $currentStock) {
+                    throw new InsufficientStockException(
+                        $qty,
+                        $currentStock,
+                        $item->getUnit()->getShortLabel()
+                    );
+                }
+
+                $newStock = round($currentStock - $qty, 2);
+                $item->setCurrentStock($newStock);
 
                     $movement = new StockMovement(
                         item: $item,
@@ -151,7 +158,6 @@ class HealthService
                     );
                     $item->addMovement($movement);
                     $this->entityManager->persist($movement);
-                }
             }
 
             // 3. Application des mutations sur le soin une fois la cohérence et les ressources garanties
@@ -233,8 +239,17 @@ class HealthService
         }
 
         if ($dto->inventoryItemId !== null) {
-            $item = $this->itemRepository->find(Ulid::fromString($dto->inventoryItemId));
-            if ($item !== null && $item->getFarm()->getId()?->toBase32() === $treatment->getFarm()->getId()?->toBase32()) {
+            $trimmedItemId = trim($dto->inventoryItemId);
+            if ($trimmedItemId === '') {
+                $treatment->setInventoryItem(null);
+            } else {
+                if (!Ulid::isValid($trimmedItemId)) {
+                    throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable.");
+                }
+                $item = $this->itemRepository->find(Ulid::fromString($trimmedItemId));
+                if ($item === null || $item->getFarm()->getId()?->toBase32() !== $treatment->getFarm()->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable ou n'appartient pas à cette exploitation.");
+                }
                 $treatment->setInventoryItem($item);
             }
         }
@@ -261,52 +276,70 @@ class HealthService
         User $user,
         ?string $programType = null
     ): array {
-        $isLayer = ($programType === 'STANDARD_LAYER') || ($flock->getPoultryType() === PoultryType::LAYER);
-        $startDate = $flock->getStartDate();
-        $initialAge = $flock->getInitialAgeDays();
+        return $this->entityManager->wrapInTransaction(function () use ($farm, $flock, $user, $programType): array {
+            // 1. Verrouillage pessimiste en écriture sur la bande pour éviter les générations concurrentes
+            $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
 
-        $scheduleTemplates = $isLayer ? $this->getLayerSchedule() : $this->getBroilerSchedule();
+            $isLayer = ($programType === 'STANDARD_LAYER') || ($flock->getPoultryType() === PoultryType::LAYER);
+            $startDate = $flock->getStartDate();
+            $initialAge = $flock->getInitialAgeDays();
 
-        // Récupération des soins existants pour garantir une génération strictement idempotente
-        $existingTreatments = $this->treatmentRepository->findBy(['flock' => $flock]);
-        $existingKeys = [];
-        foreach ($existingTreatments as $et) {
-            $existingKeys[$et->getTitle() . '_' . $et->getTargetAgeDays()] = true;
-        }
+            $scheduleTemplates = $isLayer ? $this->getLayerSchedule() : $this->getBroilerSchedule();
 
-        $createdTreatments = [];
-
-        foreach ($scheduleTemplates as $tpl) {
-            $targetAge = $tpl['age'];
-            $key = $tpl['title'] . '_' . $targetAge;
-            if (isset($existingKeys[$key])) {
-                continue; // Déjà planifié : idempotence
+            // 2. Récupération des soins existants pour garantir une génération strictement idempotente
+            $existingTreatments = $this->treatmentRepository->findBy(['flock' => $flock]);
+            $existingKeys = [];
+            foreach ($existingTreatments as $et) {
+                if ($et->getBusinessKey() !== null) {
+                    $existingKeys[$et->getBusinessKey()] = true;
+                }
+                $existingKeys[$et->getTitle() . '_' . $et->getTargetAgeDays()] = true;
             }
 
-            $daysToAdd = max(0, $targetAge - $initialAge);
-            $scheduledDate = $startDate->modify('+' . $daysToAdd . ' days');
+            $createdTreatments = [];
 
-            $treatment = new HealthTreatment(
-                farm: $farm,
-                flock: $flock,
-                title: $tpl['title'],
-                type: $tpl['type'],
-                administrationMethod: $tpl['method'],
-                targetAgeDays: $targetAge,
-                scheduledDate: $scheduledDate,
-                status: HealthTreatmentStatus::SCHEDULED,
-                notes: $tpl['notes'] ?? null,
-                recordedBy: $user
-            );
+            try {
+                foreach ($scheduleTemplates as $tpl) {
+                    $targetAge = $tpl['age'];
+                    $slug = preg_replace('/[^a-z0-9]+/i', '_', strtolower(substr($tpl['title'], 0, 40)));
+                    $businessKey = sprintf('PROPH_%d_%s', $targetAge, trim((string) $slug, '_'));
 
-            $this->entityManager->persist($treatment);
-            $createdTreatments[] = $treatment;
-            $existingKeys[$key] = true;
-        }
+                    $key = $tpl['title'] . '_' . $targetAge;
+                    if (isset($existingKeys[$businessKey]) || isset($existingKeys[$key])) {
+                        continue; // Déjà planifié : idempotence
+                    }
 
-        $this->entityManager->flush();
+                    $daysToAdd = max(0, $targetAge - $initialAge);
+                    $scheduledDate = $startDate->modify('+' . $daysToAdd . ' days');
 
-        return $createdTreatments;
+                    $treatment = new HealthTreatment(
+                        farm: $farm,
+                        flock: $flock,
+                        title: $tpl['title'],
+                        type: $tpl['type'],
+                        administrationMethod: $tpl['method'],
+                        targetAgeDays: $targetAge,
+                        scheduledDate: $scheduledDate,
+                        status: HealthTreatmentStatus::SCHEDULED,
+                        notes: $tpl['notes'] ?? null,
+                        recordedBy: $user
+                    );
+                    $treatment->setBusinessKey($businessKey);
+
+                    $this->entityManager->persist($treatment);
+                    $createdTreatments[] = $treatment;
+                    $existingKeys[$businessKey] = true;
+                    $existingKeys[$key] = true;
+                }
+
+                $this->entityManager->flush();
+            } catch (UniqueConstraintViolationException) {
+                // En cas de course concurrente malgré le verrouillage, retourner les soins existants
+                return $this->treatmentRepository->findBy(['flock' => $flock]);
+            }
+
+            return $createdTreatments;
+        });
     }
 
     /**

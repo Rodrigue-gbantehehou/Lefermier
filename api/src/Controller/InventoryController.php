@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -111,19 +112,22 @@ class InventoryController extends AbstractController
         Request $request,
     ): JsonResponse {
         $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
-
-        if ($idempotencyKey !== null && $user !== null) {
-            /** @var JsonResponse */
-            return $this->idempotencyService->process(
-                $idempotencyKey,
-                $user,
-                $request,
-                $item->getFarm(),
-                fn () => $this->doRecordMovement($item, $dto, $user)
-            );
+        if ($idempotencyKey === null || trim($idempotencyKey) === '') {
+            throw new BadRequestHttpException("L'en-tête Idempotency-Key est obligatoire pour enregistrer un mouvement de stock.");
         }
 
-        return $this->doRecordMovement($item, $dto, $user);
+        if ($user === null) {
+            throw new BadRequestHttpException("Utilisateur non authentifié.");
+        }
+
+        /** @var JsonResponse */
+        return $this->idempotencyService->process(
+            $idempotencyKey,
+            $user,
+            $request,
+            $item->getFarm(),
+            fn () => $this->doRecordMovement($item, $dto, $user)
+        );
     }
 
     private function doRecordMovement(

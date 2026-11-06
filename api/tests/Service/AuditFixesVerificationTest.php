@@ -23,6 +23,7 @@ use App\Entity\Transaction;
 use App\Entity\User;
 use App\Enum\AdministrationMethod;
 use App\Enum\BuildingType;
+use App\Enum\FarmRole;
 use App\Enum\FlockMovementType;
 use App\Enum\FlockStatus;
 use App\Enum\HealthTreatmentStatus;
@@ -38,6 +39,7 @@ use App\Enum\TransactionType;
 use App\Exception\IncompatibleUnitException;
 use App\Exception\InsufficientFlockQuantityException;
 use App\Exception\InsufficientStockException;
+use App\Exception\PlanQuotaExceededException;
 use App\Repository\BuildingRepository;
 use App\Repository\ContactRepository;
 use App\Repository\DeviceRefreshTokenRepository;
@@ -62,10 +64,26 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
+use App\Controller\TransactionController;
+use App\Controller\FlockController;
+use App\Controller\InventoryController;
+use App\Controller\EggProductionController;
+use App\Controller\HealthController;
+use App\Dto\Transaction\CreateTransactionRequestDto;
+use App\Dto\Health\CreateHealthTreatmentRequestDto;
+use App\Dto\Health\UpdateHealthTreatmentRequestDto;
+use App\Dto\Health\GenerateProphylaxisProgramRequestDto;
+use App\Dto\EggProduction\CreateEggProductionRequestDto;
+use App\Entity\FarmMembership;
+use App\Repository\IdempotencyRecordRepository;
+use App\Service\IdempotencyService;
 
 /**
  * Suite de vérification complète couvrant les anomalies de l'audit backend :
@@ -96,6 +114,13 @@ final class AuditFixesVerificationTest
             'testRefreshTokenFamilyRevocationCommittedOnReuse' => 'Sécurité JWT: commit immédiat de révocation de famille sur réutilisation',
             'testDashboardApiKeyScopesAndSanitaryBuildingIsolation' => 'Dashboard: filtrage strict clés API et isolation sanitaire des bâtiments',
             'testInventoryPrecisionValidationAndRounding' => 'Inventaire: arrondi à 2 décimales et contrôle de précision',
+            'testIdempotencyKeyEnforcedOnSensitiveEndpoints' => 'Idempotence: en-tête obligatoire sur mutations sensibles (400 si omis)',
+            'testIdempotencyAtomicTransactionCoordination' => 'Idempotence: coordination atomique bout en bout (rollback unifié)',
+            'testProphylaxisGenerationPessimisticLockAndUniqueBusinessKey' => 'Prophylaxie: verrou pessimiste cheptel et unicité business_key',
+            'testHealthBuildingFilteringAtDatabaseLevelBeforePagination' => 'Santé: filtrage SQL par bâtiments assignés avant limite',
+            'testTreatmentCompletionRejectsZeroOrNegativeQuantityWhenDeductingStock' => 'Santé: rejet quantité nulle ou négative si décompte stock',
+            'testTreatmentUpdateRejectsNonExistentOrCrossFarmInventoryItem' => 'Santé: rejet article invalide ou cross-farm dans mise à jour soin',
+            'testFlockPartialTransferEnforcesSubscriptionQuotaAndGeneratesCollisionProofCode' => 'Cheptel: contrôle strict quotas de scission et code aléatoire',
         ];
 
         foreach ($tests as $method => $description) {
@@ -103,7 +128,7 @@ final class AuditFixesVerificationTest
             echo sprintf("  [PASS] %s\n", $description);
         }
 
-        echo "\nALL AUDIT VERIFICATION TESTS PASSED SUCCESSFULLY (16/16).\n";
+        echo "\nALL AUDIT VERIFICATION TESTS PASSED SUCCESSFULLY (23/23).\n";
     }
 
     private static function createTestFarm(string $name = 'Ferme Test'): Farm
@@ -115,19 +140,34 @@ final class AuditFixesVerificationTest
     private static function createMockEntityManager(
         array &$lockedEntities,
         ?array &$persistedEntities = null,
-        ?callable $onCommit = null
+        ?callable $onCommit = null,
+        ?callable $onBeginTransaction = null,
+        ?callable $onRollback = null,
+        ?\Doctrine\DBAL\Connection $connection = null
     ): EntityManagerInterface {
-        return new class($lockedEntities, $persistedEntities, $onCommit) implements EntityManagerInterface {
+        return new class($lockedEntities, $persistedEntities, $onCommit, $onBeginTransaction, $onRollback, $connection) implements EntityManagerInterface {
             /** @var array<int, array{entity: object, lockMode: mixed}> */
             private array $locks;
             private ?array $persisted;
             private mixed $onCommit;
+            private mixed $onBeginTransaction;
+            private mixed $onRollback;
+            private ?\Doctrine\DBAL\Connection $conn;
 
-            public function __construct(array &$lockedEntities, ?array &$persistedEntities = null, ?callable $onCommit = null)
-            {
+            public function __construct(
+                array &$lockedEntities,
+                ?array &$persistedEntities = null,
+                ?callable $onCommit = null,
+                ?callable $onBeginTransaction = null,
+                ?callable $onRollback = null,
+                ?\Doctrine\DBAL\Connection $connection = null
+            ) {
                 $this->locks = &$lockedEntities;
                 $this->persisted = &$persistedEntities;
                 $this->onCommit = $onCommit;
+                $this->onBeginTransaction = $onBeginTransaction;
+                $this->onRollback = $onRollback;
+                $this->conn = $connection;
             }
 
             public function wrapInTransaction(callable $func): mixed
@@ -193,7 +233,7 @@ final class AuditFixesVerificationTest
 
             public function getConnection(): \Doctrine\DBAL\Connection
             {
-                return (new \ReflectionClass(\Doctrine\DBAL\Connection::class))->newInstanceWithoutConstructor();
+                return $this->conn ?? (new \ReflectionClass(\Doctrine\DBAL\Connection::class))->newInstanceWithoutConstructor();
             }
 
             public function getMetadataFactory(): \Doctrine\ORM\Mapping\ClassMetadataFactory
@@ -208,6 +248,9 @@ final class AuditFixesVerificationTest
 
             public function beginTransaction(): void
             {
+                if ($this->onBeginTransaction !== null) {
+                    ($this->onBeginTransaction)();
+                }
             }
 
             public function commit(): void
@@ -219,6 +262,9 @@ final class AuditFixesVerificationTest
 
             public function rollback(): void
             {
+                if ($this->onRollback !== null) {
+                    ($this->onRollback)();
+                }
             }
 
             public function createQuery(string $dql = ''): \Doctrine\ORM\Query
@@ -917,7 +963,10 @@ final class AuditFixesVerificationTest
 
         $flockRepo = (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor();
         $movRepo = (new \ReflectionClass(FlockMovementRepository::class))->newInstanceWithoutConstructor();
-        $planService = (new \ReflectionClass(CommercialPlanService::class))->newInstanceWithoutConstructor();
+        $planService = new class extends CommercialPlanService {
+            public function __construct() {}
+            public function assertCanCreateFlock(\App\Entity\Farm $farm): void {}
+        };
 
         $service = new FlockService($flockRepo, $movRepo, $bldgRepo, $planService, $em);
 
@@ -1191,4 +1240,554 @@ final class AuditFixesVerificationTest
         // 10.0 - 2.33 = 7.67
         assert(abs($item->getCurrentStock() - 7.67) < 0.001, 'Stock must be rounded to exactly 2 decimals, expected 7.67 got ' . $item->getCurrentStock());
     }
+
+    private static function testIdempotencyKeyEnforcedOnSensitiveEndpoints(): void
+    {
+        $farm = self::createTestFarm('Ferme Idem');
+        $user = new User('idem@example.com', 'Idem', 'User');
+        $flock = new Flock($farm, 'LOT-IDEM', 'Lot Idem', 500, new \DateTimeImmutable('2026-01-01'), PoultryType::BROILER);
+        $item = new InventoryItem($farm, 'Item Idem', InventoryCategory::FEED, InventoryUnit::BAG, 10.0);
+        $treatment = new HealthTreatment(
+            farm: $farm,
+            flock: $flock,
+            title: 'Soin Idem',
+            type: HealthTreatmentType::VACCINATION,
+            administrationMethod: AdministrationMethod::DRINKING_WATER,
+            targetAgeDays: 10,
+            scheduledDate: new \DateTimeImmutable('2026-01-10')
+        );
+
+        $requestWithoutKey = new Request();
+        $requestWithBlankKey = new Request();
+        $requestWithBlankKey->headers->set('Idempotency-Key', '   ');
+
+        // 1. TransactionController::create
+        $txCtrl = (new \ReflectionClass(TransactionController::class))->newInstanceWithoutConstructor();
+        $txDto = new CreateTransactionRequestDto(
+            type: TransactionType::EXPENSE,
+            category: TransactionCategory::OTHER_EXPENSE,
+            amount: 1000,
+            transactionDate: '2026-11-06'
+        );
+        $caught = false;
+        try {
+            $txCtrl->create($farm, $txDto, $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'TransactionController::create must require Idempotency-Key');
+
+        // 2. FlockController::recordMovement
+        $flockCtrl = (new \ReflectionClass(FlockController::class))->newInstanceWithoutConstructor();
+        $flockDto = new CreateFlockMovementRequestDto(
+            type: FlockMovementType::MORTALITY,
+            quantity: 5,
+            movementDate: '2026-11-06'
+        );
+        $caught = false;
+        try {
+            $flockCtrl->recordMovement($flock, $flockDto, $user, $requestWithBlankKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'FlockController::recordMovement must reject blank Idempotency-Key');
+
+        // 3. InventoryController::recordMovement
+        $invCtrl = (new \ReflectionClass(InventoryController::class))->newInstanceWithoutConstructor();
+        $stockDto = new CreateStockMovementRequestDto(
+            type: StockMovementType::ADJUSTMENT,
+            quantity: 2.0,
+            movementDate: '2026-11-06'
+        );
+        $caught = false;
+        try {
+            $invCtrl->recordMovement($item, $stockDto, $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'InventoryController::recordMovement must require Idempotency-Key');
+
+        // 4. EggProductionController::create
+        $eggCtrl = (new \ReflectionClass(EggProductionController::class))->newInstanceWithoutConstructor();
+        $eggDto = new CreateEggProductionRequestDto(
+            productionDate: '2026-11-06',
+            goodEggs: 120
+        );
+        $caught = false;
+        try {
+            $eggCtrl->create($flock, $eggDto, $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'EggProductionController::create must require Idempotency-Key');
+
+        // 5. HealthController mutations (create, generateProgram, complete)
+        $propLocks = [];
+        $em = self::createMockEntityManager($propLocks);
+        $flockRepo = new class($flock) extends FlockRepository {
+            private Flock $f;
+            public function __construct(Flock $f) { $this->f = $f; }
+            public function find(mixed $id, LockMode|int|null $lockMode = null, ?int $lockVersion = null): ?object {
+                return $this->f;
+            }
+        };
+        $memRepo = new class extends FarmMembershipRepository {
+            public function __construct() {}
+            public function findOneBy(array $criteria, ?array $orderBy = null): ?object {
+                return null;
+            }
+        };
+        $healthCtrl = new HealthController(
+            (new \ReflectionClass(HealthService::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(HealthTreatmentRepository::class))->newInstanceWithoutConstructor(),
+            $flockRepo,
+            $memRepo,
+            (new \ReflectionClass(IdempotencyService::class))->newInstanceWithoutConstructor()
+        );
+
+        $caught = false;
+        try {
+            $healthCtrl->create($farm, new CreateHealthTreatmentRequestDto(
+                flockId: $flock->getId()->toBase32(),
+                title: 'Vaccin Test',
+                type: HealthTreatmentType::VACCINATION,
+                administrationMethod: AdministrationMethod::DRINKING_WATER,
+                scheduledDate: '2026-11-10',
+                targetAgeDays: 14
+            ), $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'HealthController::create must require Idempotency-Key');
+
+        $caught = false;
+        try {
+            $healthCtrl->generateProgram($farm, new GenerateProphylaxisProgramRequestDto(
+                flockId: $flock->getId()->toBase32()
+            ), $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'HealthController::generateProgram must require Idempotency-Key');
+
+        $caught = false;
+        try {
+            $healthCtrl->complete($treatment, new CompleteHealthTreatmentRequestDto(), $user, $requestWithoutKey);
+        } catch (BadRequestHttpException) {
+            $caught = true;
+        }
+        assert($caught, 'HealthController::complete must require Idempotency-Key');
+    }
+
+    private static function testIdempotencyAtomicTransactionCoordination(): void
+    {
+        $farm = self::createTestFarm('Ferme Idem Coordination');
+        $user = new User('coord@example.com', 'Coord', 'User');
+
+        $txStarted = 0;
+        $txCommitted = 0;
+        $txRolledBack = 0;
+        $flushed = 0;
+        $connActive = false;
+
+        $conn = new class($connActive, $txRolledBack) extends \Doctrine\DBAL\Connection {
+            private bool $active;
+            private int $rolledBack;
+            public function __construct(bool &$active, int &$rolledBack) {
+                $this->active = &$active;
+                $this->rolledBack = &$rolledBack;
+            }
+            public function isTransactionActive(): bool {
+                return $this->active;
+            }
+            public function rollBack(): void {
+                $this->rolledBack++;
+                $this->active = false;
+            }
+        };
+
+        $dummyLocks = [];
+        $persisted = [];
+        $em = self::createMockEntityManager(
+            $dummyLocks,
+            $persisted,
+            onCommit: function () use (&$txCommitted, &$connActive) {
+                $txCommitted++;
+                $connActive = false;
+            },
+            onBeginTransaction: function () use (&$txStarted, &$connActive) {
+                $txStarted++;
+                $connActive = true;
+            },
+            onRollback: function () use (&$connActive) {
+                $connActive = false;
+            },
+            connection: $conn
+        );
+
+        $failedRecordId = null;
+        $failedMessage = null;
+        $recordRepo = new class($failedRecordId, $failedMessage) extends IdempotencyRecordRepository {
+            private mixed $fId;
+            private mixed $fMsg;
+            public function __construct(mixed &$fId, mixed &$fMsg) {
+                $this->fId = &$fId;
+                $this->fMsg = &$fMsg;
+            }
+            public function findByKey(string $key): ?IdempotencyRecord { return null; }
+            public function markFailed(mixed $id, ?string $errorMessage = null): int {
+                $this->fId = $id;
+                $this->fMsg = $errorMessage;
+                return 1;
+            }
+        };
+
+        $service = new IdempotencyService($recordRepo, $em);
+        $req = new Request([], [], [], [], [], ['REQUEST_URI' => '/api/test', 'REQUEST_METHOD' => 'POST'], '{"data":1}');
+
+        // Cas A : Succès -> beginTransaction et commit appelés
+        $res = $service->process('key-atom-ok-1', $user, $req, $farm, fn() => new JsonResponse(['success' => true]));
+        assert($res->getStatusCode() === 200);
+        assert($txStarted === 1, 'beginTransaction must be called');
+        assert($txCommitted === 1, 'commit must be called');
+        assert($txRolledBack === 0, 'No rollback on success');
+
+        // Cas B : Échec d'exécution -> rollback appelé et markFailed invoqué
+        $errorCaught = false;
+        try {
+            $service->process('key-atom-err-1', $user, $req, $farm, fn() => throw new \RuntimeException('Panne SQL'));
+        } catch (\RuntimeException) {
+            $errorCaught = true;
+        }
+        assert($errorCaught);
+        assert($txRolledBack === 1, 'rollBack must be called on connection when business execution throws');
+        assert($failedMessage === 'Panne SQL', 'markFailed must record business failure message');
+    }
+
+    private static function testProphylaxisGenerationPessimisticLockAndUniqueBusinessKey(): void
+    {
+        $farm = self::createTestFarm('Ferme Prophylaxie');
+        $flock = new Flock($farm, 'LOT-PROPH-1', 'Bande Proph', 1000, new \DateTimeImmutable('2026-02-01'), PoultryType::BROILER);
+        $user = new User('proph@example.com', 'Doc', 'Veto');
+
+        $locks = [];
+        $persisted = [];
+        $em = self::createMockEntityManager($locks, $persisted);
+
+        $savedTreatments = [];
+        $treatmentRepo = new class($savedTreatments) extends HealthTreatmentRepository {
+            private array $saved;
+            public function __construct(array &$saved) { $this->saved = &$saved; }
+            public function findBy(array $criteria, ?array $orderBy = null, $limit = null, $offset = null): array {
+                return $this->saved;
+            }
+        };
+        $flockRepo = (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor();
+        $itemRepo = (new \ReflectionClass(InventoryItemRepository::class))->newInstanceWithoutConstructor();
+
+        $service = new HealthService($treatmentRepo, $flockRepo, $itemRepo, $em);
+
+        $created = $service->generateStandardProgram($farm, $flock, $user);
+
+        // 1. Verrouillage pessimiste en écriture sur la bande
+        $flockLocked = false;
+        foreach ($locks as $l) {
+            if ($l['entity'] === $flock && $l['lockMode'] === LockMode::PESSIMISTIC_WRITE) {
+                $flockLocked = true;
+                break;
+            }
+        }
+        assert($flockLocked, 'Flock must be locked with PESSIMISTIC_WRITE during prophylaxis generation');
+
+        // 2. Unicité et présence de businessKey déterministe
+        assert(count($created) > 0, 'Must generate standard program treatments');
+        $keys = [];
+        foreach ($created as $t) {
+            assert($t->getBusinessKey() !== null, 'Treatment must have a businessKey');
+            assert(str_starts_with($t->getBusinessKey(), 'PROPH_'), 'businessKey must start with PROPH_ prefix');
+            assert(!isset($keys[$t->getBusinessKey()]), 'Each generated treatment must have a unique businessKey');
+            $keys[$t->getBusinessKey()] = true;
+            $savedTreatments[] = $t;
+        }
+
+        // 3. Deuxième exécution pour la même bande -> aucune création en doublon
+        $secondRun = $service->generateStandardProgram($farm, $flock, $user);
+        assert(count($secondRun) === 0, 'Re-running generateStandardProgram must produce 0 duplicate treatments');
+    }
+
+    private static function testHealthBuildingFilteringAtDatabaseLevelBeforePagination(): void
+    {
+        $farm = self::createTestFarm('Ferme Sanitaire Filtrage');
+        $user = new User('filtre@example.com', 'Filtre', 'User');
+        $bldgA = new Building($farm, 'Bâtiment Autorisé', BuildingType::POULTRY_HOUSE, 1000);
+        $bldgB = new Building($farm, 'Bâtiment Interdit', BuildingType::POULTRY_HOUSE, 1000);
+
+        $membership = new FarmMembership($farm, $user, FarmRole::VET_CONSULTANT);
+        $membership->addAssignedBuilding($bldgA);
+
+        $passedBuildingsFindByFarm = null;
+        $passedBuildingsUpcoming = null;
+        $passedBuildingsOverdue = null;
+
+        $treatmentRepo = new class($passedBuildingsFindByFarm, $passedBuildingsUpcoming, $passedBuildingsOverdue) extends HealthTreatmentRepository {
+            private mixed $pFarm;
+            private mixed $pUp;
+            private mixed $pOver;
+            public function __construct(mixed &$pFarm, mixed &$pUp, mixed &$pOver) {
+                $this->pFarm = &$pFarm;
+                $this->pUp = &$pUp;
+                $this->pOver = &$pOver;
+            }
+            public function findByFarm(Farm $farm, ?Flock $flock = null, ?HealthTreatmentStatus $status = null, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null, ?array $allowedBuildings = null): array {
+                $this->pFarm = $allowedBuildings;
+                return [];
+            }
+            public function findUpcomingTreatments(Farm $farm, int $limit = 5, ?array $allowedBuildings = null): array {
+                $this->pUp = $allowedBuildings;
+                return [];
+            }
+            public function findOverdueTreatments(Farm $farm, ?array $allowedBuildings = null): array {
+                $this->pOver = $allowedBuildings;
+                return [];
+            }
+        };
+
+        $memRepo = new class($membership) extends FarmMembershipRepository {
+            private object $mem;
+            public function __construct(object $mem) { $this->mem = $mem; }
+            public function findOneBy(array $criteria, ?array $orderBy = null): ?object {
+                return $this->mem;
+            }
+        };
+
+        $controller = new HealthController(
+            (new \ReflectionClass(HealthService::class))->newInstanceWithoutConstructor(),
+            $treatmentRepo,
+            (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor(),
+            $memRepo,
+            (new \ReflectionClass(IdempotencyService::class))->newInstanceWithoutConstructor()
+        );
+        $container = new class implements \Psr\Container\ContainerInterface {
+            public function get(string $id): mixed { return null; }
+            public function has(string $id): bool { return false; }
+        };
+        $controller->setContainer($container);
+
+        $response = $controller->list($farm, new Request(), $user);
+        assert($response->getStatusCode() === 200);
+
+        // Vérification que les requêtes ont bien reçu les bâtiments assignés
+        assert($passedBuildingsFindByFarm !== null, 'findByFarm must receive allowedBuildings parameter');
+        assert(count($passedBuildingsFindByFarm) === 1 && $passedBuildingsFindByFarm[0] === $bldgA);
+        assert($passedBuildingsUpcoming !== null, 'findUpcomingTreatments must receive allowedBuildings before limit');
+        assert(count($passedBuildingsUpcoming) === 1 && $passedBuildingsUpcoming[0] === $bldgA);
+        assert($passedBuildingsOverdue !== null, 'findOverdueTreatments must receive allowedBuildings');
+        assert(count($passedBuildingsOverdue) === 1 && $passedBuildingsOverdue[0] === $bldgA);
+    }
+
+    private static function testTreatmentCompletionRejectsZeroOrNegativeQuantityWhenDeductingStock(): void
+    {
+        $farm = self::createTestFarm('Ferme Soin Stock');
+        $user = new User('veto@example.com', 'Soin', 'Veto');
+        $item = new InventoryItem($farm, 'Vaccin Gumboro Flacon', InventoryCategory::MEDICATION, InventoryUnit::DOSE, 100.0);
+        $item->setCurrentStock(50.0);
+
+        $flock = new Flock($farm, 'LOT-SOIN', 'Bande Soin', 1000, new \DateTimeImmutable('2026-03-01'), PoultryType::BROILER);
+        $treatment = new HealthTreatment(
+            farm: $farm,
+            flock: $flock,
+            title: 'Gumboro J12',
+            type: HealthTreatmentType::VACCINATION,
+            administrationMethod: AdministrationMethod::DRINKING_WATER,
+            targetAgeDays: 12,
+            scheduledDate: new \DateTimeImmutable('2026-03-12')
+        );
+        $treatment->setInventoryItem($item);
+
+        $dummyLocks = [];
+        $em = self::createMockEntityManager($dummyLocks);
+        $treatmentRepo = (new \ReflectionClass(HealthTreatmentRepository::class))->newInstanceWithoutConstructor();
+        $flockRepo = (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor();
+        $itemRepo = (new \ReflectionClass(InventoryItemRepository::class))->newInstanceWithoutConstructor();
+
+        $service = new HealthService($treatmentRepo, $flockRepo, $itemRepo, $em);
+
+        // 1. Quantité nulle (0.0) -> Exception
+        $zeroCaught = false;
+        try {
+            $service->completeTreatment($treatment, new CompleteHealthTreatmentRequestDto(
+                quantityUsed: '0',
+                deductFromStock: true
+            ), $user);
+        } catch (UnprocessableEntityHttpException) {
+            $zeroCaught = true;
+        }
+        assert($zeroCaught, 'completeTreatment must reject quantityUsed = 0 when deductFromStock is true');
+
+        // 2. Quantité négative (-5) -> Exception
+        $negativeCaught = false;
+        try {
+            $service->completeTreatment($treatment, new CompleteHealthTreatmentRequestDto(
+                quantityUsed: '-5.0',
+                deductFromStock: true
+            ), $user);
+        } catch (UnprocessableEntityHttpException) {
+            $negativeCaught = true;
+        }
+        assert($negativeCaught, 'completeTreatment must reject negative quantityUsed');
+
+        // 3. Quantité absente alors que deductFromStock est true -> Exception
+        $nullCaught = false;
+        try {
+            $service->completeTreatment($treatment, new CompleteHealthTreatmentRequestDto(
+                quantityUsed: null,
+                deductFromStock: true
+            ), $user);
+        } catch (UnprocessableEntityHttpException) {
+            $nullCaught = true;
+        }
+        assert($nullCaught, 'completeTreatment must reject null quantityUsed when deductFromStock is true');
+    }
+
+    private static function testTreatmentUpdateRejectsNonExistentOrCrossFarmInventoryItem(): void
+    {
+        $farm1 = self::createTestFarm('Ferme 1');
+        $farm2 = self::createTestFarm('Ferme 2');
+        $flock = new Flock($farm1, 'LOT-F1', 'Bande F1', 500, new \DateTimeImmutable('2026-01-01'), PoultryType::BROILER);
+        $treatment = new HealthTreatment(
+            farm: $farm1,
+            flock: $flock,
+            title: 'Traitement F1',
+            type: HealthTreatmentType::TREATMENT,
+            administrationMethod: AdministrationMethod::DRINKING_WATER,
+            targetAgeDays: 5,
+            scheduledDate: new \DateTimeImmutable('2026-01-05')
+        );
+
+        $crossItem = new InventoryItem($farm2, 'Produit Ferme 2', InventoryCategory::MEDICATION, InventoryUnit::VIAL, 10.0);
+
+        $itemsMap = [
+            $crossItem->getId()?->toBase32() => $crossItem,
+        ];
+        $itemRepo = new class($itemsMap) extends InventoryItemRepository {
+            private array $map;
+            public function __construct(array $map) { $this->map = $map; }
+            public function find(mixed $id, LockMode|int|null $lockMode = null, ?int $lockVersion = null): ?object {
+                $key = $id instanceof \Symfony\Component\Uid\Ulid ? $id->toBase32() : (string) $id;
+                return $this->map[$key] ?? null;
+            }
+        };
+
+        $dummyLocks = [];
+        $em = self::createMockEntityManager($dummyLocks);
+        $treatmentRepo = (new \ReflectionClass(HealthTreatmentRepository::class))->newInstanceWithoutConstructor();
+        $flockRepo = (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor();
+
+        $service = new HealthService($treatmentRepo, $flockRepo, $itemRepo, $em);
+
+        // 1. Article appartenant à une autre exploitation -> NotFoundHttpException
+        $crossCaught = false;
+        try {
+            $service->updateTreatment($treatment, new UpdateHealthTreatmentRequestDto(
+                inventoryItemId: $crossItem->getId()?->toBase32()
+            ));
+        } catch (NotFoundHttpException) {
+            $crossCaught = true;
+        }
+        assert($crossCaught, 'updateTreatment must reject cross-farm inventory item with NotFoundHttpException');
+
+        // 2. Article avec ULID inexistant -> NotFoundHttpException
+        $nonExistentCaught = false;
+        try {
+            $service->updateTreatment($treatment, new UpdateHealthTreatmentRequestDto(
+                inventoryItemId: (new \Symfony\Component\Uid\Ulid())->toBase32()
+            ));
+        } catch (NotFoundHttpException) {
+            $nonExistentCaught = true;
+        }
+        assert($nonExistentCaught, 'updateTreatment must reject non-existent inventory item with NotFoundHttpException');
+
+        // 3. Chaîne vide -> dissocie l'article
+        $treatment->setInventoryItem($crossItem);
+        $service->updateTreatment($treatment, new UpdateHealthTreatmentRequestDto(
+            inventoryItemId: ''
+        ));
+        assert($treatment->getInventoryItem() === null, 'updateTreatment with empty inventoryItemId must dissociate item');
+    }
+
+    private static function testFlockPartialTransferEnforcesSubscriptionQuotaAndGeneratesCollisionProofCode(): void
+    {
+        $farm = self::createTestFarm('Ferme Quotas');
+        $bldgA = new Building($farm, 'Bât A', BuildingType::POULTRY_HOUSE, 1000);
+        $bldgB = new Building($farm, 'Bât B', BuildingType::POULTRY_HOUSE, 1000);
+        $flock = new Flock($farm, 'LOT-QUOTA-SRC', 'Bande Quota Source', 800, new \DateTimeImmutable('2026-04-01'), PoultryType::BROILER);
+        $flock->setBuilding($bldgA);
+
+        $buildingsMap = [
+            $bldgB->getId()?->toBase32() => $bldgB,
+        ];
+        $bldgRepo = new class($buildingsMap) extends BuildingRepository {
+            private array $map;
+            public function __construct(array $map) { $this->map = $map; }
+            public function find(mixed $id, LockMode|int|null $lockMode = null, ?int $lockVersion = null): ?object {
+                $key = $id instanceof \Symfony\Component\Uid\Ulid ? $id->toBase32() : (string) $id;
+                return $this->map[$key] ?? null;
+            }
+        };
+
+        $dummyLocks = [];
+        $persistedEntities = [];
+        $em = self::createMockEntityManager($dummyLocks, $persistedEntities);
+        $flockRepo = (new \ReflectionClass(FlockRepository::class))->newInstanceWithoutConstructor();
+        $movRepo = (new \ReflectionClass(FlockMovementRepository::class))->newInstanceWithoutConstructor();
+
+        // 1. Quota d'abonnement dépassé : assertCanCreateFlock lève une exception
+        $failingPlanService = new class extends CommercialPlanService {
+            public function __construct() {}
+            public function assertCanCreateFlock(\App\Entity\Farm $farm): void {
+                throw new PlanQuotaExceededException('max_flocks', 3, 3, 'STANDARD');
+            }
+        };
+
+        $failingService = new FlockService($flockRepo, $movRepo, $bldgRepo, $failingPlanService, $em);
+        $quotaCaught = false;
+        try {
+            $failingService->recordMovement($flock, new CreateFlockMovementRequestDto(
+                type: FlockMovementType::TRANSFER,
+                quantity: 200,
+                movementDate: '2026-11-06',
+                targetBuildingId: $bldgB->getId()?->toBase32()
+            ));
+        } catch (PlanQuotaExceededException) {
+            $quotaCaught = true;
+        }
+        assert($quotaCaught, 'Partial transfer must enforce subscription quota before creating split flock');
+
+        // 2. Quota valide : génération d'un code de scission aléatoire anti-collision
+        $okPlanService = new class extends CommercialPlanService {
+            public function __construct() {}
+            public function assertCanCreateFlock(\App\Entity\Farm $farm): void {}
+        };
+        $okService = new FlockService($flockRepo, $movRepo, $bldgRepo, $okPlanService, $em);
+
+        $okService->recordMovement($flock, new CreateFlockMovementRequestDto(
+            type: FlockMovementType::TRANSFER,
+            quantity: 200,
+            movementDate: '2026-11-06',
+            targetBuildingId: $bldgB->getId()?->toBase32()
+        ));
+
+        $splitFlock = null;
+        foreach ($persistedEntities as $p) {
+            if ($p instanceof Flock && $p !== $flock) {
+                $splitFlock = $p;
+                break;
+            }
+        }
+        assert($splitFlock !== null, 'Split flock must be created when quota allows');
+        assert(preg_match('/^LOT-QUOTA-SRC-S[A-F0-9]{6}$/', $splitFlock->getCode()) === 1,
+            'Split flock code must contain random hex suffix to prevent collisions, got ' . $splitFlock->getCode()
+        );
+    }
 }
+

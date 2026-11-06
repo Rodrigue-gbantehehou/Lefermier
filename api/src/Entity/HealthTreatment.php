@@ -19,6 +19,7 @@ use Symfony\Component\Uid\Ulid;
 #[ORM\Index(name: 'idx_health_flock', columns: ['flock_id'])]
 #[ORM\Index(name: 'idx_health_scheduled_date', columns: ['scheduled_date'])]
 #[ORM\Index(name: 'idx_health_status', columns: ['status'])]
+#[ORM\UniqueConstraint(name: 'uniq_health_flock_business_key', columns: ['flock_id', 'business_key'])]
 #[ORM\HasLifecycleCallbacks]
 class HealthTreatment
 {
@@ -74,6 +75,9 @@ class HealthTreatment
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(name: 'recorded_by_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?User $recordedBy = null;
+
+    #[ORM\Column(name: 'business_key', type: Types::STRING, length: 100, nullable: true)]
+    private ?string $businessKey = null;
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
@@ -289,6 +293,17 @@ class HealthTreatment
     public function setRecordedBy(?User $recordedBy): static
     {
         $this->recordedBy = $recordedBy;
+        return $this;
+    }
+
+    public function getBusinessKey(): ?string
+    {
+        return $this->businessKey;
+    }
+
+    public function setBusinessKey(?string $businessKey): static
+    {
+        $this->businessKey = $businessKey;
         return $this;
     }
 

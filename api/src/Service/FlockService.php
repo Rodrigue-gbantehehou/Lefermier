@@ -186,7 +186,11 @@ class FlockService
                     $flock->setCurrentQuantity($currentQty - $qty);
 
                     // 2. Création d'une bande scindée dans le bâtiment cible
-                    $splitCode = $flock->getCode() . '-T' . substr((string) time(), -4);
+                    // Vérification préalable stricte des quotas du forfait d'abonnement
+                    $this->commercialPlanService->assertCanCreateFlock($flock->getFarm());
+
+                    $suffix = strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+                    $splitCode = sprintf('%s-S%s', substr($flock->getCode(), 0, 40), $suffix);
                     $splitName = $flock->getName() . ' (' . $targetBuilding->getName() . ')';
                     $splitFlock = new Flock(
                         $flock->getFarm(),

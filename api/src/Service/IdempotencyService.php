@@ -120,7 +120,8 @@ class IdempotencyService
             }
         }
 
-        // 6. Exécution de la mutation métier
+        // 6. Exécution coordonnée de la mutation métier et de la clôture de l'idempotence dans une transaction unique
+        $this->entityManager->beginTransaction();
         try {
             /** @var Response $response */
             $response = $execute();
@@ -131,11 +132,19 @@ class IdempotencyService
             $record->setResponseHeaders(['Content-Type' => 'application/json']);
 
             $this->entityManager->flush();
+            $this->entityManager->commit();
 
             $response->headers->set('X-Cache-Idempotency', 'MISS');
 
             return $response;
         } catch (\Throwable $e) {
+            try {
+                if ($this->entityManager->getConnection()->isTransactionActive()) {
+                    $this->entityManager->getConnection()->rollBack();
+                }
+            } catch (\Throwable) {
+            }
+
             // En cas d'erreur métier ou de validation, enregistrer l'échec et libérer le verrou sans masquer l'exception
             try {
                 if ($record->getId() !== null) {

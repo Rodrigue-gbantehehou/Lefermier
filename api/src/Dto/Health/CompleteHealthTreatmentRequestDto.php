@@ -12,6 +12,10 @@ final readonly class CompleteHealthTreatmentRequestDto
         #[Assert\Date(message: "La date d'administration doit être au format YYYY-MM-DD.")]
         public ?string $administeredDate = null,
 
+        #[Assert\Regex(
+            pattern: '/^\d+(\.\d{1,2})?$/',
+            message: "La quantité utilisée doit être un nombre positif avec au maximum 2 décimales."
+        )]
         public ?string $quantityUsed = null,
 
         #[Assert\PositiveOrZero(message: "Le coût en FCFA doit être supérieur ou égal à zéro.")]
