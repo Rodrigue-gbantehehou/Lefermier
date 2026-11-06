@@ -38,13 +38,16 @@ final class DocsController extends AbstractController
         return new JsonResponse($data, Response::HTTP_OK, [
             'Access-Control-Allow-Origin' => '*',
             'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-            'Cache-Control' => 'public, max-age=3600',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
         ]);
     }
 
     #[Route('/docs', name: 'scalar_reference', methods: ['GET'])]
     public function scalarReference(): Response
     {
+        $version = '20261107_01';
         $html = <<<HTML
 <!doctype html>
 <html lang="fr">
@@ -184,6 +187,22 @@ final class DocsController extends AbstractController
         }
       }
     </style>
+    <script>
+      // Nettoyage immédiat de tout cache de serveur local dans le navigateur
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            const val = localStorage.getItem(key);
+            if (val && (val.includes('127.0.0.1') || val.includes('localhost'))) {
+              keysToRemove.push(key);
+            }
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <header class="custom-header">
@@ -202,7 +221,7 @@ final class DocsController extends AbstractController
 
     <script
       id="api-reference"
-      data-url="/api/openapi.json"
+      data-url="/api/openapi.json?v={$version}"
       data-configuration='{
         "theme": "kepler",
         "darkMode": true,
@@ -210,6 +229,13 @@ final class DocsController extends AbstractController
         "layout": "modern",
         "hideModels": false,
         "searchHotKey": "k",
+        "baseServerURL": "https://api.poulvia.com",
+        "servers": [
+          {
+            "url": "https://api.poulvia.com",
+            "description": "Serveur de Production Officiel (poulvia.com)"
+          }
+        ],
         "defaultHttpClient": {
           "targetKey": "shell",
           "clientKey": "curl"
@@ -223,12 +249,14 @@ HTML;
 
         return new Response($html, Response::HTTP_OK, [
             'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         ]);
     }
 
     #[Route('/docs/redoc', name: 'redoc_reference', methods: ['GET'])]
     public function redocReference(): Response
     {
+        $version = '20261107_01';
         $html = <<<HTML
 <!DOCTYPE html>
 <html lang="fr">
@@ -243,7 +271,7 @@ HTML;
     </style>
   </head>
   <body>
-    <redoc spec-url="/api/openapi.json" expand-responses="200,201"></redoc>
+    <redoc spec-url="/api/openapi.json?v={$version}" expand-responses="200,201"></redoc>
     <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"> </script>
   </body>
 </html>
@@ -251,12 +279,14 @@ HTML;
 
         return new Response($html, Response::HTTP_OK, [
             'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         ]);
     }
 
     #[Route('/docs/swagger', name: 'swagger_reference', methods: ['GET'])]
     public function swaggerReference(): Response
     {
+        $version = '20261107_01';
         $html = <<<HTML
 <!DOCTYPE html>
 <html lang="fr">
@@ -279,7 +309,7 @@ HTML;
   <script>
     window.onload = function() {
       SwaggerUIBundle({
-        url: "/api/openapi.json",
+        url: "/api/openapi.json?v={$version}",
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
@@ -296,6 +326,7 @@ HTML;
 
         return new Response($html, Response::HTTP_OK, [
             'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         ]);
     }
 }
