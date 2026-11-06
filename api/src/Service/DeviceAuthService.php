@@ -110,6 +110,16 @@ class DeviceAuthService
             $existing->setRevoked(true);
             $existing->markAsUsed();
 
+            // Vérification du compte : un utilisateur désactivé ne peut pas renouveler sa session.
+            // Révocation complète de la famille de jetons pour couper tous les terminaux actifs.
+            $user = $existing->getUser();
+            if (!$user->isActive()) {
+                $this->tokenRepository->revokeFamily($existing->getFamilyId());
+                $this->entityManager->flush();
+                $this->entityManager->commit();
+                throw new AuthenticationException("Ce compte a été désactivé. Session révoquée.");
+            }
+
             // 2. Génération du jeton successeur dans la même famille
             $newRawToken = bin2hex(random_bytes(32));
             $newHash = hash('sha256', $newRawToken);
@@ -129,7 +139,7 @@ class DeviceAuthService
             $this->entityManager->flush();
             $this->entityManager->commit();
 
-            $user = $existing->getUser();
+            // $user est déjà défini lors du guard isActive ci-dessus
             $jwt = $this->jwtManager->create($user);
 
             return [

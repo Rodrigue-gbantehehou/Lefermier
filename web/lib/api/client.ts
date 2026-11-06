@@ -126,6 +126,93 @@ export async function apiRequest<T = any>(
 }
 
 /**
+ * Variante de apiRequest qui retourne l'enveloppe complète de la réponse API
+ * sans extraire automatiquement le champ "data".
+ *
+ * Utiliser quand la réponse contient des métadonnées supplémentaires (pagination,
+ * compteurs, etc.) en dehors du champ "data", par exemple :
+ * { data: HealthTreatment[], meta: { totalItems, overdueCount, upcomingCount } }
+ *
+ * @example
+ * const { data, meta } = await apiRequestFull<{ data: HealthTreatment[], meta: HealthMeta }>(
+ *   '/api/health-treatments'
+ * );
+ */
+export async function apiRequestFull<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const baseUrl = getApiBaseUrl();
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${baseUrl}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("lefermier_token");
+    if (token && !headers["Authorization"]) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  const method = (options.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH"].includes(method)) {
+    if (!headers["Idempotency-Key"] && !headers["X-Idempotency-Key"]) {
+      headers["Idempotency-Key"] =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    }
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  let body: any;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (!response.ok) {
+    let errorMsg = "Une erreur est survenue lors de la communication avec l'API.";
+    if (response.status === 401) {
+      errorMsg = "Votre session a expiré. Veuillez vous reconnecter.";
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("lefermier_token");
+        if (
+          !window.location.pathname.startsWith("/login") &&
+          !window.location.pathname.startsWith("/register")
+        ) {
+          setTimeout(() => { window.location.href = "/login?expired=1"; }, 1200);
+        }
+      }
+    } else if (response.status === 403) {
+      errorMsg = "Action non autorisée avec vos permissions actuelles.";
+    } else if (Array.isArray(body?.violations) && body.violations.length > 0) {
+      errorMsg = body.violations.map((v: any) => v.title || v.message).filter(Boolean).join(". ");
+    } else if (body?.detail) {
+      errorMsg = body.detail;
+    } else if (body?.message) {
+      errorMsg = body.message;
+    }
+    throw new ApiError(errorMsg, response.status, body);
+  }
+
+  // Retourne l'enveloppe complète sans extraction — le service appelant extrait data/meta
+  return body as T;
+}
+
+/**
  * Télécharge un fichier binaire (ex: PDF généré par le backend)
  */
 export async function downloadApiFile(

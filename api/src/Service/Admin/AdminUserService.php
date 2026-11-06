@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Entity\User;
+use App\Repository\DeviceRefreshTokenRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -16,6 +17,7 @@ class AdminUserService
     public function __construct(
         private readonly UserRepository $userRepository,
         private readonly EntityManagerInterface $entityManager,
+        private readonly DeviceRefreshTokenRepository $deviceRefreshTokenRepository,
     ) {
     }
 
@@ -79,6 +81,13 @@ class AdminUserService
     public function setUserActive(User $user, bool $isActive): User
     {
         $user->setIsActive($isActive);
+
+        // Lors d'une désactivation, révoquer immédiatement toutes les sessions mobiles existantes.
+        // Garantit qu'aucun terminal ne peut renouveler une session après désactivation.
+        if (!$isActive) {
+            $this->deviceRefreshTokenRepository->revokeAllUserTokens($user);
+        }
+
         $this->entityManager->flush();
 
         return $user;

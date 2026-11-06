@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, apiRequestFull } from "./client";
 import { HealthTreatment } from "../types";
 
 export const healthApi = {
@@ -12,10 +12,13 @@ export const healthApi = {
     if (params?.from) q.append("from", params.from);
     if (params?.to) q.append("to", params.to);
     const queryStr = q.toString() ? `?${q.toString()}` : "";
-    const res = await apiRequest<any>(`/farms/${farmId}/health-treatments${queryStr}`);
+    // Utilise apiRequestFull pour préserver {data, meta} sans strip automatique
+    const res = await apiRequestFull<{ data: HealthTreatment[]; meta: { totalItems: number; overdueCount: number; upcomingCount: number } }>(
+      `/farms/${farmId}/health-treatments${queryStr}`
+    );
     return {
-      data: Array.isArray(res) ? res : res?.data || [],
-      meta: res?.meta || { totalItems: 0, overdueCount: 0, upcomingCount: 0 },
+      data: Array.isArray(res?.data) ? res.data : [],
+      meta: res?.meta ?? { totalItems: 0, overdueCount: 0, upcomingCount: 0 },
     };
   },
 

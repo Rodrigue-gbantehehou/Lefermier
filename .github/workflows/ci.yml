@@ -67,7 +67,7 @@ jobs:
       - name: Run Doctrine migrations
         run: php bin/console doctrine:migrations:migrate --no-interaction
         env:
-          APP_ENV: test
+          APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
@@ -75,7 +75,7 @@ jobs:
       - name: Lint Symfony container
         run: php bin/console lint:container
         env:
-          APP_ENV: test
+          APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
@@ -83,7 +83,7 @@ jobs:
       - name: Validate Doctrine mapping
         run: php bin/console doctrine:schema:validate --skip-sync
         env:
-          APP_ENV: test
+          APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
@@ -91,7 +91,7 @@ jobs:
       - name: Run Backend Audit Verification Suite (27 tests P0/P1/P2)
         run: php bin/console app:audit:verify
         env:
-          APP_ENV: test
+          APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
@@ -99,7 +99,7 @@ jobs:
       - name: Run MySQL Integration Tests (InnoDB locks, fencing, rollback, quotas)
         run: php bin/console app:audit:integration
         env:
-          APP_ENV: test
+          APP_ENV: prod
           APP_SECRET: ci_test_secret_32_characters_long_val
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"

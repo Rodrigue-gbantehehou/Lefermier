@@ -80,4 +80,20 @@ class DeviceRefreshTokenRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    /**
+     * Révoque TOUTES les sessions d'un utilisateur (utilisé lors de la désactivation du compte).
+     * Garantit qu'aucun terminal ne peut plus renouveler une session après désactivation.
+     */
+    public function revokeAllUserTokens(User $user): int
+    {
+        return $this->createQueryBuilder('t')
+            ->update()
+            ->set('t.isRevoked', 'true')
+            ->andWhere('t.user = :user')
+            ->andWhere('t.isRevoked = false')
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->execute();
+    }
 }

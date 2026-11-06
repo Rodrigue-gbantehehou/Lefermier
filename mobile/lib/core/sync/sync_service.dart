@@ -46,6 +46,10 @@ class SyncService {
     required String endpoint,
     required Map<String, dynamic> payload,
     String? farmId,
+    // Clé d'idempotence à réutiliser si l'opération avait déjà été tentée (ex: timeout réseau).
+    // Si fournie, le serveur reconnaîtra la requête comme un doublon et retournera le résultat
+    // mis en cache au lieu de créer une nouvelle entrée.
+    String? idempotencyKey,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final currentQueue = await getQueue();
@@ -58,7 +62,7 @@ class SyncService {
       method: method.toUpperCase(),
       endpoint: endpoint,
       payload: payload,
-      idempotencyKey: const Uuid().v4(),
+      idempotencyKey: idempotencyKey ?? const Uuid().v4(),
       createdAt: DateTime.now(),
       farmId: effectiveFarmId,
       ownerKey: ownerKey,
@@ -210,6 +214,13 @@ class SyncService {
         } else if (item.method == 'DELETE') {
           response = await _apiClient.dio.delete(item.endpoint, options: opts);
         } else {
+          // C7 — Méthode non reconnue : quarantaine au lieu de disparition silencieuse.
+          // Le `continue` précédent causait la perte définitive de l'action lors de la sauvegarde.
+          updatedQueue.add(item.copyWith(
+            status: SyncItemStatus.failed,
+            lastError: 'Méthode HTTP non supportée : ${item.method}',
+          ));
+          failedCount++;
           continue;
         }
 
@@ -301,8 +312,17 @@ class SyncService {
       }
     }
 
+    // C6 — Protection contre la race condition lecture/écriture de la file.
+    // Si des actions ont été enfilées (via un provider ou une action UI) pendant le traitement
+    // ci-dessus, une simple réécriture de updatedQueue les écrase.
+    // On relit la file depuis SharedPreferences et on fusionne les nouveaux éléments.
     final prefs = await SharedPreferences.getInstance();
-    await _saveQueue(prefs, updatedQueue);
+    final latestQueue = await getQueue();
+    final processedIds = updatedQueue.map((e) => e.id).toSet();
+    final newEntries = latestQueue.where((e) => !processedIds.contains(e.id)).toList();
+    final mergedQueue = [...updatedQueue, ...newEntries];
+
+    await _saveQueue(prefs, mergedQueue);
     return FlushResult(
       sentCount: sentCount,
       pendingCount: pendingCount,

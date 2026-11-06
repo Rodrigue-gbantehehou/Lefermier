@@ -525,7 +525,10 @@ final class MysqlConcurrencyIntegrationTest
             self::dsnToPdo($dsn),
             self::dsnUser($dsn),
             self::dsnPassword($dsn),
-            [\PDO::ATTR_TIMEOUT => 5]
+            [
+                \PDO::ATTR_TIMEOUT => 5,
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ]
         );
         $pdoB->exec('SET SESSION innodb_lock_wait_timeout = 1');
         $pdoB->exec('SET SESSION autocommit = 0');
@@ -540,8 +543,12 @@ final class MysqlConcurrencyIntegrationTest
         try {
             $pdoB->query('SELECT * FROM idempotency_records WHERE idempotency_key = ' . $pdoB->quote($uniqueKey) . ' FOR UPDATE');
         } catch (\PDOException $e) {
-            // 1205 = ER_LOCK_WAIT_TIMEOUT
-            $lockTimedOut = str_contains($e->getMessage(), 'Lock wait timeout') || $e->getCode() === 'HY000';
+            // MySQL error 1205 : Lock wait timeout exceeded; try restarting transaction
+            // On vérifie le message précis ET le code natif MySQL (errorInfo[1] = 1205).
+            // Le SQLSTATE HY000 est trop générique (couvre des dizaines d'erreurs MySQL).
+            $nativeCode = (int) ($e->errorInfo[1] ?? 0);
+            $lockTimedOut = str_contains($e->getMessage(), 'Lock wait timeout exceeded')
+                || $nativeCode === 1205;
         }
         $pdoB->rollBack();
 

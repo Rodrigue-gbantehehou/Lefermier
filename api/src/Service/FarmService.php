@@ -18,6 +18,7 @@ use App\Repository\BuildingRepository;
 use App\Repository\FarmRepository;
 use App\Repository\OrganizationRepository;
 use App\Service\Admin\CommercialPlanService;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\String\Slugger\SluggerInterface;
@@ -56,7 +57,16 @@ class FarmService
         // assertCanCreateFarm() y est appelé à l'intérieur pour que son verrou pessimiste
         // sur l'organisation soit effectif (isTransactionActive() = true).
         return $this->entityManager->wrapInTransaction(function () use ($user, $dto): Farm {
-            // 0. Contrôle de quota avec verrou pessimiste sur l'organisation (si elle existe)
+            // 0. Verrou pessimiste sur le User pour sérialiser les créations concurrentes.
+            // Sans ce verrou, deux requêtes simultanées de création de première ferme peuvent
+            // toutes deux constater l'absence d'organisation et en créer deux séparément.
+            // Avec le verrou, la seconde requête attend le commit de la première, puis lit
+            // l'organisation créée, et assertCanCreateFarm() applique correctement le quota.
+            $this->entityManager->lock($user, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($user)) {
+                $this->entityManager->refresh($user, LockMode::PESSIMISTIC_WRITE);
+            }
+
             $this->commercialPlanService->assertCanCreateFarm($user);
 
             // 1. Déterminer l'organisation de rattachement du propriétaire

@@ -91,6 +91,16 @@ class AuthController extends AbstractController
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Rejet des comptes désactivés par l'administration.
+        // Le message générique "identifiants invalides" n'est pas utilisé ici
+        // pour informer l'utilisateur de la cause réelle (compte suspendu).
+        if (!$user->isActive()) {
+            return $this->json([
+                'title' => 'Compte désactivé',
+                'detail' => 'Ce compte a été suspendu. Contactez l\'administrateur de la plateforme.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $session = $this->deviceAuthService->createDeviceSession($user, $deviceId, $deviceName);
 
         return $this->json([
