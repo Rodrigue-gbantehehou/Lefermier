@@ -194,8 +194,8 @@ void main() {
       SecureStorageService().resetForTesting();
       final storage = SecureStorageService();
 
-      expect(
-        () => storage.saveTokens(token: 'failing_token', refreshToken: 'failing_refresh'),
+      await expectLater(
+        storage.saveTokens(token: 'failing_token', refreshToken: 'failing_refresh'),
         throwsA(isA<SecureStoragePersistenceException>()),
       );
 
@@ -210,8 +210,8 @@ void main() {
       SecureStorageService().resetForTesting();
       final storage = SecureStorageService();
 
-      expect(
-        () => storage.updateToken('failing_update'),
+      await expectLater(
+        storage.updateToken('failing_update'),
         throwsA(isA<SecureStoragePersistenceException>()),
       );
     });
@@ -231,8 +231,8 @@ void main() {
       expect(success, isFalse);
 
       // With throwOnFailure: throws SecureStoragePersistenceException
-      expect(
-        () => storage.clearAuth(throwOnFailure: true),
+      await expectLater(
+        storage.clearAuth(throwOnFailure: true),
         throwsA(isA<SecureStoragePersistenceException>()),
       );
     });
@@ -288,6 +288,41 @@ void main() {
       expect(prefs.containsKey('sec_vault_refresh_token'), isFalse);
       expect(prefs.containsKey('sec_vault_device_id'), isFalse);
       expect(prefs.containsKey('lf_vault_entropy_seed'), isFalse);
+    });
+
+    test('saveTokens rolls back access token if refresh token write fails', () async {
+      final platform = _FailingRefreshTokenStoragePlatform();
+      FlutterSecureStoragePlatform.instance = platform;
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+
+      await expectLater(
+        storage.saveTokens(token: 'jwt_valid', refreshToken: 'refresh_fails'),
+        throwsA(isA<SecureStoragePersistenceException>()),
+      );
+
+      // Rollback must have deleted the access token
+      expect(storage.token, isNull);
+      expect(storage.refreshToken, isNull);
+      expect(platform.data.containsKey('lf_jwt_token'), isFalse);
+    });
+
+    test('saveTokens rolls back access token if old refresh token delete fails when refreshToken is null', () async {
+      final platform = _FailingDeleteRefreshTokenPlatform();
+      FlutterSecureStoragePlatform.instance = platform;
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+
+      await expectLater(
+        storage.saveTokens(token: 'jwt_valid', refreshToken: null),
+        throwsA(isA<SecureStoragePersistenceException>()),
+      );
+
+      // Rollback must have deleted the access token
+      expect(storage.token, isNull);
+      expect(platform.data.containsKey('lf_jwt_token'), isFalse);
     });
   });
 }
@@ -361,4 +396,66 @@ class _FailingReadStoragePlatform extends FlutterSecureStoragePlatform {
 
   @override
   Future<void> write({required String key, required String value, required Map<String, String> options}) async {}
+}
+
+class _FailingRefreshTokenStoragePlatform extends FlutterSecureStoragePlatform {
+  final Map<String, String> data = {};
+
+  @override
+  Future<bool> containsKey({required String key, required Map<String, String> options}) async => data.containsKey(key);
+
+  @override
+  Future<void> delete({required String key, required Map<String, String> options}) async {
+    data.remove(key);
+  }
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async => data.clear();
+
+  @override
+  Future<String?> read({required String key, required Map<String, String> options}) async => data[key];
+
+  @override
+  Future<Map<String, String>> readAll({required Map<String, String> options}) async => Map.from(data);
+
+  @override
+  Future<void> write({required String key, required String value, required Map<String, String> options}) async {
+    if (key == 'lf_refresh_token') {
+      throw Exception('Simulated refresh token KeyStore write failure');
+    }
+    data[key] = value;
+  }
+}
+
+class _FailingDeleteRefreshTokenPlatform extends FlutterSecureStoragePlatform {
+  final Map<String, String> data = {'lf_refresh_token': 'old_persisted_refresh'};
+
+  @override
+  Future<bool> containsKey({required String key, required Map<String, String> options}) async => data.containsKey(key);
+
+  @override
+  Future<void> delete({required String key, required Map<String, String> options}) async {
+    if (key == 'lf_refresh_token') {
+      // Simule un échec de suppression : la clé reste dans la map
+      return;
+    }
+    data.remove(key);
+  }
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async => data.clear();
+
+  @override
+  Future<String?> read({required String key, required Map<String, String> options}) async => data[key];
+
+  @override
+  Future<Map<String, String>> readAll({required Map<String, String> options}) async => Map.from(data);
+
+  @override
+  Future<void> write({required String key, required String value, required Map<String, String> options}) async {
+    if (key == 'lf_refresh_token') {
+      throw Exception('Locked refresh token');
+    }
+    data[key] = value;
+  }
 }

@@ -294,13 +294,16 @@ class AppDrawer extends ConsumerWidget {
 
                       if (!context.mounted) return;
                       Navigator.of(context).pop();
-                      await ref.read(authProvider.notifier).logout();
-                      if (context.mounted) {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (route) => false,
-                        );
+                      final success = await ref.read(authProvider.notifier).logout();
+                      if (!context.mounted) return;
+                      if (!success) {
+                        _showLogoutFailureDialog(context, ref);
+                        return;
                       }
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
                     },
                     borderRadius: BorderRadius.circular(8),
                     child: const Padding(
@@ -326,6 +329,49 @@ class AppDrawer extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showLogoutFailureDialog(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (alertCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+            SizedBox(width: 8),
+            Text("Sécurité du terminal"),
+          ],
+        ),
+        content: const Text(
+          "Le système sécurisé de l'appareil n'a pas pu effacer vos clés de session. "
+          "Vos identifiants pourraient subsister sur cet appareil.\n\n"
+          "Souhaitez-vous forcer la déconnexion locale quand même ?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(alertCtx),
+            child: const Text("Réessayer"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(alertCtx);
+              await ref.read(authProvider.notifier).logout(force: true);
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text("Forcer la déconnexion"),
+          ),
+        ],
       ),
     );
   }

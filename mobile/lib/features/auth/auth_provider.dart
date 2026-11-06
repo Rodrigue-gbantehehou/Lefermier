@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
@@ -559,7 +560,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> logout() async {
+  /// Déconnecte l'utilisateur.
+  /// Si la purge du coffre-fort sécurisé échoue et que [force] est `false`,
+  /// l'opération retourne `false` et conserve l'état pour ne pas masquer l'anomalie de sécurité.
+  /// Si [force] est `true` ou si la purge réussit, l'état local et les caches sont vidés et retourne `true`.
+  Future<bool> logout({bool force = false}) async {
+    // 1. Révocation distante côté serveur (best-effort)
     try {
       final storage = SecureStorageService();
       final refreshToken = storage.refreshToken;
@@ -573,12 +579,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
     } catch (_) {}
+
+    // 2. Suppression vérifiée dans le coffre-fort sécurisé natif
     final secureCleared = await _apiClient.clearAuth();
+
+    if (!secureCleared && !force) {
+      state = state.copyWith(
+        error: "Échec de purge sécurisée : Vos identifiants n'ont pas pu être effacés du terminal.",
+      );
+      return false;
+    }
+
+    // 3. Purge complète des caches applicatifs et de la file d'attente
     await _apiClient.setActiveFarmId(null);
     await SyncService(_apiClient).clearQueue();
     await OfflineCacheService().clearAllCache();
     state = const AuthState();
-    return secureCleared;
+    return true;
+  }
+
+  @visibleForTesting
+  void setAuthenticatedForTesting({required String token}) {
+    state = state.copyWith(isAuthenticated: true, token: token);
   }
 }
 

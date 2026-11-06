@@ -148,28 +148,44 @@ class SecureStorageService {
   String? get refreshToken => _cachedRefreshToken;
   bool get hasToken => _cachedToken != null && _cachedToken!.isNotEmpty;
 
-  /// Sauvegarde durablement les jetons dans le stockage natif sécurisé.
-  /// Lève une [SecureStoragePersistenceException] si le stockage natif refuse d'écrire ou de confirmer la persistance.
+  /// Sauvegarde durablement les jetons dans le stockage natif sécurisé de manière atomique (tout ou rien).
+  /// En cas d'échec de la persistance ou de purge du jeton de rafraîchissement, un rollback immédiat
+  /// supprime le jeton d'accès pour éviter toute persistance partielle, puis lève une [SecureStoragePersistenceException].
   Future<void> saveTokens({required String token, String? refreshToken}) async {
     final tokenSaved = await _writeSafe(_keyToken, token);
     if (!tokenSaved) {
+      _cachedToken = null;
       throw const SecureStoragePersistenceException(
         "Échec de l'enregistrement sécurisé du jeton d'accès sur le terminal.",
       );
     }
-    _cachedToken = token;
 
     if (refreshToken != null && refreshToken.isNotEmpty) {
       final refreshSaved = await _writeSafe(_keyRefreshToken, refreshToken);
       if (!refreshSaved) {
+        // Rollback atomique : suppression du jeton d'accès précédemment écrit
+        await _deleteSafe(_keyToken);
+        _cachedToken = null;
+        _cachedRefreshToken = null;
         throw const SecureStoragePersistenceException(
-          "Échec de l'enregistrement sécurisé du jeton de rafraîchissement sur le terminal.",
+          "Échec de l'enregistrement sécurisé du jeton de rafraîchissement sur le terminal. Écriture annulée.",
         );
       }
+      _cachedToken = token;
       _cachedRefreshToken = refreshToken;
     } else {
+      final refreshDeleted = await _deleteSafe(_keyRefreshToken);
+      if (!refreshDeleted) {
+        // Rollback atomique : si l'ancien refresh token ne peut pas être purgé, annuler l'écriture du token
+        await _deleteSafe(_keyToken);
+        _cachedToken = null;
+        _cachedRefreshToken = null;
+        throw const SecureStoragePersistenceException(
+          "Échec de la purge de l'ancien jeton de rafraîchissement sur le terminal. Écriture annulée.",
+        );
+      }
+      _cachedToken = token;
       _cachedRefreshToken = null;
-      await _deleteSafe(_keyRefreshToken);
     }
   }
 

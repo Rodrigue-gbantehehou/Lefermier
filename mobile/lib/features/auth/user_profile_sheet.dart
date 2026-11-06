@@ -221,16 +221,61 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              if (mounted) Navigator.pop(context);
-              await ref.read(authProvider.notifier).logout();
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
+              final success = await ref.read(authProvider.notifier).logout();
+              if (!mounted) return;
+              if (!success) {
+                _showLogoutFailureDialog(context);
+                return;
+              }
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: Text(summary.total > 0 ? "Se déconnecter quand même" : "Se déconnecter"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutFailureDialog(BuildContext parentContext) {
+    showDialog<void>(
+      context: parentContext,
+      builder: (alertCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+            SizedBox(width: 8),
+            Text("Sécurité du terminal"),
+          ],
+        ),
+        content: const Text(
+          "Le système sécurisé de l'appareil n'a pas pu effacer vos clés de session. "
+          "Vos identifiants pourraient subsister sur cet appareil.\n\n"
+          "Souhaitez-vous forcer la déconnexion locale quand même ?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(alertCtx),
+            child: const Text("Réessayer"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(alertCtx);
+              await ref.read(authProvider.notifier).logout(force: true);
+              if (parentContext.mounted) {
+                Navigator.of(parentContext).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
                 );
               }
             },
-            child: Text(summary.total > 0 ? "Se déconnecter quand même" : "Se déconnecter"),
+            child: const Text("Forcer la déconnexion"),
           ),
         ],
       ),
