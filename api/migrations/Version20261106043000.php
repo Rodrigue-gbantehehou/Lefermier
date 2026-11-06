@@ -66,9 +66,15 @@ final class Version20261106043000 extends AbstractMigration
         $this->addSql('CREATE TABLE IF NOT EXISTS subscription_upgrade_requests (id BINARY(16) NOT NULL, current_plan VARCHAR(50) NOT NULL, target_plan VARCHAR(50) NOT NULL, target_plan_name VARCHAR(150) NOT NULL, billing_cycle VARCHAR(20) NOT NULL, message LONGTEXT DEFAULT NULL, status VARCHAR(30) NOT NULL, admin_notes LONGTEXT DEFAULT NULL, created_at DATETIME NOT NULL, processed_at DATETIME DEFAULT NULL, farm_id BINARY(16) NOT NULL, organization_id BINARY(16) NOT NULL, user_id BINARY(16) NOT NULL, processed_by_id BINARY(16) DEFAULT NULL, INDEX idx_sub_req_status (status), INDEX idx_sub_req_created_at (created_at), INDEX IDX_D858AB2265FCFA0D (farm_id), INDEX IDX_D858AB2232C8A3DE (organization_id), INDEX IDX_D858AB22A76ED395 (user_id), INDEX IDX_D858AB222FFD4FD3 (processed_by_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 ENGINE = InnoDB');
 
         // ── Colonnes : chaque colonne vérifiée individuellement ──────────────────
-        // Si la colonne est absente → on l'ajoute ET on l'enregistre dans _mig_43000_state.
-        // Si la colonne était déjà présente → on ne fait rien, et surtout le down()
-        // ne la supprimera pas (car elle ne sera pas dans _mig_43000_state).
+        // Stratégie d'enregistrement-avant-DDL :
+        //   1. Vérifier l'absence de la colonne dans information_schema.
+        //   2. Enregistrer l'intention dans _mig_43000_state AVANT le DDL.
+        //   3. Exécuter le DDL.
+        //
+        // Ainsi, une interruption entre le DDL et l'INSERT de suivi n'est plus
+        // possible : le suivi précède toujours le DDL. Si le DDL échoue, le
+        // down() vérifie information_schema avant de supprimer → aucun dommage.
+        // Si la colonne existait déjà, @absent = 0 : ni INSERT ni DDL.
         $conditionalAdds = [
             'farms' => [
                 'phone'       => 'ALTER TABLE farms ADD phone VARCHAR(50) DEFAULT NULL',
@@ -101,58 +107,62 @@ final class Version20261106043000 extends AbstractMigration
 
         foreach ($conditionalAdds as $table => $columns) {
             foreach ($columns as $column => $alterSql) {
-                // Vérifier si la colonne est absente et la créer si besoin
                 $escapedSql = str_replace("'", "''", $alterSql);
+                // Étape 1 : détecter l'absence de la colonne
                 $this->addSql("
                     SELECT IF(
                         NOT EXISTS (
                             SELECT 1 FROM information_schema.COLUMNS
                             WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table' AND COLUMN_NAME = '$column'
                         ),
-                        '$escapedSql',
-                        'SELECT 1'
-                    ) INTO @sql
+                        1, 0
+                    ) INTO @absent
                 ");
-                $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
-                // Enregistrer uniquement les colonnes que CETTE migration a créées
+                // Étape 2 : enregistrer l'intention AVANT le DDL
                 $this->addSql("
                     INSERT IGNORE INTO _mig_43000_state (item)
-                    SELECT 'col:$table:$column'
-                    WHERE @sql != 'SELECT 1'
+                    SELECT 'col:$table:$column' WHERE @absent > 0
                 ");
+                // Étape 3 : exécuter le DDL
+                $this->addSql("SET @sql = IF(@absent > 0, '$escapedSql', 'SELECT 1')");
+                $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
             }
         }
 
         // ── FK et index ──────────────────────────────────────────────────────────
+        // Même stratégie : enregistrement dans _mig_43000_state AVANT le DDL.
+
+        // FK FK_1483A5E9123FA025 (users → admin_roles)
         $this->addSql("
             SELECT IF(
                 NOT EXISTS (
                     SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
                     WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND CONSTRAINT_NAME = 'FK_1483A5E9123FA025'
                 ),
-                'ALTER TABLE users ADD CONSTRAINT FK_1483A5E9123FA025 FOREIGN KEY (admin_role_id) REFERENCES admin_roles (id) ON DELETE SET NULL',
-                'SELECT 1'
-            ) INTO @sql
+                1, 0
+            ) INTO @absent
         ");
+        $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'fk:users:FK_1483A5E9123FA025' WHERE @absent > 0");
+        $this->addSql("SET @sql = IF(@absent > 0, 'ALTER TABLE users ADD CONSTRAINT FK_1483A5E9123FA025 FOREIGN KEY (admin_role_id) REFERENCES admin_roles (id) ON DELETE SET NULL', 'SELECT 1')");
         $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
-        $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'fk:users:FK_1483A5E9123FA025' WHERE @sql != 'SELECT 1'");
 
+        // Index IDX_1483A5E9123FA025 (users.admin_role_id)
         $this->addSql("
             SELECT IF(
                 NOT EXISTS (
                     SELECT 1 FROM information_schema.STATISTICS
                     WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND INDEX_NAME = 'IDX_1483A5E9123FA025'
                 ),
-                'CREATE INDEX IDX_1483A5E9123FA025 ON users (admin_role_id)',
-                'SELECT 1'
-            ) INTO @sql
+                1, 0
+            ) INTO @absent
         ");
+        $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'idx:users:IDX_1483A5E9123FA025' WHERE @absent > 0");
+        $this->addSql("SET @sql = IF(@absent > 0, 'CREATE INDEX IDX_1483A5E9123FA025 ON users (admin_role_id)', 'SELECT 1')");
         $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
-        $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'idx:users:IDX_1483A5E9123FA025' WHERE @sql != 'SELECT 1'");
 
         // ── FK de subscription_upgrade_requests : chaque contrainte vérifiée ────
         // individuellement dans information_schema avant ajout, et enregistrée
-        // dans _mig_43000_state uniquement si elle a été créée par ce up().
+        // dans _mig_43000_state AVANT le DDL (stratégie enregistrement-avant-DDL).
         $subFks = [
             'FK_D858AB2265FCFA0D' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2265FCFA0D FOREIGN KEY (farm_id) REFERENCES farms (id) ON DELETE CASCADE',
             'FK_D858AB2232C8A3DE' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2232C8A3DE FOREIGN KEY (organization_id) REFERENCES organizations (id) ON DELETE CASCADE',
@@ -162,6 +172,7 @@ final class Version20261106043000 extends AbstractMigration
 
         foreach ($subFks as $fkName => $fkSql) {
             $escapedFkSql = str_replace("'", "''", $fkSql);
+            // Étape 1 : détecter l'absence de la FK
             $this->addSql("
                 SELECT IF(
                     NOT EXISTS (
@@ -169,12 +180,14 @@ final class Version20261106043000 extends AbstractMigration
                         WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'subscription_upgrade_requests'
                           AND CONSTRAINT_NAME = '$fkName' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
                     ),
-                    '$escapedFkSql',
-                    'SELECT 1'
-                ) INTO @sql
+                    1, 0
+                ) INTO @absent
             ");
+            // Étape 2 : enregistrer AVANT le DDL
+            $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'fk:subscription_upgrade_requests:$fkName' WHERE @absent > 0");
+            // Étape 3 : DDL
+            $this->addSql("SET @sql = IF(@absent > 0, '$escapedFkSql', 'SELECT 1')");
             $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
-            $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'fk:subscription_upgrade_requests:$fkName' WHERE @sql != 'SELECT 1'");
         }
     }
 
