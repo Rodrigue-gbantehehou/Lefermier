@@ -52,6 +52,13 @@ class SyncService {
   /// SyncService coexistent dans le même processus Dart.
   static final _AsyncMutex _queueLock = _AsyncMutex();
 
+  /// Guard contre les flushQueue() simultanés.
+  /// Si un flush est déjà en cours, le second appel retourne immédiatement
+  /// un FlushResult vide plutôt que de lire le même snapshot et d'envoyer
+  /// des doublons réseau. L'idempotence backend reste la dernière ligne de défense,
+  /// mais ce guard évite la contention au niveau de la file locale.
+  static bool _flushInProgress = false;
+
   final ApiClient _apiClient;
 
   SyncService(this._apiClient);
@@ -179,6 +186,10 @@ class SyncService {
   ///   → On relit la file, on écarte les IDs initiaux (traités en phase B),
   ///     et on sauvegarde [résultats du traitement + nouvelles entrées].
   Future<FlushResult> flushQueue() async {
+    // Guard contre les appels simultanés : un seul flush actif à la fois.
+    if (_flushInProgress) return const FlushResult();
+    _flushInProgress = true;
+    try {
     // ── Phase A : lecture sous verrou ──────────────────────────────────────────
     late List<SyncQueueItem> queue;
     await _queueLock.protect(() async {
@@ -187,7 +198,6 @@ class SyncService {
     });
 
     if (queue.isEmpty) return const FlushResult();
-
     // Snapshot des IDs présents AVANT le traitement réseau.
     // Utilisé en phase C pour distinguer les entrées initiales (traitées)
     // des nouvelles entrées ajoutées pendant la phase B.
@@ -337,11 +347,21 @@ class SyncService {
     // ── Phase C : fusion et écriture sous verrou ───────────────────────────────
     // On relit la file pour capturer les actions ajoutées pendant la phase B
     // (hors verrou). On n'inclut que les IDs qui n'existaient pas au début du flush.
-    return _queueLock.protect(() async {
+    //
+    // Tombstone : si l'utilisateur a appelé removeQueueItem() sur un item pendant
+    // la phase B, cet item est absent de latestQueue mais présent dans updatedQueue
+    // (en état d'erreur ou en attente). On l'exclut de la fusion pour respecter la
+    // suppression intentionnelle.
+    return await _queueLock.protect(() async {
       final prefs = await SharedPreferences.getInstance();
       final latestQueue = _readQueue(prefs);
+      final latestIds = latestQueue.map((e) => e.id).toSet();
+      // IDs supprimés intentionnellement par l'utilisateur pendant la phase réseau
+      final deletedDuringFlush = initialIds.difference(latestIds);
+      // N'inclure dans la file finale que les items non supprimés intentionnellement
+      final survivingUpdated = updatedQueue.where((e) => !deletedDuringFlush.contains(e.id)).toList();
       final newEntries = latestQueue.where((e) => !initialIds.contains(e.id)).toList();
-      final mergedQueue = [...updatedQueue, ...newEntries];
+      final mergedQueue = [...survivingUpdated, ...newEntries];
       await _saveQueue(prefs, mergedQueue);
       return FlushResult(
         sentCount: sentCount,
@@ -349,6 +369,9 @@ class SyncService {
         failedCount: failedCount,
       );
     });
+    } finally {
+      _flushInProgress = false;
+    }
   }
 
   Future<Map<String, dynamic>?> pullDelta(String farmId) async {

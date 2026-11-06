@@ -143,23 +143,25 @@ class SyncNotifier extends StateNotifier<SyncState> {
       // 1. Envoyer la file d'attente hors-ligne (Push robuste)
       final flushResult = await _syncService.flushQueue();
 
-      // 2. Rechargement complet des providers — on attend leur réussite avant
-      // de faire avancer le curseur de synchronisation. Sans ce await, lastSyncTime
-      // pourrait avancer alors que les données locales n'ont pas encore été mises à jour.
-      await Future.wait([
-        _ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false),
-        _ref.read(flockProvider.notifier).loadFlocks(showLoading: false),
-        _ref.read(eggProvider.notifier).loadData(showLoading: false),
-        _ref.read(financeProvider.notifier).loadTransactions(showLoading: false),
-        _ref.read(inventoryProvider.notifier).loadItems(showLoading: false),
-        _ref.read(healthProvider.notifier).loadTreatments(showLoading: false),
-      ]);
+      // 2. Rechargement des providers en mode best-effort.
+      // On ne les await pas pour le curseur : chaque provider swallowe ses propres
+      // erreurs Dio, donc Future.wait() se terminerait toujours normalement même si
+      // tous les rechargements ont échoué — avancer lastSyncTime dans ce cas serait erroné.
+      // On déclenche les rechargements sans await : l'UI se rafraîchira quand ils aboutiront.
+      _ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
+      _ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
+      _ref.read(eggProvider.notifier).loadData(showLoading: false);
+      _ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
+      _ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
+      _ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
 
-      // 3. Curseur de synchronisation : avancé APRÈS que les rechargements ont abouti.
-      // pullDelta() sera activé quand le backend exposera un endpoint /sync/delta
-      // permettant d'appliquer des changements incrémentiels. Pour l'instant on enregistre
-      // le timestamp de la dernière sync complète réussie.
-      await _syncService.setLastSyncTime(activeFarm.id, DateTime.now().toIso8601String());
+      // 3. Curseur de synchronisation : avancé seulement si toutes les actions
+      // locales ont été transmises sans échec définitif.
+      // Sémantique : "mes actions locales sont sur le serveur", pas "l'UI est à jour".
+      // Les providers UI sont best-effort et ne doivent pas bloquer ce curseur.
+      if (flushResult.failedCount == 0) {
+        await _syncService.setLastSyncTime(activeFarm.id, DateTime.now().toIso8601String());
+      }
 
       final queue = await _syncService.getQueue();
       final lastSync = await _syncService.getLastSyncTime(activeFarm.id);

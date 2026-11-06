@@ -98,7 +98,17 @@ final class Version20261106043000 extends AbstractMigration
         ");
         $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
 
-        $this->addSql('CREATE INDEX IF NOT EXISTS IDX_1483A5E9123FA025 ON users (admin_role_id)');
+        $this->addSql("
+            SELECT IF(
+                NOT EXISTS (
+                    SELECT 1 FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND INDEX_NAME = 'IDX_1483A5E9123FA025'
+                ),
+                'CREATE INDEX IDX_1483A5E9123FA025 ON users (admin_role_id)',
+                'SELECT 1'
+            ) INTO @sql
+        ");
+        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
 
         $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2265FCFA0D FOREIGN KEY (farm_id) REFERENCES farms (id) ON DELETE CASCADE');
         $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2232C8A3DE FOREIGN KEY (organization_id) REFERENCES organizations (id) ON DELETE CASCADE');
@@ -108,28 +118,64 @@ final class Version20261106043000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        // Contraintes FK de subscription_upgrade_requests : DROP FOREIGN KEY IF EXISTS (MySQL 8.0.29+)
-        // Sécurité : ne lève pas d'erreur si la FK n'existe pas (rollback partiel).
-        $this->addSql('ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY IF EXISTS FK_D858AB2265FCFA0D');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY IF EXISTS FK_D858AB2232C8A3DE');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY IF EXISTS FK_D858AB22A76ED395');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY IF EXISTS FK_D858AB222FFD4FD3');
+        // Les syntaxes DROP FOREIGN KEY IF EXISTS et DROP INDEX IF EXISTS
+        // ne sont pas supportées uniformément sur MySQL 8.4 selon la version mineure.
+        // On utilise le même pattern information_schema que pour les colonnes.
+        $db = $this->connection->getDatabase();
 
-        // Tables créées par cette migration uniquement → DROP IF EXISTS pour sécuriser le rollback
-        // sur une base où certaines tables préexistaient avant la migration.
+        // Contraintes FK de subscription_upgrade_requests
+        foreach (['FK_D858AB2265FCFA0D', 'FK_D858AB2232C8A3DE', 'FK_D858AB22A76ED395', 'FK_D858AB222FFD4FD3'] as $fk) {
+            $this->addSql("
+                SELECT IF(
+                    EXISTS (
+                        SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                        WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'subscription_upgrade_requests'
+                          AND CONSTRAINT_NAME = '$fk' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                    ),
+                    'ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY $fk',
+                    'SELECT 1'
+                ) INTO @sql
+            ");
+            $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+        }
+
+        // Tables créées par cette migration
         $this->addSql('DROP TABLE IF EXISTS subscription_upgrade_requests');
         $this->addSql('DROP TABLE IF EXISTS subscription_plans');
 
-        // admin_roles : supprimer la FK et l'index sur users avant de supprimer la table référencée
-        $this->addSql('DROP INDEX IF EXISTS IDX_1483A5E9123FA025 ON users');
-        $this->addSql('ALTER TABLE users DROP FOREIGN KEY IF EXISTS FK_1483A5E9123FA025');
+        // admin_roles : supprimer d'abord l'index et la FK sur users, puis la table référencée
+
+        // Index IDX_1483A5E9123FA025 sur users
+        $this->addSql("
+            SELECT IF(
+                EXISTS (
+                    SELECT 1 FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users' AND INDEX_NAME = 'IDX_1483A5E9123FA025'
+                ),
+                'DROP INDEX IDX_1483A5E9123FA025 ON users',
+                'SELECT 1'
+            ) INTO @sql
+        ");
+        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+
+        // FK FK_1483A5E9123FA025 sur users
+        $this->addSql("
+            SELECT IF(
+                EXISTS (
+                    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                    WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'users'
+                      AND CONSTRAINT_NAME = 'FK_1483A5E9123FA025' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                ),
+                'ALTER TABLE users DROP FOREIGN KEY FK_1483A5E9123FA025',
+                'SELECT 1'
+            ) INTO @sql
+        ");
+        $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+
         $this->addSql('DROP TABLE IF EXISTS admin_roles');
         $this->addSql('DROP TABLE IF EXISTS admin_audit_logs');
 
         // Colonnes conditionnelles : ne supprimer que si présentes.
-        // Un rollback sur une base où ces colonnes préexistaient ne doit pas les supprimer.
-        $db = $this->connection->getDatabase();
-
         $conditionalDrops = [
             'users' => ['password_reset_token', 'password_reset_expires_at', 'admin_role_id'],
             'farms' => ['phone', 'email', 'address', 'ifu', 'rccm', 'description'],
