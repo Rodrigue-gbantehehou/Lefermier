@@ -180,3 +180,16 @@ export function isDateInPeriod(dateString: string | null | undefined, period: Ti
 
 // Re-export des utilitaires de gestion explicite des unités
 export * from "./units";
+
+/**
+ * Retourne la date du jour au format YYYY-MM-DD dans le fuseau horaire
+ * Africa/Porto-Novo (UTC+1, Bénin). Évite le décalage UTC qui peut donner
+ * la veille entre minuit local et 01h00 locale.
+ *
+ * Usage : const today = localDateString();
+ */
+export function localDateString(date?: Date): string {
+  return (date ?? new Date()).toLocaleDateString("en-CA", {
+    timeZone: "Africa/Porto-Novo",
+  });
+}

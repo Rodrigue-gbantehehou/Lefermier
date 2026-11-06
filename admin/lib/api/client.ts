@@ -6,6 +6,19 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+// Avertissement de configuration manquante en production côté client
+if (
+  typeof window !== "undefined" &&
+  process.env.NODE_ENV === "production" &&
+  !process.env.NEXT_PUBLIC_API_URL
+) {
+  console.warn(
+    "[Lefermier Admin] NEXT_PUBLIC_API_URL non défini en production — " +
+      "les requêtes utilisent le fallback http://127.0.0.1:8000. " +
+      "Définissez cette variable dans votre environnement de déploiement."
+  );
+}
+
 export class ApiError extends Error {
   status: number;
   data: any;

@@ -34,11 +34,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoFill = () => {
-    setEmail("admin.test@lefermier.bj");
-    setPassword("Lefermier2026@Secure!");
-  };
-
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-6 lg:p-8">
       {/* Theme Toggle Top Right */}

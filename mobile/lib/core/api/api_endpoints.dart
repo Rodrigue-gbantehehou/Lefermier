@@ -9,7 +9,7 @@ class ApiEndpoints {
   static const String deviceRefresh = "/api/auth/refresh";
   static const String deviceLogout = "/api/auth/device-logout";
   static const String me = "/api/auth/me";
-  static const String changePassword = "/api/change-password";
+  static const String changePassword = "/api/auth/change-password";
 
   // Exploitations (Multi-Tenancy)
   static const String farms = "/api/farms";

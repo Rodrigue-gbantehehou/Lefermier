@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 import { flocksApi } from "./flocks";
 import { dashboardApi } from "./dashboard";
 import { EggProduction } from "../types";
+import { localDateString } from "../utils";
 
 export const eggsApi = {
   list: async (params?: { farmId?: string; flockId?: string }) => {
@@ -61,7 +62,7 @@ export const eggsApi = {
     if (session === "NOON") session = "AFTERNOON";
 
     const payload = {
-      productionDate: data.productionDate || data.date || new Date().toISOString().split("T")[0],
+      productionDate: data.productionDate || data.date || localDateString(),
       session,
       goodEggs: Number(data.goodEggs || 0),
       crackedEggs: Number(data.crackedEggs !== undefined ? data.crackedEggs : (data.brokenEggs || 0)),

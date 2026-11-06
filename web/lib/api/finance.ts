@@ -1,5 +1,6 @@
 import { apiRequest } from "./client";
 import { Transaction } from "../types";
+import { localDateString } from "../utils";
 
 export const financeApi = {
   listTransactions: async (params?: {
@@ -70,7 +71,7 @@ export const financeApi = {
       paymentStatus: data.paymentStatus || "PAID",
       paidAmount: data.paidAmount !== undefined ? Number(data.paidAmount) : undefined,
       dueDate: data.dueDate || undefined,
-      transactionDate: data.transactionDate || data.date || new Date().toISOString().split("T")[0],
+      transactionDate: data.transactionDate || data.date || localDateString(),
       paymentMethod: data.paymentMethod || "CASH",
       reference: data.reference || undefined,
       description,

@@ -42,7 +42,7 @@ import {
   Transaction,
   InventoryItem,
 } from "@/lib/types";
-import { formatFcfa, formatNumber, formatPercent, formatDate, cn } from "@/lib/utils";
+import { formatFcfa, formatNumber, formatPercent, formatDate, cn, localDateString } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { activeFarm, hasPermission, hasModule, activePlan, isOwner } = useAuth();
@@ -82,7 +82,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateString();
     setTodayStr(today);
 
     if (activeFarm?.id) {
