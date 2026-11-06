@@ -9,6 +9,7 @@ use App\Entity\Farm;
 use App\Entity\FarmMembership;
 use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -22,6 +23,7 @@ class ApiKeyVoter extends Voter
 
     public function __construct(
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
     ) {
     }
 
@@ -36,6 +38,11 @@ class ApiKeyVoter extends Voter
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, #[\SensitiveParameter] mixed $vote = null): bool
     {
+        // Une clé API ne peut jamais gérer, créer ou révoquer d'autres clés API
+        if ($this->apiKeyChecker->isApiKeyRequest()) {
+            return false;
+        }
+
         $user = $token->getUser();
         if (!$user instanceof User) {
             return false;

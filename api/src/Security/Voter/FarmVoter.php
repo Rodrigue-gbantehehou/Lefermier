@@ -8,6 +8,7 @@ use App\Entity\Farm;
 use App\Entity\FarmMembership;
 use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -25,6 +26,7 @@ class FarmVoter extends Voter
 
     public function __construct(
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
     ) {
     }
 
@@ -44,12 +46,28 @@ class FarmVoter extends Voter
             return false;
         }
 
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return true;
-        }
-
         /** @var Farm $farm */
         $farm = $subject;
+
+        $apiKey = $this->apiKeyChecker->getApiKey();
+        if ($apiKey !== null) {
+            // Une clé API ne peut jamais supprimer une exploitation ni gérer les membres ou rôles
+            if (in_array($attribute, [self::DELETE, self::MANAGE_MEMBERS, self::MANAGE_ROLES], true)) {
+                return false;
+            }
+
+            $requiredPermission = match ($attribute) {
+                self::VIEW => Permission::FARM_VIEW,
+                self::EDIT => Permission::FARM_EDIT,
+                default => 'none',
+            };
+
+            if (!$this->apiKeyChecker->isAccessAllowed($farm, $requiredPermission)) {
+                return false;
+            }
+        } elseif (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return true;
+        }
 
         $membership = $this->membershipRepository->findOneBy([
             'farm' => $farm,

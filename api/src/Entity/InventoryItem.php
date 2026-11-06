@@ -249,4 +249,14 @@ class InventoryItem
     {
         return $this->movements;
     }
+
+    public function addMovement(StockMovement $movement): self
+    {
+        if (!$this->movements->contains($movement)) {
+            $this->movements->add($movement);
+            $movement->setItem($this);
+        }
+
+        return $this;
+    }
 }

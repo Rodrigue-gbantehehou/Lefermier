@@ -39,6 +39,19 @@ class DeviceRefreshTokenRepository extends ServiceEntityRepository
     }
 
     /**
+     * Recherche un jeton par son empreinte avec un verrouillage pessimiste d'écriture (SELECT ... FOR UPDATE).
+     */
+    public function findByHashWithLock(string $hash): ?DeviceRefreshToken
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.refreshTokenHash = :hash')
+            ->setParameter('hash', $hash)
+            ->getQuery()
+            ->setLockMode(\Doctrine\DBAL\LockMode::PESSIMISTIC_WRITE)
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Révoque toute la famille d'un jeton suite à une détection de réutilisation
      */
     public function revokeFamily(string $familyId): int

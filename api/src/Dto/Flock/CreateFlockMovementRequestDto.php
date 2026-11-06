@@ -22,6 +22,12 @@ final readonly class CreateFlockMovementRequestDto
 
         #[Assert\Length(max: 255, maxMessage: "Le motif ne doit pas dépasser 255 caractères.")]
         public ?string $reason = null,
+
+        #[Assert\Ulid(message: "L'identifiant du bâtiment de destination doit être un ULID valide.")]
+        public ?string $targetBuildingId = null,
+
+        #[Assert\Ulid(message: "L'identifiant du bâtiment de destination doit être un ULID valide.")]
+        public ?string $destinationBuildingId = null,
     ) {
     }
 }

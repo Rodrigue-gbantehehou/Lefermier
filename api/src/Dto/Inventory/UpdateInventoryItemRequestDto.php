@@ -20,7 +20,7 @@ final readonly class UpdateInventoryItemRequestDto
         #[Assert\Length(max: 100, maxMessage: "La précision de catégorie ne doit pas dépasser 100 caractères.")]
         public ?string $customCategory = null,
 
-        public InventoryUnit $unit = InventoryUnit::BAG_50KG,
+        public ?InventoryUnit $unit = null,
 
         #[Assert\PositiveOrZero(message: "Le seuil d'alerte doit être un nombre positif ou nul.")]
         public ?float $alertThreshold = null,

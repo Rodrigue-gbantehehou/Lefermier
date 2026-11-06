@@ -60,7 +60,16 @@ class DashboardService
         $maxMembers = (int) ($planQuotas['maxMembers'] ?? 2);
 
         $farmsCount = count($org->getFarms());
-        $activeFlocks = $this->flockRepository->findByFarm($farm, FlockStatus::ACTIVE);
+        $membership = $this->membershipRepository->findOneBy([
+            'farm' => $farm,
+            'user' => $user,
+            'isActive' => true,
+        ]);
+        $allowedBuildings = ($membership !== null && $membership->hasBuildingRestrictions())
+            ? $membership->getAssignedBuildings()->toArray()
+            : null;
+
+        $activeFlocks = $this->flockRepository->findByFarm($farm, FlockStatus::ACTIVE, $allowedBuildings);
         $totalFlocksCount = $this->flockRepository->count(['farm' => $farm]);
         $buildingsCount = $this->buildingRepository->count(['farm' => $farm]);
 
@@ -136,10 +145,10 @@ class DashboardService
         // 2. Production d'œufs (conditionnée par le module 'eggs')
         $hasEggModule = in_array('eggs', $planModules, true);
         if ($hasEggModule) {
-            $eggSummary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate);
-            $eggChart = $this->eggProductionRepository->getFarmDailyProductionChart($farm, $startDate, $endDate);
+            $eggSummary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate, $allowedBuildings);
+            $eggChart = $this->eggProductionRepository->getFarmDailyProductionChart($farm, $startDate, $endDate, $allowedBuildings);
             $todayDate = new \DateTimeImmutable(date('Y-m-d'));
-            $todayEggStats = $this->eggProductionRepository->getFarmSummaryStats($farm, $todayDate, $todayDate);
+            $todayEggStats = $this->eggProductionRepository->getFarmSummaryStats($farm, $todayDate, $todayDate, $allowedBuildings);
 
             $eggData = [
                 'hasAccess' => true,
@@ -283,15 +292,25 @@ class DashboardService
                 'hasAccess' => true,
                 'currentMonth' => [
                     'income' => $monthFinances['totalIncome'],
+                    'collectedIncome' => $monthFinances['collectedIncome'],
+                    'receivablesAmount' => $monthFinances['receivablesAmount'],
                     'expense' => $monthFinances['totalExpense'],
+                    'paidExpense' => $monthFinances['paidExpense'],
+                    'payablesAmount' => $monthFinances['payablesAmount'],
                     'netBalance' => $monthFinances['netBalance'],
+                    'cashBalance' => $monthFinances['cashBalance'],
                     'transactionsCount' => $monthFinances['transactionsCount'],
                     'currency' => $farm->getCurrency(),
                 ],
                 'period' => [
                     'income' => $periodFinances['totalIncome'],
+                    'collectedIncome' => $periodFinances['collectedIncome'],
+                    'receivablesAmount' => $periodFinances['receivablesAmount'],
                     'expense' => $periodFinances['totalExpense'],
+                    'paidExpense' => $periodFinances['paidExpense'],
+                    'payablesAmount' => $periodFinances['payablesAmount'],
                     'netBalance' => $periodFinances['netBalance'],
+                    'cashBalance' => $periodFinances['cashBalance'],
                     'transactionsCount' => $periodFinances['transactionsCount'],
                     'currency' => $farm->getCurrency(),
                 ],

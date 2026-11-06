@@ -19,21 +19,27 @@ final class Permission
     // Bandes & Volailles
     public const FLOCK_VIEW = 'flock:view';
     public const FLOCK_CREATE = 'flock:create';
+    public const FLOCK_EDIT = 'flock:edit';
     public const FLOCK_MOVEMENT = 'flock:movement';
 
     // Alimentation & Stocks
     public const INVENTORY_VIEW = 'inventory:view';
     public const INVENTORY_CREATE = 'inventory:create';
+    public const INVENTORY_EDIT = 'inventory:edit';
     public const INVENTORY_MOVEMENT = 'inventory:movement';
     public const INVENTORY_VALUATION = 'inventory:valuation';
 
     // Production d'œufs
     public const EGG_VIEW = 'egg:view';
     public const EGG_CREATE = 'egg:create';
+    public const EGG_EDIT = 'egg:edit';
+    public const EGG_DELETE = 'egg:delete';
 
     // Finances & Ventes
     public const FINANCE_VIEW = 'finance:view';
     public const FINANCE_CREATE = 'finance:create';
+    public const FINANCE_EDIT = 'finance:edit';
+    public const FINANCE_DELETE = 'finance:delete';
     public const FINANCE_MARGIN = 'finance:margin';
 
     // Contacts & Tiers
@@ -94,6 +100,11 @@ final class Permission
                 'label' => 'Créer une bande',
                 'description' => 'Enregistrer un nouveau lot de volailles',
             ],
+            self::FLOCK_EDIT => [
+                'module' => 'Bandes & Effectifs',
+                'label' => 'Modifier une bande',
+                'description' => 'Mettre à jour les paramètres d\'un lot',
+            ],
             self::FLOCK_MOVEMENT => [
                 'module' => 'Bandes & Effectifs',
                 'label' => 'Enregistrer un mouvement',
@@ -108,6 +119,11 @@ final class Permission
                 'module' => 'Alimentation & Stocks',
                 'label' => 'Créer un article',
                 'description' => 'Ajouter un aliment, médicament ou équipement',
+            ],
+            self::INVENTORY_EDIT => [
+                'module' => 'Alimentation & Stocks',
+                'label' => 'Modifier un article',
+                'description' => 'Mettre à jour la fiche d\'un article ou intrant',
             ],
             self::INVENTORY_MOVEMENT => [
                 'module' => 'Alimentation & Stocks',
@@ -129,6 +145,16 @@ final class Permission
                 'label' => 'Saisir une collecte',
                 'description' => 'Enregistrer les œufs ramassés par session',
             ],
+            self::EGG_EDIT => [
+                'module' => 'Production d\'œufs',
+                'label' => 'Modifier une collecte',
+                'description' => 'Corriger les données d\'une ponte enregistrée',
+            ],
+            self::EGG_DELETE => [
+                'module' => 'Production d\'œufs',
+                'label' => 'Supprimer une collecte',
+                'description' => 'Annuler un enregistrement de collecte d\'œufs',
+            ],
             self::FINANCE_VIEW => [
                 'module' => 'Finances & Ventes',
                 'label' => 'Consulter les finances',
@@ -138,6 +164,16 @@ final class Permission
                 'module' => 'Finances & Ventes',
                 'label' => 'Enregistrer une opération',
                 'description' => 'Saisir des ventes (œufs/volailles) et dépenses',
+            ],
+            self::FINANCE_EDIT => [
+                'module' => 'Finances & Ventes',
+                'label' => 'Modifier une opération',
+                'description' => 'Mettre à jour une transaction financière',
+            ],
+            self::FINANCE_DELETE => [
+                'module' => 'Finances & Ventes',
+                'label' => 'Supprimer une opération',
+                'description' => 'Supprimer une transaction financière',
             ],
             self::FINANCE_MARGIN => [
                 'module' => 'Finances & Ventes',

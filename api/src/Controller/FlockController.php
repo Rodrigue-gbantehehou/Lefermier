@@ -54,15 +54,16 @@ class FlockController extends AbstractController
             $status = FlockStatus::tryFrom(strtoupper((string) $statusParam));
         }
 
-        $flocks = $this->flockRepository->findByFarm($farm, $status);
-
+        $allowedBuildings = null;
         $currentUser = $this->getUser();
         if ($currentUser instanceof User) {
-            $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser]);
+            $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser, 'isActive' => true]);
             if ($membership !== null && $membership->hasBuildingRestrictions()) {
-                $flocks = array_values(array_filter($flocks, fn (Flock $f) => $membership->isBuildingAssigned($f->getBuilding())));
+                $allowedBuildings = $membership->getAssignedBuildings()->toArray();
             }
         }
+
+        $flocks = $this->flockRepository->findByFarm($farm, $status, $allowedBuildings);
 
         $serialized = array_map(fn (Flock $f) => $this->flockService->serializeFlock($f), $flocks);
 

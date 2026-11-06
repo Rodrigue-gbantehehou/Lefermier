@@ -189,6 +189,7 @@ class TransactionController extends AbstractController
                 'summary' => array_merge($summary, [
                     'currency' => $flock->getFarm()->getCurrency(),
                     'grossMargin' => $summary['netBalance'],
+                    'cashMargin' => $summary['cashBalance'],
                 ]),
             ],
         ]);

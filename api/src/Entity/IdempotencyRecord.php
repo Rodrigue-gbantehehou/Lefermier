@@ -191,4 +191,15 @@ class IdempotencyRecord
     {
         return $this->status === self::STATUS_COMPLETED;
     }
+
+    /**
+     * Renouvelle le verrou concurrentiel pour une nouvelle tentative d'exécution.
+     */
+    public function renewLock(int $lockDurationSeconds = 30): self
+    {
+        $this->status = self::STATUS_PENDING;
+        $this->lockedUntil = (new \DateTimeImmutable())->modify(sprintf('+%d seconds', $lockDurationSeconds));
+
+        return $this;
+    }
 }

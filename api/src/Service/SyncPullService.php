@@ -100,6 +100,12 @@ class SyncPullService
         $serializedHealth = [];
         if ($canViewHealth) {
             $treatments = $this->treatmentRepository->findUpdatedSince($farm, $since);
+            if ($hasBuildingRestrictions) {
+                $treatments = array_values(array_filter(
+                    $treatments,
+                    fn ($t) => $t->getFlock() === null || $membership->isBuildingAssigned($t->getFlock()->getBuilding())
+                ));
+            }
             $serializedHealth = array_map(
                 fn ($t) => $this->healthService->serializeTreatment($t),
                 $treatments

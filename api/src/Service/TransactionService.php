@@ -11,11 +11,14 @@ use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\Transaction;
 use App\Entity\User;
+use App\Enum\PaymentStatus;
 use App\Exception\CategoryTypeMismatchException;
 use App\Repository\ContactRepository;
 use App\Repository\FlockRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Ulid;
 
 class TransactionService
@@ -36,6 +39,8 @@ class TransactionService
         if ($dto->category->getType() !== $dto->type) {
             throw new CategoryTypeMismatchException($dto->category, $dto->type);
         }
+
+        $this->validatePaymentParameters($dto->amount, $dto->paymentStatus, $dto->paidAmount, true);
 
         // 2. Vérification du tiers (Contact) s'il est spécifié
         $contact = null;
@@ -89,39 +94,107 @@ class TransactionService
             throw new CategoryTypeMismatchException($dto->category, $dto->type);
         }
 
-        $farm = $transaction->getFarm();
-
-        $contact = null;
-        if ($dto->contactId !== null) {
-            $contact = $this->contactRepository->find(Ulid::fromString($dto->contactId));
-            if ($contact === null || $contact->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
-                throw new NotFoundHttpException("Le contact spécifié n'existe pas dans cette exploitation.");
+        return $this->entityManager->wrapInTransaction(function () use ($transaction, $dto): Transaction {
+            $this->entityManager->lock($transaction, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($transaction)) {
+                $this->entityManager->refresh($transaction, LockMode::PESSIMISTIC_WRITE);
             }
+
+            $effectiveStatus = $dto->paymentStatus ?? $transaction->getPaymentStatus();
+            $requireExplicitPartialAmount = $dto->paymentStatus === PaymentStatus::PARTIAL
+                && $transaction->getPaymentStatus() !== PaymentStatus::PARTIAL;
+            $this->validatePaymentParameters(
+                $dto->amount,
+                $effectiveStatus,
+                $dto->paidAmount,
+                $requireExplicitPartialAmount
+            );
+
+            $farm = $transaction->getFarm();
+
+            $contact = null;
+            if ($dto->contactId !== null) {
+                $contact = $this->contactRepository->find(Ulid::fromString($dto->contactId));
+                if ($contact === null || $contact->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("Le contact spécifié n'existe pas dans cette exploitation.");
+                }
+            }
+
+            $flock = null;
+            if ($dto->flockId !== null) {
+                $flock = $this->flockRepository->find(Ulid::fromString($dto->flockId));
+                if ($flock === null || $flock->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("La bande spécifiée n'existe pas dans cette exploitation.");
+                }
+            }
+
+            $transactionDate = new \DateTimeImmutable($dto->transactionDate);
+            $dueDate = $dto->dueDate !== null
+                ? new \DateTimeImmutable($dto->dueDate)
+                : $transaction->getDueDate();
+
+            $transaction->setType($dto->type);
+            $transaction->setCategory($dto->category);
+            $transaction->setAmount($dto->amount);
+            $transaction->setTransactionDate($transactionDate);
+            $transaction->setPaymentMethod($dto->paymentMethod);
+            $transaction->setReference($dto->reference);
+            $transaction->setDescription($dto->description);
+            $transaction->setContact($contact);
+            $transaction->setFlock($flock);
+
+            if ($dto->paymentStatus !== null) {
+                $transaction->setPaymentStatus($dto->paymentStatus);
+            }
+            if ($dto->paidAmount !== null) {
+                $transaction->setPaidAmount($dto->paidAmount);
+            }
+            $transaction->setDueDate($transaction->getPaymentStatus() === PaymentStatus::PAID ? null : $dueDate);
+            $transaction->syncPaymentState();
+
+            $this->entityManager->flush();
+
+            return $transaction;
+        });
+    }
+
+    private function validatePaymentParameters(
+        int $amount,
+        ?PaymentStatus $paymentStatus,
+        ?int $paidAmount,
+        bool $requireExplicitPartialAmount = false,
+    ): void {
+        if ($paidAmount !== null && $paidAmount > $amount) {
+            throw new UnprocessableEntityHttpException(
+                "Le montant réglé ne peut pas être supérieur au montant total de la transaction."
+            );
         }
 
-        $flock = null;
-        if ($dto->flockId !== null) {
-            $flock = $this->flockRepository->find(Ulid::fromString($dto->flockId));
-            if ($flock === null || $flock->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
-                throw new NotFoundHttpException("La bande spécifiée n'existe pas dans cette exploitation.");
-            }
+        if ($paymentStatus === PaymentStatus::UNPAID && $paidAmount !== null && $paidAmount > 0) {
+            throw new UnprocessableEntityHttpException(
+                "Une transaction marquée comme non réglée ne peut pas avoir un montant payé supérieur à 0."
+            );
         }
 
-        $transactionDate = new \DateTimeImmutable($dto->transactionDate);
+        if ($paymentStatus === PaymentStatus::PAID && $paidAmount !== null && $paidAmount !== $amount) {
+            throw new UnprocessableEntityHttpException(
+                "Une transaction marquée comme totalement réglée doit avoir un montant payé égal au montant total."
+            );
+        }
 
-        $transaction->setType($dto->type);
-        $transaction->setCategory($dto->category);
-        $transaction->setAmount($dto->amount);
-        $transaction->setTransactionDate($transactionDate);
-        $transaction->setPaymentMethod($dto->paymentMethod);
-        $transaction->setReference($dto->reference);
-        $transaction->setDescription($dto->description);
-        $transaction->setContact($contact);
-        $transaction->setFlock($flock);
+        if ($paymentStatus === PaymentStatus::PARTIAL) {
+            if ($requireExplicitPartialAmount && $paidAmount === null) {
+                throw new UnprocessableEntityHttpException(
+                    "Pour un règlement partiel (acompte), le montant déjà payé doit être renseigné."
+                );
+            }
 
-        $this->entityManager->flush();
-
-        return $transaction;
+            if ($paidAmount !== null && ($paidAmount <= 0 || $paidAmount >= $amount)) {
+                throw new UnprocessableEntityHttpException(
+                    "Pour un règlement partiel (acompte), le montant payé doit être strictement compris entre 0 et le montant total."
+                );
+            }
+        }
     }
 
     public function deleteTransaction(Transaction $transaction): void

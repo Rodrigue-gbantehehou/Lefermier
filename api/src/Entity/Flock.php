@@ -345,7 +345,88 @@ class Flock
     }
 
     /**
-     * Calcule le taux de mortalité/perte cumulé en pourcentage.
+     * Calcule le cumul des mortalités naturelles/maladies enregistrées.
+     */
+    public function getTotalMortality(): int
+    {
+        $total = 0;
+        foreach ($this->movements as $movement) {
+            if ($movement->getType() === FlockMovementType::MORTALITY) {
+                $total += $movement->getQuantity();
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Calcule le cumul des réformes/tris enregistrés.
+     */
+    public function getTotalCulling(): int
+    {
+        $total = 0;
+        foreach ($this->movements as $movement) {
+            if ($movement->getType() === FlockMovementType::CULLING) {
+                $total += $movement->getQuantity();
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Calcule le cumul des ventes de sujets vifs enregistrées.
+     */
+    public function getTotalSales(): int
+    {
+        $total = 0;
+        foreach ($this->movements as $movement) {
+            if ($movement->getType() === FlockMovementType::SALE) {
+                $total += $movement->getQuantity();
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Calcule le cumul des pertes zootechniques (mortalité naturelle + réformes).
+     */
+    public function getTotalLosses(): int
+    {
+        return $this->getTotalMortality() + $this->getTotalCulling();
+    }
+
+    /**
+     * Calcule l'écart net imputable aux ajustements d'inventaire.
+     */
+    public function getNetAdjustmentDelta(): int
+    {
+        $theoreticalQty = $this->initialQuantity
+            - $this->getTotalMortality()
+            - $this->getTotalCulling()
+            - $this->getTotalSales();
+
+        return $this->currentQuantity - $theoreticalQty;
+    }
+
+    /**
+     * Retourne le nombre de mouvements d'ajustement d'effectif enregistrés.
+     */
+    public function getAdjustmentsCount(): int
+    {
+        $count = 0;
+        foreach ($this->movements as $movement) {
+            if ($movement->getType() === FlockMovementType::ADJUSTMENT) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Calcule le taux de mortalité naturelle cumulé en pourcentage (hors ventes et réformes).
      */
     public function getMortalityRate(): float
     {
@@ -353,7 +434,42 @@ class Flock
             return 0.0;
         }
 
-        $losses = $this->initialQuantity - $this->currentQuantity;
-        return round(($losses / $this->initialQuantity) * 100, 2);
+        return round(($this->getTotalMortality() / $this->initialQuantity) * 100, 2);
+    }
+
+    /**
+     * Calcule le taux de réforme cumulé en pourcentage.
+     */
+    public function getCullingRate(): float
+    {
+        if ($this->initialQuantity <= 0) {
+            return 0.0;
+        }
+
+        return round(($this->getTotalCulling() / $this->initialQuantity) * 100, 2);
+    }
+
+    /**
+     * Calcule le taux de vente cumulé en pourcentage.
+     */
+    public function getSalesRate(): float
+    {
+        if ($this->initialQuantity <= 0) {
+            return 0.0;
+        }
+
+        return round(($this->getTotalSales() / $this->initialQuantity) * 100, 2);
+    }
+
+    /**
+     * Calcule le taux de perte globale (mortalité naturelle + réformes) en pourcentage.
+     */
+    public function getLossRate(): float
+    {
+        if ($this->initialQuantity <= 0) {
+            return 0.0;
+        }
+
+        return round(($this->getTotalLosses() / $this->initialQuantity) * 100, 2);
     }
 }

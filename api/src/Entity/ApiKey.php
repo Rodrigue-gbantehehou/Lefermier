@@ -185,4 +185,62 @@ class ApiKey
     {
         return $this->keyPrefix . '...' . $this->lastFour;
     }
+
+    /**
+     * Vérifie si les scopes de la clé autorisent une permission donnée.
+     */
+    public function supportsPermission(string $permission): bool
+    {
+        if (in_array('*', $this->scopes, true)) {
+            return true;
+        }
+
+        if (in_array($permission, $this->scopes, true)) {
+            return true;
+        }
+
+        // Protection des actions administratives sensibles : exigent une mention explicite
+        $sensitivePermissions = [
+            'farm:delete',
+            'member:manage',
+            'role:manage',
+            'api_key:manage',
+        ];
+
+        if (in_array($permission, $sensitivePermissions, true)) {
+            return false;
+        }
+
+        // Préfixe de domaine (ex: "flock" pour "flock:view")
+        $parts = explode(':', $permission, 2);
+        $prefix = $parts[0] ?? '';
+        $action = $parts[1] ?? '';
+
+        if ($prefix !== '') {
+            // Support "flock:*" ou "flocks:*"
+            if (in_array($prefix . ':*', $this->scopes, true) || in_array($prefix . 's:*', $this->scopes, true)) {
+                return true;
+            }
+
+            $isRead = ($action === 'view');
+            if ($isRead) {
+                if (in_array($prefix . ':read', $this->scopes, true)
+                    || in_array($prefix . 's:read', $this->scopes, true)
+                    || in_array('read', $this->scopes, true)
+                ) {
+                    return true;
+                }
+            } else {
+                if (in_array($prefix . ':write', $this->scopes, true)
+                    || in_array($prefix . 's:write', $this->scopes, true)
+                    || in_array('write', $this->scopes, true)
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }
+

@@ -20,8 +20,10 @@ use App\Repository\BuildingRepository;
 use App\Repository\FlockMovementRepository;
 use App\Repository\FlockRepository;
 use App\Service\Admin\CommercialPlanService;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Ulid;
 
 class FlockService
@@ -82,47 +84,89 @@ class FlockService
 
     public function updateFlock(Flock $flock, UpdateFlockRequestDto $dto): Flock
     {
-        $flock->setName($dto->name);
-        $flock->setStrain($dto->strain);
-        $flock->setStatus($dto->status);
-        $flock->setNotes($dto->notes);
-
-        if ($dto->buildingId !== null) {
-            $building = $this->buildingRepository->find(Ulid::fromString($dto->buildingId));
-            if ($building === null || $building->getFarm()->getId()?->toBase32() !== $flock->getFarm()->getId()?->toBase32()) {
-                throw new NotFoundHttpException("Le bâtiment spécifié n'appartient pas à cette exploitation.");
+        return $this->entityManager->wrapInTransaction(function () use ($flock, $dto): Flock {
+            $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($flock)) {
+                $this->entityManager->refresh($flock, LockMode::PESSIMISTIC_WRITE);
             }
-            $flock->setBuilding($building);
-        } else {
-            $flock->setBuilding(null);
-        }
 
-        if ($dto->estimatedEndDate !== null) {
-            $flock->setEstimatedEndDate(new \DateTimeImmutable($dto->estimatedEndDate));
-        }
-        if ($dto->actualEndDate !== null) {
-            $flock->setActualEndDate(new \DateTimeImmutable($dto->actualEndDate));
-        }
+            $flock->setName($dto->name);
+            $flock->setStrain($dto->strain);
+            $flock->setStatus($dto->status);
+            $flock->setNotes($dto->notes);
 
-        $this->entityManager->flush();
+            if ($dto->buildingId !== null) {
+                $building = $this->buildingRepository->find(Ulid::fromString($dto->buildingId));
+                if ($building === null || $building->getFarm()->getId()?->toBase32() !== $flock->getFarm()->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("Le bâtiment spécifié n'appartient pas à cette exploitation.");
+                }
+                $flock->setBuilding($building);
+            } else {
+                $flock->setBuilding(null);
+            }
 
-        return $flock;
+            if ($dto->estimatedEndDate !== null) {
+                $flock->setEstimatedEndDate(new \DateTimeImmutable($dto->estimatedEndDate));
+            }
+            if ($dto->actualEndDate !== null) {
+                $flock->setActualEndDate(new \DateTimeImmutable($dto->actualEndDate));
+            }
+
+            $this->entityManager->flush();
+
+            return $flock;
+        });
     }
 
     public function recordMovement(Flock $flock, CreateFlockMovementRequestDto $dto, ?User $recordedBy = null): FlockMovement
     {
         return $this->entityManager->wrapInTransaction(function () use ($flock, $dto, $recordedBy): FlockMovement {
+            // Verrouillage pessimiste exclusif (SELECT ... FOR UPDATE) et rafraîchissement de la bande
+            // pour empêcher que deux mortalités/ventes simultanées ne contournent le contrôle d'effectif disponible.
+            $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($flock)) {
+                $this->entityManager->refresh($flock, LockMode::PESSIMISTIC_WRITE);
+            }
+
             $movementDate = new \DateTimeImmutable($dto->movementDate);
             $qty = $dto->quantity;
             $currentQty = $flock->getCurrentQuantity();
 
-            // Règle métier : décompte de l'effectif vivant
+            $sourceBuilding = null;
+            $targetBuilding = null;
+
+            // Règle métier : décompte de l'effectif vivant, transfert ou ajustement
             if (in_array($dto->type, [FlockMovementType::MORTALITY, FlockMovementType::CULLING, FlockMovementType::SALE], true)) {
                 if ($qty > $currentQty) {
                     throw new InsufficientFlockQuantityException($qty, $currentQty);
                 }
 
                 $flock->setCurrentQuantity($currentQty - $qty);
+            } elseif ($dto->type === FlockMovementType::TRANSFER) {
+                if ($qty > $currentQty) {
+                    throw new InsufficientFlockQuantityException($qty, $currentQty);
+                }
+
+                $targetBuildingId = $dto->targetBuildingId ?? $dto->destinationBuildingId;
+                if ($targetBuildingId === null) {
+                    throw new UnprocessableEntityHttpException("Le bâtiment de destination est obligatoire pour un mouvement de transfert.");
+                }
+
+                $targetBuilding = $this->buildingRepository->find(Ulid::fromString($targetBuildingId));
+                if ($targetBuilding === null || $targetBuilding->getFarm()->getId()?->toBase32() !== $flock->getFarm()->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("Le bâtiment de destination n'appartient pas à cette exploitation.");
+                }
+
+                if (!$targetBuilding->isActive()) {
+                    throw new UnprocessableEntityHttpException("Le bâtiment de destination est inactif.");
+                }
+
+                $sourceBuilding = $flock->getBuilding();
+                if ($sourceBuilding !== null && $sourceBuilding->getId()?->toBase32() === $targetBuilding->getId()?->toBase32()) {
+                    throw new UnprocessableEntityHttpException("Le bâtiment de destination doit être différent du bâtiment actuel de la bande.");
+                }
+
+                $flock->setBuilding($targetBuilding);
             } elseif ($dto->type === FlockMovementType::ADJUSTMENT) {
                 // Ajustement d'inventaire : réalignement direct
                 $flock->setCurrentQuantity($qty);
@@ -143,8 +187,11 @@ class FlockService
                 $movementDate,
                 $dto->reason,
                 $recordedBy,
+                $sourceBuilding,
+                $targetBuilding,
             );
 
+            $flock->addMovement($movement);
             $this->entityManager->persist($movement);
             $this->entityManager->flush();
 
@@ -174,6 +221,17 @@ class FlockService
             'ageInDays' => $flock->getAgeInDays(),
             'ageInWeeks' => $flock->getAgeInWeeks(),
             'mortalityRate' => $flock->getMortalityRate(),
+            'cullingRate' => $flock->getCullingRate(),
+            'salesRate' => $flock->getSalesRate(),
+            'lossRate' => $flock->getLossRate(),
+            'movementsSummary' => [
+                'mortality' => $flock->getTotalMortality(),
+                'culling' => $flock->getTotalCulling(),
+                'sales' => $flock->getTotalSales(),
+                'losses' => $flock->getTotalLosses(),
+                'netAdjustment' => $flock->getNetAdjustmentDelta(),
+                'adjustmentsCount' => $flock->getAdjustmentsCount(),
+            ],
             'startDate' => $flock->getStartDate()->format('Y-m-d'),
             'estimatedEndDate' => $flock->getEstimatedEndDate()?->format('Y-m-d'),
             'actualEndDate' => $flock->getActualEndDate()?->format('Y-m-d'),
@@ -202,6 +260,14 @@ class FlockService
             'quantity' => $movement->getQuantity(),
             'movementDate' => $movement->getMovementDate()->format('Y-m-d'),
             'reason' => $movement->getReason(),
+            'sourceBuilding' => $movement->getSourceBuilding() !== null ? [
+                'id' => $movement->getSourceBuilding()->getId()?->toBase32(),
+                'name' => $movement->getSourceBuilding()->getName(),
+            ] : null,
+            'targetBuilding' => $movement->getTargetBuilding() !== null ? [
+                'id' => $movement->getTargetBuilding()->getId()?->toBase32(),
+                'name' => $movement->getTargetBuilding()->getName(),
+            ] : null,
             'recordedBy' => $movement->getRecordedBy() !== null ? [
                 'id' => $movement->getRecordedBy()->getId()?->toBase32(),
                 'name' => $movement->getRecordedBy()->getFullName(),

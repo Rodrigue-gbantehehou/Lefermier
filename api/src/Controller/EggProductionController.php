@@ -48,19 +48,17 @@ class EggProductionController extends AbstractController
         $startDate = $startDateParam !== null ? new \DateTimeImmutable((string) $startDateParam) : null;
         $endDate = $endDateParam !== null ? new \DateTimeImmutable((string) $endDateParam) : null;
 
-        $productions = $this->eggProductionRepository->findByFarm($farm, $startDate, $endDate, $limit);
-        $summary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate);
-
+        $allowedBuildings = null;
         $currentUser = $this->getUser();
         if ($currentUser instanceof User) {
             $membership = $this->membershipRepository->findOneBy(['farm' => $farm, 'user' => $currentUser, 'isActive' => true]);
             if ($membership !== null && $membership->hasBuildingRestrictions()) {
-                $productions = array_values(array_filter(
-                    $productions,
-                    fn (EggProduction $p) => $membership->isBuildingAssigned($p->getFlock()->getBuilding())
-                ));
+                $allowedBuildings = $membership->getAssignedBuildings()->toArray();
             }
         }
+
+        $productions = $this->eggProductionRepository->findByFarm($farm, $startDate, $endDate, $limit, $allowedBuildings);
+        $summary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate, $allowedBuildings);
 
         $serialized = array_map(
             fn (EggProduction $p) => $this->eggProductionService->serializeEggProduction($p),

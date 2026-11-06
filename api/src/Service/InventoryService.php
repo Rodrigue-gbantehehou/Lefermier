@@ -13,11 +13,14 @@ use App\Entity\StockMovement;
 use App\Entity\User;
 use App\Enum\StockMovementType;
 use App\Exception\DuplicateInventoryItemException;
+use App\Exception\IncompatibleUnitException;
 use App\Exception\InsufficientStockException;
 use App\Repository\FlockRepository;
 use App\Repository\InventoryItemRepository;
 use App\Repository\StockMovementRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Ulid;
 
@@ -67,6 +70,7 @@ class InventoryService
                     $dto->unitPrice,
                     $recordedBy,
                 );
+                $item->addMovement($movement);
                 $this->entityManager->persist($movement);
             }
 
@@ -78,26 +82,89 @@ class InventoryService
 
     public function updateItem(InventoryItem $item, UpdateInventoryItemRequestDto $dto): InventoryItem
     {
-        $item->setName($dto->name);
-        if ($dto->category !== null) {
-            $item->setCategory($dto->category);
-        }
-        $item->setCustomCategory($dto->customCategory);
-        $item->setUnit($dto->unit);
-        $item->setPackageWeightKg($dto->packageWeightKg);
-        $item->setAlertThreshold($dto->alertThreshold);
-        $item->setUnitPrice($dto->unitPrice);
-        $item->setNotes($dto->notes);
-        $item->setIsActive($dto->isActive);
+        return $this->entityManager->wrapInTransaction(function () use ($item, $dto): InventoryItem {
+            $this->entityManager->lock($item, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($item)) {
+                $this->entityManager->refresh($item, LockMode::PESSIMISTIC_WRITE);
+            }
 
-        $this->entityManager->flush();
+            $oldUnit = $item->getUnit();
+            $oldBagWeight = $item->getPackageWeightKg();
+            $oldStock = $item->getCurrentStock();
+            $oldAlertThreshold = $item->getAlertThreshold();
+            $oldUnitPrice = $item->getUnitPrice();
 
-        return $item;
+            $newUnit = $dto->unit ?? $oldUnit;
+            $newBagWeight = $dto->packageWeightKg;
+
+            $hasStockOrHistory = $oldStock > 0.0
+                || !$item->getMovements()->isEmpty()
+                || $this->movementRepository->count(['item' => $item]) > 0;
+
+            $effectiveAlertThreshold = $dto->alertThreshold;
+            $effectiveUnitPrice = $dto->unitPrice;
+
+            if ($hasStockOrHistory) {
+                if ($newUnit !== $oldUnit) {
+                    if (!$oldUnit->isCompatibleWith($newUnit)) {
+                        throw new IncompatibleUnitException($oldUnit, $newUnit);
+                    }
+
+                    if ($oldUnit->getFamily() === 'VET_DOSE') {
+                        throw new ConflictHttpException(
+                            "Impossible de modifier l'unité de conditionnement vétérinaire (dose, flacon, sachet) d'un article ayant déjà un stock ou un historique de mouvements."
+                        );
+                    }
+                }
+
+                $oldMultiplier = $oldUnit->getBaseMultiplier($oldBagWeight);
+                $newMultiplier = $newUnit->getBaseMultiplier($newBagWeight);
+
+                if (abs($oldMultiplier - $newMultiplier) > 0.00001 && $newMultiplier > 0.0) {
+                    $conversionRatio = $oldMultiplier / $newMultiplier;
+
+                    if ($oldStock > 0.0) {
+                        $item->setCurrentStock(round($oldStock * $conversionRatio, 2));
+                    }
+
+                    if ($effectiveAlertThreshold !== null && $oldAlertThreshold !== null && abs($effectiveAlertThreshold - $oldAlertThreshold) < 0.0001) {
+                        $effectiveAlertThreshold = round($oldAlertThreshold * $conversionRatio, 2);
+                    }
+
+                    if ($effectiveUnitPrice !== null && $oldUnitPrice !== null && $effectiveUnitPrice === $oldUnitPrice) {
+                        $effectiveUnitPrice = (int) round($oldUnitPrice / $conversionRatio);
+                    }
+                }
+            }
+
+            $item->setName($dto->name);
+            if ($dto->category !== null) {
+                $item->setCategory($dto->category);
+            }
+            $item->setCustomCategory($dto->customCategory);
+            $item->setUnit($newUnit);
+            $item->setPackageWeightKg($newBagWeight);
+            $item->setAlertThreshold($effectiveAlertThreshold);
+            $item->setUnitPrice($effectiveUnitPrice);
+            $item->setNotes($dto->notes);
+            $item->setIsActive($dto->isActive);
+
+            $this->entityManager->flush();
+
+            return $item;
+        });
     }
 
     public function recordMovement(InventoryItem $item, CreateStockMovementRequestDto $dto, ?User $recordedBy = null): StockMovement
     {
         return $this->entityManager->wrapInTransaction(function () use ($item, $dto, $recordedBy): StockMovement {
+            // Verrouillage pessimiste exclusif (SELECT ... FOR UPDATE) et rafraîchissement de l'état
+            // pour empêcher les conditions de course lors de distributions ou ajustements simultanés.
+            $this->entityManager->lock($item, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($item)) {
+                $this->entityManager->refresh($item, LockMode::PESSIMISTIC_WRITE);
+            }
+
             $movementDate = new \DateTimeImmutable($dto->movementDate);
             $qty = $dto->quantity;
             $currentStock = $item->getCurrentStock();
@@ -152,6 +219,7 @@ class InventoryService
                 $recordedBy,
             );
 
+            $item->addMovement($movement);
             $this->entityManager->persist($movement);
             $this->entityManager->flush();
 

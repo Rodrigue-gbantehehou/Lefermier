@@ -107,8 +107,13 @@ class Transaction
         $this->flock = $flock;
         $this->recordedBy = $recordedBy;
         $this->paymentStatus = $paymentStatus;
-        $this->paidAmount = $paidAmount !== null ? (string) max(0, $paidAmount) : ($paymentStatus === PaymentStatus::UNPAID ? '0' : (string) max(1, $amount));
         $this->dueDate = $dueDate;
+        if ($paidAmount !== null) {
+            $this->setPaidAmount($paidAmount);
+        } else {
+            $this->paidAmount = $paymentStatus === PaymentStatus::UNPAID ? '0' : $this->amount;
+            $this->syncPaymentState();
+        }
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -127,13 +132,20 @@ class Transaction
     public function setPaymentStatus(PaymentStatus $paymentStatus): self
     {
         $this->paymentStatus = $paymentStatus;
+        if ($paymentStatus === PaymentStatus::PAID) {
+            $this->paidAmount = $this->amount;
+            $this->dueDate = null;
+        } elseif ($paymentStatus === PaymentStatus::UNPAID) {
+            $this->paidAmount = '0';
+        }
+
         return $this;
     }
 
     public function getPaidAmount(): int
     {
         if ($this->paidAmount !== null) {
-            return (int) $this->paidAmount;
+            return min($this->getAmount(), max(0, (int) $this->paidAmount));
         }
 
         return $this->paymentStatus === PaymentStatus::UNPAID ? 0 : $this->getAmount();
@@ -141,7 +153,58 @@ class Transaction
 
     public function setPaidAmount(?int $paidAmount): self
     {
-        $this->paidAmount = $paidAmount !== null ? (string) max(0, $paidAmount) : null;
+        if ($paidAmount === null) {
+            $this->paidAmount = $this->paymentStatus === PaymentStatus::UNPAID ? '0' : $this->amount;
+            return $this;
+        }
+
+        $clamped = min($this->getAmount(), max(0, $paidAmount));
+        $this->paidAmount = (string) $clamped;
+
+        if ($clamped === 0) {
+            $this->paymentStatus = PaymentStatus::UNPAID;
+        } elseif ($clamped >= $this->getAmount()) {
+            $this->paymentStatus = PaymentStatus::PAID;
+            $this->dueDate = null;
+        } else {
+            $this->paymentStatus = PaymentStatus::PARTIAL;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Réconcilie automatiquement le montant déjà réglé et le statut de paiement
+     * lorsque le montant total de la transaction est modifié.
+     */
+    public function syncPaymentState(): self
+    {
+        $total = $this->getAmount();
+
+        if ($this->paymentStatus === PaymentStatus::PAID) {
+            $this->paidAmount = (string) $total;
+            $this->dueDate = null;
+            return $this;
+        }
+
+        if ($this->paymentStatus === PaymentStatus::UNPAID) {
+            $this->paidAmount = '0';
+            return $this;
+        }
+
+        $paid = $this->paidAmount !== null ? max(0, (int) $this->paidAmount) : 0;
+        if ($paid >= $total) {
+            $this->paidAmount = (string) $total;
+            $this->paymentStatus = PaymentStatus::PAID;
+            $this->dueDate = null;
+        } elseif ($paid <= 0) {
+            $this->paidAmount = '0';
+            $this->paymentStatus = PaymentStatus::UNPAID;
+        } else {
+            $this->paidAmount = (string) $paid;
+            $this->paymentStatus = PaymentStatus::PARTIAL;
+        }
+
         return $this;
     }
 
@@ -216,6 +279,7 @@ class Transaction
     public function setAmount(int $amount): self
     {
         $this->amount = (string) max(1, $amount);
+        $this->syncPaymentState();
         return $this;
     }
 

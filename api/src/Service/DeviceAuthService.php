@@ -69,27 +69,28 @@ class DeviceAuthService
     public function rotateRefreshToken(string $rawToken, string $deviceId): array
     {
         $hash = hash('sha256', $rawToken);
-        $existing = $this->tokenRepository->findByHash($hash);
 
-        if ($existing === null) {
-            throw new AuthenticationException("Jeton de rafraîchissement non reconnu.");
-        }
+        return $this->entityManager->wrapInTransaction(function () use ($hash, $deviceId): array {
+            $existing = $this->tokenRepository->findByHashWithLock($hash);
 
-        if ($existing->getDeviceId() !== $deviceId) {
-            throw new AuthenticationException("Incohérence d'identifiant de terminal.");
-        }
+            if ($existing === null) {
+                throw new AuthenticationException("Jeton de rafraîchissement non reconnu.");
+            }
 
-        // Détection de réutilisation (Jeton déjà révoqué / consommé) -> Attaque potentielle
-        if ($existing->isRevoked()) {
-            $this->tokenRepository->revokeFamily($existing->getFamilyId());
-            throw new AuthenticationException("Alerte de sécurité : réutilisation de jeton détectée. Session révoquée.");
-        }
+            if ($existing->getDeviceId() !== $deviceId) {
+                throw new AuthenticationException("Incohérence d'identifiant de terminal.");
+            }
 
-        if ($existing->isExpired()) {
-            throw new AuthenticationException("Le jeton de rafraîchissement a expiré. Veuillez vous reconnecter.");
-        }
+            // Détection de réutilisation (Jeton déjà révoqué / consommé) -> Attaque potentielle
+            if ($existing->isRevoked()) {
+                $this->tokenRepository->revokeFamily($existing->getFamilyId());
+                throw new AuthenticationException("Alerte de sécurité : réutilisation de jeton détectée. Session révoquée.");
+            }
 
-        return $this->entityManager->wrapInTransaction(function () use ($existing, $deviceId): array {
+            if ($existing->isExpired()) {
+                throw new AuthenticationException("Le jeton de rafraîchissement a expiré. Veuillez vous reconnecter.");
+            }
+
             // 1. Invalidation du jeton courant
             $existing->setRevoked(true);
             $existing->markAsUsed();

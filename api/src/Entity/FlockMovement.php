@@ -39,6 +39,14 @@ class FlockMovement
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $recordedBy = null;
 
+    #[ORM\ManyToOne(targetEntity: Building::class)]
+    #[ORM\JoinColumn(name: 'source_building_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Building $sourceBuilding = null;
+
+    #[ORM\ManyToOne(targetEntity: Building::class)]
+    #[ORM\JoinColumn(name: 'target_building_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    private ?Building $targetBuilding = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -49,6 +57,8 @@ class FlockMovement
         \DateTimeImmutable $movementDate,
         ?string $reason = null,
         ?User $recordedBy = null,
+        ?Building $sourceBuilding = null,
+        ?Building $targetBuilding = null,
     ) {
         $this->id = new Ulid();
         $this->flock = $flock;
@@ -57,6 +67,8 @@ class FlockMovement
         $this->movementDate = $movementDate;
         $this->reason = $reason;
         $this->recordedBy = $recordedBy;
+        $this->sourceBuilding = $sourceBuilding;
+        $this->targetBuilding = $targetBuilding;
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -128,6 +140,28 @@ class FlockMovement
     public function setRecordedBy(?User $recordedBy): self
     {
         $this->recordedBy = $recordedBy;
+        return $this;
+    }
+
+    public function getSourceBuilding(): ?Building
+    {
+        return $this->sourceBuilding;
+    }
+
+    public function setSourceBuilding(?Building $sourceBuilding): self
+    {
+        $this->sourceBuilding = $sourceBuilding;
+        return $this;
+    }
+
+    public function getTargetBuilding(): ?Building
+    {
+        return $this->targetBuilding;
+    }
+
+    public function setTargetBuilding(?Building $targetBuilding): self
+    {
+        $this->targetBuilding = $targetBuilding;
         return $this;
     }
 

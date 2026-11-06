@@ -78,8 +78,8 @@
 
         {% set initialQty = flock.initialQuantity %}
         {% set currentQty = flock.currentQuantity %}
-        {% set losses = initialQty - currentQty %}
-        {% set mortalityRate = initialQty > 0 ? ((losses / initialQty) * 100) : 0 %}
+        {% set losses = flock.totalMortality %}
+        {% set mortalityRate = flock.mortalityRate %}
 
         <table class="w-full">
             <tr>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Security\Voter;
 
 use App\Entity\User;
+use App\Security\ApiKeySecurityChecker;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -15,6 +16,11 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  */
 class AdminPermissionVoter extends Voter
 {
+    public function __construct(
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
+    ) {
+    }
+
     protected function supports(string $attribute, mixed $subject): bool
     {
         return str_starts_with($attribute, 'admin:');
@@ -22,6 +28,11 @@ class AdminPermissionVoter extends Voter
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?\Symfony\Component\Security\Core\Authorization\Voter\Vote $vote = null): bool
     {
+        // Les clés API n'ont jamais accès aux actions d'administration globale
+        if ($this->apiKeyChecker->isApiKeyRequest()) {
+            return false;
+        }
+
         $user = $token->getUser();
         if (!$user instanceof User) {
             return false;

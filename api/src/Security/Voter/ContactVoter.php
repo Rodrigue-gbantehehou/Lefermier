@@ -9,6 +9,7 @@ use App\Entity\Farm;
 use App\Entity\FarmMembership;
 use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -24,6 +25,7 @@ class ContactVoter extends Voter
 
     public function __construct(
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
     ) {
     }
 
@@ -43,10 +45,6 @@ class ContactVoter extends Voter
             return false;
         }
 
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return true;
-        }
-
         $farm = match (true) {
             $subject instanceof Contact => $subject->getFarm(),
             $subject instanceof Farm => $subject,
@@ -55,6 +53,21 @@ class ContactVoter extends Voter
 
         if ($farm === null) {
             return false;
+        }
+
+        $apiKey = $this->apiKeyChecker->getApiKey();
+        if ($apiKey !== null) {
+            $requiredPermission = match ($attribute) {
+                self::VIEW => Permission::CONTACT_VIEW,
+                self::MANAGE, self::DELETE => Permission::CONTACT_CREATE,
+                default => 'none',
+            };
+
+            if (!$this->apiKeyChecker->isAccessAllowed($farm, $requiredPermission)) {
+                return false;
+            }
+        } elseif (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return true;
         }
 
         $membership = $this->membershipRepository->findOneBy([

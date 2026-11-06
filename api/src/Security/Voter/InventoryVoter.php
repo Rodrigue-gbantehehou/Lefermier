@@ -9,6 +9,7 @@ use App\Entity\FarmMembership;
 use App\Entity\InventoryItem;
 use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -25,6 +26,7 @@ class InventoryVoter extends Voter
 
     public function __construct(
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
     ) {
     }
 
@@ -44,10 +46,6 @@ class InventoryVoter extends Voter
             return false;
         }
 
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return true;
-        }
-
         $farm = match (true) {
             $subject instanceof InventoryItem => $subject->getFarm(),
             $subject instanceof Farm => $subject,
@@ -56,6 +54,23 @@ class InventoryVoter extends Voter
 
         if ($farm === null) {
             return false;
+        }
+
+        $apiKey = $this->apiKeyChecker->getApiKey();
+        if ($apiKey !== null) {
+            $requiredPermission = match ($attribute) {
+                self::VIEW => Permission::INVENTORY_VIEW,
+                self::CREATE => Permission::INVENTORY_CREATE,
+                self::EDIT => Permission::INVENTORY_EDIT,
+                self::MOVE => Permission::INVENTORY_MOVEMENT,
+                default => 'none',
+            };
+
+            if (!$this->apiKeyChecker->isAccessAllowed($farm, $requiredPermission)) {
+                return false;
+            }
+        } elseif (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return true;
         }
 
         $membership = $this->membershipRepository->findOneBy([
@@ -71,7 +86,7 @@ class InventoryVoter extends Voter
         return match ($attribute) {
             self::VIEW => $membership->hasPermission(Permission::INVENTORY_VIEW),
             self::CREATE => $membership->hasPermission(Permission::INVENTORY_CREATE),
-            self::EDIT => $membership->hasPermission(Permission::INVENTORY_CREATE),
+            self::EDIT => $membership->hasPermission(Permission::INVENTORY_EDIT) || $membership->hasPermission(Permission::INVENTORY_CREATE),
             self::MOVE => $membership->hasPermission(Permission::INVENTORY_MOVEMENT),
             default => false,
         };

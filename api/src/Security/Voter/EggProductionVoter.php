@@ -9,6 +9,7 @@ use App\Entity\FarmMembership;
 use App\Entity\Flock;
 use App\Entity\User;
 use App\Repository\FarmMembershipRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -25,6 +26,7 @@ class EggProductionVoter extends Voter
 
     public function __construct(
         private readonly FarmMembershipRepository $membershipRepository,
+        private readonly ApiKeySecurityChecker $apiKeyChecker,
     ) {
     }
 
@@ -44,10 +46,6 @@ class EggProductionVoter extends Voter
             return false;
         }
 
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return true;
-        }
-
         $farm = match (true) {
             $subject instanceof EggProduction => $subject->getFlock()->getFarm(),
             $subject instanceof Flock => $subject->getFarm(),
@@ -56,6 +54,23 @@ class EggProductionVoter extends Voter
 
         if ($farm === null) {
             return false;
+        }
+
+        $apiKey = $this->apiKeyChecker->getApiKey();
+        if ($apiKey !== null) {
+            $requiredPermission = match ($attribute) {
+                self::VIEW => Permission::EGG_VIEW,
+                self::RECORD => Permission::EGG_CREATE,
+                self::EDIT => Permission::EGG_EDIT,
+                self::DELETE => Permission::EGG_DELETE,
+                default => 'none',
+            };
+
+            if (!$this->apiKeyChecker->isAccessAllowed($farm, $requiredPermission)) {
+                return false;
+            }
+        } elseif (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return true;
         }
 
         $membership = $this->membershipRepository->findOneBy([
@@ -82,7 +97,9 @@ class EggProductionVoter extends Voter
 
         return match ($attribute) {
             self::VIEW => $membership->hasPermission(Permission::EGG_VIEW),
-            self::RECORD, self::EDIT, self::DELETE => $membership->hasPermission(Permission::EGG_CREATE),
+            self::RECORD => $membership->hasPermission(Permission::EGG_CREATE),
+            self::EDIT => $membership->hasPermission(Permission::EGG_EDIT) || $membership->hasPermission(Permission::EGG_CREATE),
+            self::DELETE => $membership->hasPermission(Permission::EGG_DELETE) || $membership->hasPermission(Permission::EGG_CREATE),
             default => false,
         };
     }

@@ -107,7 +107,7 @@ class IdempotencyService
             }
         } else {
             $record = $existing;
-            $record->setStatus(IdempotencyRecord::STATUS_PENDING);
+            $record->renewLock(30);
             $this->entityManager->flush();
         }
 
@@ -127,9 +127,15 @@ class IdempotencyService
 
             return $response;
         } catch (\Throwable $e) {
-            // En cas d'erreur métier ou de validation, enregistrer l'échec
-            $record->setStatus(IdempotencyRecord::STATUS_FAILED);
-            $this->entityManager->flush();
+            // En cas d'erreur métier ou de validation, enregistrer l'échec sans masquer l'exception d'origine
+            try {
+                if ($this->entityManager->isOpen()) {
+                    $record->setStatus(IdempotencyRecord::STATUS_FAILED);
+                    $this->entityManager->flush();
+                }
+            } catch (\Throwable) {
+                // Ignore failure to write status if entity manager is closed/rolled back
+            }
 
             throw $e;
         }

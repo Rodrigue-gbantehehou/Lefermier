@@ -9,9 +9,11 @@ use App\Dto\Health\CreateHealthTreatmentRequestDto;
 use App\Dto\Health\GenerateProphylaxisProgramRequestDto;
 use App\Dto\Health\UpdateHealthTreatmentRequestDto;
 use App\Entity\Farm;
+use App\Entity\FarmMembership;
 use App\Entity\HealthTreatment;
 use App\Entity\User;
 use App\Enum\HealthTreatmentStatus;
+use App\Repository\FarmMembershipRepository;
 use App\Repository\FlockRepository;
 use App\Repository\HealthTreatmentRepository;
 use App\Security\Voter\HealthTreatmentVoter;
@@ -33,6 +35,7 @@ class HealthController extends AbstractController
         private readonly HealthService $healthService,
         private readonly HealthTreatmentRepository $treatmentRepository,
         private readonly FlockRepository $flockRepository,
+        private readonly FarmMembershipRepository $membershipRepository,
         private readonly IdempotencyService $idempotencyService,
     ) {
     }
@@ -41,7 +44,8 @@ class HealthController extends AbstractController
     #[IsGranted(HealthTreatmentVoter::VIEW, subject: 'farm')]
     public function list(
         Farm $farm,
-        Request $request
+        Request $request,
+        #[CurrentUser] User $user
     ): JsonResponse {
         $flockIdParam = $request->query->get('flockId');
         $statusParam = $request->query->get('status');
@@ -64,6 +68,20 @@ class HealthController extends AbstractController
         $treatments = $this->treatmentRepository->findByFarm($farm, $flock, $status, $from, $to);
         $overdueTreatments = $this->treatmentRepository->findOverdueTreatments($farm);
         $upcomingTreatments = $this->treatmentRepository->findUpcomingTreatments($farm, 5);
+
+        // Filtrage strict par bâtiments assignés si l'utilisateur a des restrictions
+        $membership = $this->membershipRepository->findOneBy([
+            'farm' => $farm,
+            'user' => $user,
+            'isActive' => true,
+        ]);
+
+        if ($membership instanceof FarmMembership && $membership->hasBuildingRestrictions()) {
+            $filterBuilding = fn (HealthTreatment $t) => $t->getFlock() === null || $membership->isBuildingAssigned($t->getFlock()->getBuilding());
+            $treatments = array_values(array_filter($treatments, $filterBuilding));
+            $overdueTreatments = array_values(array_filter($overdueTreatments, $filterBuilding));
+            $upcomingTreatments = array_values(array_filter($upcomingTreatments, $filterBuilding));
+        }
 
         $serialized = array_map(
             fn (HealthTreatment $t) => $this->healthService->serializeTreatment($t),
@@ -88,6 +106,23 @@ class HealthController extends AbstractController
         #[CurrentUser] User $user,
         Request $request
     ): JsonResponse {
+        $flock = $this->flockRepository->find(Ulid::fromString($dto->flockId));
+        if ($flock === null || $flock->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
+            return $this->json(['message' => "La bande spécifiée n'existe pas dans cette exploitation."], Response::HTTP_NOT_FOUND);
+        }
+
+        $membership = $this->membershipRepository->findOneBy([
+            'farm' => $farm,
+            'user' => $user,
+            'isActive' => true,
+        ]);
+
+        if ($membership instanceof FarmMembership && $membership->hasBuildingRestrictions()) {
+            if (!$membership->isBuildingAssigned($flock->getBuilding())) {
+                return $this->json(['message' => "Vous n'avez pas accès au bâtiment de cette bande."], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         $idempotencyKey = $request->headers->get('Idempotency-Key') ?? $request->headers->get('X-Idempotency-Key');
 
         if ($idempotencyKey !== null) {
@@ -124,6 +159,18 @@ class HealthController extends AbstractController
         $flock = $this->flockRepository->find(Ulid::fromString($dto->flockId));
         if ($flock === null || $flock->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
             return $this->json(['message' => "La bande spécifiée n'existe pas dans cette exploitation."], Response::HTTP_NOT_FOUND);
+        }
+
+        $membership = $this->membershipRepository->findOneBy([
+            'farm' => $farm,
+            'user' => $user,
+            'isActive' => true,
+        ]);
+
+        if ($membership instanceof FarmMembership && $membership->hasBuildingRestrictions()) {
+            if (!$membership->isBuildingAssigned($flock->getBuilding())) {
+                return $this->json(['message' => "Vous n'avez pas accès au bâtiment de cette bande."], Response::HTTP_FORBIDDEN);
+            }
         }
 
         $treatments = $this->healthService->generateStandardProgram($farm, $flock, $user, $dto->programType);

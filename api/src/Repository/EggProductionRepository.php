@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Building;
 use App\Entity\EggProduction;
+use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Enum\EggCollectionSession;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Ulid;
 
 /**
  * @extends ServiceEntityRepository<EggProduction>
@@ -50,25 +54,28 @@ class EggProductionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array<int, Building|Ulid|string>|null $allowedBuildings
      * @return EggProduction[]
      */
     public function findByFarm(
-        \App\Entity\Farm $farm,
+        Farm $farm,
         ?\DateTimeImmutable $startDate = null,
         ?\DateTimeImmutable $endDate = null,
-        int $limit = 100
+        int $limit = 100,
+        ?array $allowedBuildings = null,
     ): array {
         $qb = $this->createQueryBuilder('p')
             ->innerJoin('p.flock', 'f')
+            ->addSelect('f')
             ->andWhere('f.farm = :farm')
             ->setParameter('farm', $farm->getId(), 'ulid')
             ->leftJoin('p.recordedBy', 'u')
             ->addSelect('u')
-            ->leftJoin('p.flock', 'flock')
-            ->addSelect('flock')
             ->orderBy('p.productionDate', 'DESC')
             ->addOrderBy('p.createdAt', 'DESC')
             ->setMaxResults($limit);
+
+        $this->applyBuildingRestrictions($qb, 'f', $allowedBuildings);
 
         if ($startDate !== null) {
             $qb->andWhere('p.productionDate >= :startDate')
@@ -185,6 +192,7 @@ class EggProductionRepository extends ServiceEntityRepository
     /**
      * Calcule les statistiques cumulées de ponte pour toute une ferme sur une période.
      *
+     * @param array<int, Building|Ulid|string>|null $allowedBuildings
      * @return array{
      *     totalGoodEggs: int,
      *     totalCrackedEggs: int,
@@ -198,9 +206,10 @@ class EggProductionRepository extends ServiceEntityRepository
      * }
      */
     public function getFarmSummaryStats(
-        \App\Entity\Farm $farm,
+        Farm $farm,
         ?\DateTimeImmutable $startDate = null,
         ?\DateTimeImmutable $endDate = null,
+        ?array $allowedBuildings = null,
     ): array {
         $qb = $this->createQueryBuilder('p')
             ->select(
@@ -215,6 +224,8 @@ class EggProductionRepository extends ServiceEntityRepository
             ->innerJoin('p.flock', 'f')
             ->andWhere('f.farm = :farm')
             ->setParameter('farm', $farm->getId(), 'ulid');
+
+        $this->applyBuildingRestrictions($qb, 'f', $allowedBuildings);
 
         if ($startDate !== null) {
             $qb->andWhere('p.productionDate >= :startDate')
@@ -248,6 +259,7 @@ class EggProductionRepository extends ServiceEntityRepository
     /**
      * Retourne la série chronologique des ramassages d'œufs pour tracer les courbes de ponte.
      *
+     * @param array<int, Building|Ulid|string>|null $allowedBuildings
      * @return array<int, array{
      *     date: string,
      *     goodEggs: int,
@@ -260,9 +272,10 @@ class EggProductionRepository extends ServiceEntityRepository
      * }>
      */
     public function getFarmDailyProductionChart(
-        \App\Entity\Farm $farm,
+        Farm $farm,
         \DateTimeImmutable $startDate,
         \DateTimeImmutable $endDate,
+        ?array $allowedBuildings = null,
     ): array {
         $qb = $this->createQueryBuilder('p')
             ->select(
@@ -284,6 +297,8 @@ class EggProductionRepository extends ServiceEntityRepository
             ->groupBy('p.productionDate')
             ->orderBy('p.productionDate', 'ASC');
 
+        $this->applyBuildingRestrictions($qb, 'f', $allowedBuildings);
+
         $rows = $qb->getQuery()->getResult();
 
         $chart = [];
@@ -303,5 +318,39 @@ class EggProductionRepository extends ServiceEntityRepository
         }
 
         return $chart;
+    }
+
+    /**
+     * Applique au niveau DQL la restriction d'accès aux bâtiments attribués au membre.
+     *
+     * @param array<int, Building|Ulid|string>|null $allowedBuildings
+     */
+    private function applyBuildingRestrictions(
+        QueryBuilder $qb,
+        string $flockAlias,
+        ?array $allowedBuildings,
+    ): void {
+        if ($allowedBuildings === null) {
+            return;
+        }
+
+        $buildingIds = [];
+        foreach ($allowedBuildings as $building) {
+            if ($building instanceof Building && $building->getId() !== null) {
+                $buildingIds[] = $building->getId()->toBinary();
+            } elseif ($building instanceof Ulid) {
+                $buildingIds[] = $building->toBinary();
+            } elseif (is_string($building)) {
+                $buildingIds[] = Ulid::isValid($building) ? Ulid::fromString($building)->toBinary() : $building;
+            }
+        }
+
+        if ($buildingIds === []) {
+            $qb->andWhere('1 = 0');
+            return;
+        }
+
+        $qb->andWhere(sprintf('IDENTITY(%s.building) IN (:allowedBuildingIds)', $flockAlias))
+            ->setParameter('allowedBuildingIds', $buildingIds);
     }
 }

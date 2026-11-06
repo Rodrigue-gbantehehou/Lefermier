@@ -8,6 +8,7 @@ use App\Entity\Contact;
 use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\Transaction;
+use App\Enum\PaymentStatus;
 use App\Enum\TransactionCategory;
 use App\Enum\TransactionType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -107,12 +108,18 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Calcule la balance financière et la synthèse des recettes/dépenses en FCFA.
+     * Calcule la balance financière en distinguant la comptabilité d'engagement (montants facturés/enregistrés)
+     * et la trésorerie réelle (encaissements et décaissements effectifs) en FCFA.
      *
      * @return array{
      *     totalIncome: int,
+     *     collectedIncome: int,
+     *     receivablesAmount: int,
      *     totalExpense: int,
+     *     paidExpense: int,
+     *     payablesAmount: int,
      *     netBalance: int,
+     *     cashBalance: int,
      *     transactionsCount: int
      * }
      */
@@ -126,12 +133,15 @@ class TransactionRepository extends ServiceEntityRepository
             ->select(
                 "COALESCE(SUM(CASE WHEN t.type = :incomeType THEN t.amount ELSE 0 END), 0) AS totalIncome",
                 "COALESCE(SUM(CASE WHEN t.type = :expenseType THEN t.amount ELSE 0 END), 0) AS totalExpense",
+                "COALESCE(SUM(CASE WHEN t.type = :incomeType THEN (CASE WHEN t.paidAmount IS NOT NULL THEN t.paidAmount WHEN t.paymentStatus = :unpaidStatus THEN 0 ELSE t.amount END) ELSE 0 END), 0) AS collectedIncome",
+                "COALESCE(SUM(CASE WHEN t.type = :expenseType THEN (CASE WHEN t.paidAmount IS NOT NULL THEN t.paidAmount WHEN t.paymentStatus = :unpaidStatus THEN 0 ELSE t.amount END) ELSE 0 END), 0) AS paidExpense",
                 "COUNT(t.id) AS transactionsCount"
             )
             ->andWhere('t.farm = :farm')
             ->setParameter('farm', $farm->getId(), 'ulid')
             ->setParameter('incomeType', TransactionType::INCOME)
-            ->setParameter('expenseType', TransactionType::EXPENSE);
+            ->setParameter('expenseType', TransactionType::EXPENSE)
+            ->setParameter('unpaidStatus', PaymentStatus::UNPAID);
 
         if ($startDate !== null) {
             $qb->andWhere('t.transactionDate >= :startDate')
@@ -152,11 +162,18 @@ class TransactionRepository extends ServiceEntityRepository
 
         $income = (int) $row['totalIncome'];
         $expense = (int) $row['totalExpense'];
+        $collectedIncome = min($income, max(0, (int) $row['collectedIncome']));
+        $paidExpense = min($expense, max(0, (int) $row['paidExpense']));
 
         return [
             'totalIncome' => $income,
+            'collectedIncome' => $collectedIncome,
+            'receivablesAmount' => max(0, $income - $collectedIncome),
             'totalExpense' => $expense,
+            'paidExpense' => $paidExpense,
+            'payablesAmount' => max(0, $expense - $paidExpense),
             'netBalance' => $income - $expense,
+            'cashBalance' => $collectedIncome - $paidExpense,
             'transactionsCount' => (int) $row['transactionsCount'],
         ];
     }
