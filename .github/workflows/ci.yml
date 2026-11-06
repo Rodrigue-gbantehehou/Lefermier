@@ -88,7 +88,7 @@ jobs:
           JWT_PASSPHRASE: test_passphrase
           DATABASE_URL: "mysql://root:@127.0.0.1:3306/db_lefermier_test?serverVersion=8.4.0&charset=utf8mb4"
 
-      - name: Run Backend Audit Verification Suite (27 tests P0/P1/P2)
+      - name: Run Backend Audit Verification Suite (28 tests P0/P1/P2)
         run: php bin/console app:audit:verify
         env:
           APP_ENV: prod

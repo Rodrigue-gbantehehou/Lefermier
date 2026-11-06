@@ -23,18 +23,13 @@ class FlushResult {
 /// Verrou asynchrone minimaliste sans dépendance externe.
 ///
 /// Garantit que les opérations de lecture-modification-écriture sur la file
-/// SharedPreferences (enqueueAction, flushQueue, removeQueueItem, retryFailedItem,
-/// clearQueue) ne s'entrecroisent pas, même avec plusieurs appels concurrents.
+/// SharedPreferences (enqueueAction, phases I/O de flushQueue, removeQueueItem,
+/// retryFailedItem, clearQueue) ne s'entrecroisent pas.
 ///
-/// Principe : chaque opération protégée s'enchaîne sur la queue de futures
-/// existante. L'appelant attend que toutes les opérations antérieures soient
-/// terminées avant d'exécuter la sienne.
-///
-/// Exemple de concurrence résolue :
-///   t0: flushQueue() démarre → lit queue [A, B], commence à traiter A
-///   t1: enqueueAction(C) demande le verrou → attend que flushQueue() finisse
-///   t2: flushQueue() finit, sauvegarde [B] (A réussi, C pas encore en file)
-///   t3: enqueueAction(C) obtient le verrou → lit [B], ajoute C, sauvegarde [B, C]
+/// IMPORTANT : les appels réseau (Dio) sont exécutés HORS du verrou pour que
+/// l'utilisateur puisse toujours ajouter des actions pendant qu'un flush est en
+/// cours. Seules les phases de lecture et d'écriture dans SharedPreferences sont
+/// protégées.
 class _AsyncMutex {
   Future<void> _tail = Future.value();
 
@@ -61,28 +56,17 @@ class SyncService {
 
   SyncService(this._apiClient);
 
-  /// Lecture seule — pas de verrou nécessaire (SharedPreferences est thread-safe
-  /// en lecture). Le verrou s'applique uniquement aux cycles lecture-modif-écriture.
+  /// Lecture seule — pas de verrou nécessaire.
   Future<List<SyncQueueItem>> getQueue() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_queueKey) ?? [];
-    return raw.map((itemStr) {
-      try {
-        final map = jsonDecode(itemStr) as Map<String, dynamic>;
-        return SyncQueueItem.fromJson(map);
-      } catch (_) {
-        return null;
-      }
-    }).whereType<SyncQueueItem>().toList();
+    return _readQueue(prefs);
   }
 
-  /// Ajoute une action à la file.
+  /// Ajoute une action à la file (sous verrou).
   ///
-  /// [idempotencyKey] : clé à réutiliser si l'opération avait déjà été tentée
-  /// (ex: timeout réseau). Passer `e.requestOptions.headers['X-Idempotency-Key']`
-  /// depuis le catch DioException du provider. Si absente, une nouvelle UUID est
-  /// générée — ce qui créerait un doublon côté serveur si la requête initiale
-  /// avait bien été reçue avant le timeout.
+  /// [idempotencyKey] : clé à réutiliser si l'opération avait déjà été tentée.
+  /// Passer `e.requestOptions.headers['X-Idempotency-Key']` depuis le catch DioException
+  /// du provider pour que le serveur reconnaisse la requête comme un doublon.
   Future<void> enqueueAction({
     required String label,
     required String method,
@@ -93,7 +77,7 @@ class SyncService {
   }) =>
       _queueLock.protect(() async {
         final prefs = await SharedPreferences.getInstance();
-        final currentQueue = await _readQueue(prefs);
+        final currentQueue = _readQueue(prefs);
         final effectiveFarmId = farmId ?? _apiClient.activeFarmId;
         final ownerKey = _apiClient.sessionSubject;
 
@@ -114,24 +98,20 @@ class SyncService {
         await _saveQueue(prefs, currentQueue);
       });
 
-  /// Retire un élément de la file par son identifiant.
+  /// Retire un élément de la file (sous verrou).
   Future<void> removeQueueItem(String id) =>
       _queueLock.protect(() async {
         final prefs = await SharedPreferences.getInstance();
-        final currentQueue = await _readQueue(prefs);
+        final currentQueue = _readQueue(prefs);
         currentQueue.removeWhere((item) => item.id == id);
         await _saveQueue(prefs, currentQueue);
       });
 
-  /// Relance une action en échec.
-  ///
-  /// Sécurité stricte :
-  /// 1. Les actions orphelines (sans propriétaire) restent en quarantaine.
-  /// 2. Une action appartenant à un tiers ne peut pas être relancée.
+  /// Relance une action en échec (sous verrou).
   Future<bool> retryFailedItem(String id) =>
       _queueLock.protect(() async {
         final prefs = await SharedPreferences.getInstance();
-        final currentQueue = await _readQueue(prefs);
+        final currentQueue = _readQueue(prefs);
         final index = currentQueue.indexWhere((item) => item.id == id);
         if (index == -1) return false;
 
@@ -151,7 +131,7 @@ class SyncService {
         return true;
       });
 
-  /// Vide entièrement la file.
+  /// Vide la file (sous verrou).
   Future<void> clearQueue() =>
       _queueLock.protect(() async {
         final prefs = await SharedPreferences.getInstance();
@@ -161,10 +141,7 @@ class SyncService {
   Future<DateTime?> getLastSyncTime(String farmId) async {
     final prefs = await SharedPreferences.getInstance();
     final val = prefs.getString("$_lastSyncPrefix$farmId");
-    if (val != null) {
-      return DateTime.tryParse(val);
-    }
-    return null;
+    return val != null ? DateTime.tryParse(val) : null;
   }
 
   Future<void> setLastSyncTime(String farmId, String isoTime) async {
@@ -189,213 +166,196 @@ class SyncService {
 
   /// Envoie toutes les actions en attente vers l'API.
   ///
-  /// Protégé par le mutex : garantit qu'aucune action ne peut être ajoutée
-  /// (et perdue) pendant la lecture initiale et la sauvegarde finale.
+  /// Architecture en 3 phases pour séparer verrou local et appels réseau :
   ///
-  /// Fusion post-traitement : relit la file après le traitement pour capturer
-  /// les actions ajoutées *pendant* l'exécution réseau (hors verrou), et les
-  /// fusionne avec les résultats du traitement. Seuls les IDs *initiaux* sont
-  /// exclus — pas les nouveaux arrivants.
-  Future<FlushResult> flushQueue() =>
-      _queueLock.protect(() async {
-        final prefs = await SharedPreferences.getInstance();
-        final queue = await _readQueue(prefs);
-        if (queue.isEmpty) return const FlushResult();
+  /// Phase A (sous verrou) : lire la file et extraire le snapshot initial.
+  ///   → Garantit que personne ne modifie la file pendant la lecture.
+  ///
+  /// Phase B (hors verrou) : exécuter les requêtes réseau.
+  ///   → enqueueAction(), removeQueueItem(), etc. peuvent s'exécuter librement
+  ///     pendant les appels Dio potentiellement lents.
+  ///
+  /// Phase C (sous verrou) : fusionner les résultats avec les nouvelles entrées.
+  ///   → On relit la file, on écarte les IDs initiaux (traités en phase B),
+  ///     et on sauvegarde [résultats du traitement + nouvelles entrées].
+  Future<FlushResult> flushQueue() async {
+    // ── Phase A : lecture sous verrou ──────────────────────────────────────────
+    late List<SyncQueueItem> queue;
+    await _queueLock.protect(() async {
+      final prefs = await SharedPreferences.getInstance();
+      queue = _readQueue(prefs);
+    });
 
-        // Snapshot des IDs présents AVANT le traitement.
-        // Utilisé pour la fusion : on exclut ces IDs de latestQueue afin de
-        // ne conserver que les éléments réellement nouveaux. Sans cela, les
-        // items réussis — retirés de updatedQueue — seraient réintroduits.
-        final initialIds = queue.map((e) => e.id).toSet();
+    if (queue.isEmpty) return const FlushResult();
 
-        int sentCount = 0;
-        int pendingCount = 0;
-        int failedCount = 0;
-        final updatedQueue = <SyncQueueItem>[];
-        final currentOwner = _apiClient.sessionSubject;
-        final now = DateTime.now();
+    // Snapshot des IDs présents AVANT le traitement réseau.
+    // Utilisé en phase C pour distinguer les entrées initiales (traitées)
+    // des nouvelles entrées ajoutées pendant la phase B.
+    final initialIds = queue.map((e) => e.id).toSet();
 
-        for (int i = 0; i < queue.length; i++) {
-          final item = queue[i];
+    // ── Phase B : traitement réseau HORS verrou ────────────────────────────────
+    int sentCount = 0;
+    int pendingCount = 0;
+    int failedCount = 0;
+    final updatedQueue = <SyncQueueItem>[];
+    final currentOwner = _apiClient.sessionSubject;
+    final now = DateTime.now();
 
-          // 1. Quarantaine : actions orphelines
-          if (item.ownerKey == null || item.ownerKey!.isEmpty) {
-            updatedQueue.add(item.copyWith(
-              status: SyncItemStatus.failed,
-              lastError: "Action orpheline sans propriétaire : mise en quarantaine de sécurité.",
-            ));
-            failedCount++;
-            continue;
-          }
+    for (int i = 0; i < queue.length; i++) {
+      final item = queue[i];
 
-          // 2. Isolation : ne pas exécuter les actions d'un autre utilisateur
-          if (currentOwner == null || item.ownerKey != currentOwner) {
-            updatedQueue.add(item);
-            if (item.isFailed) {
-              failedCount++;
-            } else {
-              pendingCount++;
-            }
-            continue;
-          }
+      // Quarantaine : actions orphelines
+      if (item.ownerKey == null || item.ownerKey!.isEmpty) {
+        updatedQueue.add(item.copyWith(
+          status: SyncItemStatus.failed,
+          lastError: "Action orpheline sans propriétaire : mise en quarantaine de sécurité.",
+        ));
+        failedCount++;
+        continue;
+      }
 
-          // 3. Actions en échec définitif : conservées pour consultation/réessai
-          if (item.isFailed) {
-            updatedQueue.add(item);
-            failedCount++;
-            continue;
-          }
+      // Isolation : ne pas exécuter les actions d'un autre utilisateur
+      if (currentOwner == null || item.ownerKey != currentOwner) {
+        updatedQueue.add(item);
+        if (item.isFailed) { failedCount++; } else { pendingCount++; }
+        continue;
+      }
 
-          // 4. Temporisation (Retry-After ou Exponential Backoff)
-          if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
-            updatedQueue.add(item);
-            pendingCount++;
-            continue;
-          }
+      // Échec définitif : conservé pour consultation/réessai
+      if (item.isFailed) {
+        updatedQueue.add(item);
+        failedCount++;
+        continue;
+      }
 
-          try {
-            Response response;
-            final headers = <String, dynamic>{
-              'X-Idempotency-Key': item.idempotencyKey,
-              'Idempotency-Key': item.idempotencyKey,
-            };
-            if (item.farmId != null && item.farmId!.isNotEmpty) {
-              headers['X-Farm-Id'] = item.farmId;
-            }
+      // Temporisation (Retry-After ou Exponential Backoff)
+      if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
+        updatedQueue.add(item);
+        pendingCount++;
+        continue;
+      }
 
-            final opts = Options(headers: headers);
+      // Appels réseau — hors verrou, enqueueAction peut s'exécuter en parallèle
+      try {
+        Response response;
+        final headers = <String, dynamic>{
+          'X-Idempotency-Key': item.idempotencyKey,
+          'Idempotency-Key': item.idempotencyKey,
+        };
+        if (item.farmId != null && item.farmId!.isNotEmpty) {
+          headers['X-Farm-Id'] = item.farmId;
+        }
+        final opts = Options(headers: headers);
 
-            if (item.method == 'POST') {
-              response = await _apiClient.dio.post(item.endpoint, data: item.payload, options: opts);
-            } else if (item.method == 'PUT') {
-              response = await _apiClient.dio.put(item.endpoint, data: item.payload, options: opts);
-            } else if (item.method == 'DELETE') {
-              response = await _apiClient.dio.delete(item.endpoint, options: opts);
-            } else {
-              // Méthode non reconnue : quarantaine explicite
-              updatedQueue.add(item.copyWith(
-                status: SyncItemStatus.failed,
-                lastError: 'Méthode HTTP non supportée : ${item.method}',
-              ));
-              failedCount++;
-              continue;
-            }
-
-            final isHit = response.headers.value('x-cache-idempotency')?.toUpperCase() == 'HIT';
-            final isSuccessCode = response.statusCode != null &&
-                response.statusCode! >= 200 &&
-                response.statusCode! < 300;
-
-            if (isSuccessCode || isHit) {
-              sentCount++;
-              // Succès : l'item est retiré de updatedQueue (non réajouté)
-            } else {
-              updatedQueue.add(item.copyWith(
-                retryCount: item.retryCount + 1,
-                lastError: "Code HTTP ${response.statusCode}",
-                httpStatus: response.statusCode,
-              ));
-              pendingCount++;
-            }
-          } on DioException catch (e) {
-            final statusCode = e.response?.statusCode;
-            final isHit = e.response?.headers.value('x-cache-idempotency')?.toUpperCase() == 'HIT';
-
-            if (isHit) {
-              sentCount++;
-            } else if (statusCode == 409) {
-              int retryAfterSec = 2;
-              final retryHeader = e.response?.headers.value('retry-after');
-              if (retryHeader != null) {
-                retryAfterSec = int.tryParse(retryHeader) ?? 2;
-              }
-              updatedQueue.add(item.copyWith(
-                retryCount: item.retryCount + 1,
-                nextAttemptAt: DateTime.now().add(Duration(seconds: retryAfterSec)),
-                lastError: "Opération en cours de traitement sur le serveur (HTTP 409)",
-                httpStatus: 409,
-              ));
-              pendingCount++;
-            } else if (statusCode == 401) {
-              updatedQueue.add(item.copyWith(
-                lastError: "Session non autorisée (HTTP 401)",
-                httpStatus: 401,
-              ));
-              pendingCount++;
-
-              // PROTECTION CRITIQUE : conserver l'intégralité des actions non traitées
-              for (int j = i + 1; j < queue.length; j++) {
-                final nextItem = queue[j];
-                updatedQueue.add(nextItem);
-                if (nextItem.isFailed) {
-                  failedCount++;
-                } else {
-                  pendingCount++;
-                }
-              }
-              break;
-            } else if (statusCode != null &&
-                (statusCode == 400 || statusCode == 403 || statusCode == 404 || statusCode == 422)) {
-              String msg = "Erreur $statusCode";
-              if (e.response?.data is Map) {
-                final data = e.response!.data as Map;
-                msg = data['detail'] ?? data['message'] ?? msg;
-              }
-              updatedQueue.add(item.copyWith(
-                status: SyncItemStatus.failed,
-                lastError: msg,
-                httpStatus: statusCode,
-              ));
-              failedCount++;
-            } else {
-              final delaySec = min(60, 2 << min(item.retryCount, 5));
-              updatedQueue.add(item.copyWith(
-                retryCount: item.retryCount + 1,
-                nextAttemptAt: DateTime.now().add(Duration(seconds: delaySec)),
-                lastError: e.message ?? "Erreur réseau de transmission",
-                httpStatus: statusCode,
-              ));
-              pendingCount++;
-            }
-          } catch (e) {
-            updatedQueue.add(item.copyWith(
-              retryCount: item.retryCount + 1,
-              lastError: e.toString(),
-            ));
-            pendingCount++;
-          }
+        if (item.method == 'POST') {
+          response = await _apiClient.dio.post(item.endpoint, data: item.payload, options: opts);
+        } else if (item.method == 'PUT') {
+          response = await _apiClient.dio.put(item.endpoint, data: item.payload, options: opts);
+        } else if (item.method == 'DELETE') {
+          response = await _apiClient.dio.delete(item.endpoint, options: opts);
+        } else {
+          updatedQueue.add(item.copyWith(
+            status: SyncItemStatus.failed,
+            lastError: 'Méthode HTTP non supportée : ${item.method}',
+          ));
+          failedCount++;
+          continue;
         }
 
-        // Fusion post-traitement : capture les actions ajoutées pendant l'exécution
-        // réseau ci-dessus (qui se déroule hors verrou, puisqu'on est déjà dans
-        // _queueLock.protect). On relit la file et on ajoute uniquement les IDs
-        // qui n'existaient pas au début du flush (initialIds).
-        //
-        // Note : pendant flushQueue(), le mutex bloque les enqueueAction concurrents.
-        // Mais les appels réseau (await dio.post/put/delete) libèrent le thread Dart
-        // et permettent à d'autres microtâches de progresser. Des enqueueAction
-        // en attente du verrou s'exécuteront après flushQueue(). La fusion ci-dessous
-        // assure qu'on ne perd pas ces actions si elles ont été ajoutées avant la
-        // sauvegarde finale.
-        final latestQueue = await _readQueue(prefs);
-        final newEntries = latestQueue.where((e) => !initialIds.contains(e.id)).toList();
-        final mergedQueue = [...updatedQueue, ...newEntries];
+        final isHit = response.headers.value('x-cache-idempotency')?.toUpperCase() == 'HIT';
+        final isSuccess = response.statusCode != null &&
+            response.statusCode! >= 200 &&
+            response.statusCode! < 300;
 
-        await _saveQueue(prefs, mergedQueue);
-        return FlushResult(
-          sentCount: sentCount,
-          pendingCount: pendingCount,
-          failedCount: failedCount,
-        );
-      });
+        if (isSuccess || isHit) {
+          sentCount++;
+          // Succès : l'item est retiré de updatedQueue (non réajouté)
+        } else {
+          updatedQueue.add(item.copyWith(
+            retryCount: item.retryCount + 1,
+            lastError: "Code HTTP ${response.statusCode}",
+            httpStatus: response.statusCode,
+          ));
+          pendingCount++;
+        }
+      } on DioException catch (e) {
+        final statusCode = e.response?.statusCode;
+        final isHit = e.response?.headers.value('x-cache-idempotency')?.toUpperCase() == 'HIT';
+
+        if (isHit) {
+          sentCount++;
+        } else if (statusCode == 409) {
+          int retryAfterSec = 2;
+          final retryHeader = e.response?.headers.value('retry-after');
+          if (retryHeader != null) retryAfterSec = int.tryParse(retryHeader) ?? 2;
+          updatedQueue.add(item.copyWith(
+            retryCount: item.retryCount + 1,
+            nextAttemptAt: DateTime.now().add(Duration(seconds: retryAfterSec)),
+            lastError: "Opération en cours de traitement sur le serveur (HTTP 409)",
+            httpStatus: 409,
+          ));
+          pendingCount++;
+        } else if (statusCode == 401) {
+          updatedQueue.add(item.copyWith(lastError: "Session non autorisée (HTTP 401)", httpStatus: 401));
+          pendingCount++;
+          // Conserver toutes les actions non traitées
+          for (int j = i + 1; j < queue.length; j++) {
+            final nextItem = queue[j];
+            updatedQueue.add(nextItem);
+            if (nextItem.isFailed) { failedCount++; } else { pendingCount++; }
+          }
+          break;
+        } else if (statusCode != null &&
+            (statusCode == 400 || statusCode == 403 || statusCode == 404 || statusCode == 422)) {
+          String msg = "Erreur $statusCode";
+          if (e.response?.data is Map) {
+            final data = e.response!.data as Map;
+            msg = data['detail'] ?? data['message'] ?? msg;
+          }
+          updatedQueue.add(item.copyWith(
+            status: SyncItemStatus.failed,
+            lastError: msg,
+            httpStatus: statusCode,
+          ));
+          failedCount++;
+        } else {
+          final delaySec = min(60, 2 << min(item.retryCount, 5));
+          updatedQueue.add(item.copyWith(
+            retryCount: item.retryCount + 1,
+            nextAttemptAt: DateTime.now().add(Duration(seconds: delaySec)),
+            lastError: e.message ?? "Erreur réseau de transmission",
+            httpStatus: statusCode,
+          ));
+          pendingCount++;
+        }
+      } catch (e) {
+        updatedQueue.add(item.copyWith(retryCount: item.retryCount + 1, lastError: e.toString()));
+        pendingCount++;
+      }
+    }
+
+    // ── Phase C : fusion et écriture sous verrou ───────────────────────────────
+    // On relit la file pour capturer les actions ajoutées pendant la phase B
+    // (hors verrou). On n'inclut que les IDs qui n'existaient pas au début du flush.
+    return _queueLock.protect(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final latestQueue = _readQueue(prefs);
+      final newEntries = latestQueue.where((e) => !initialIds.contains(e.id)).toList();
+      final mergedQueue = [...updatedQueue, ...newEntries];
+      await _saveQueue(prefs, mergedQueue);
+      return FlushResult(
+        sentCount: sentCount,
+        pendingCount: pendingCount,
+        failedCount: failedCount,
+      );
+    });
+  }
 
   Future<Map<String, dynamic>?> pullDelta(String farmId) async {
     try {
       final lastSync = await getLastSyncTime(farmId);
       final queryParams = <String, dynamic>{};
-      if (lastSync != null) {
-        queryParams['since'] = lastSync.toIso8601String();
-      }
+      if (lastSync != null) queryParams['since'] = lastSync.toIso8601String();
 
       final response = await _apiClient.dio.get(
         ApiEndpoints.farmSyncPull(farmId),
@@ -412,8 +372,7 @@ class SyncService {
     }
   }
 
-  /// Lecture interne sans SharedPreferences.getInstance() supplémentaire.
-  Future<List<SyncQueueItem>> _readQueue(SharedPreferences prefs) async {
+  List<SyncQueueItem> _readQueue(SharedPreferences prefs) {
     final raw = prefs.getStringList(_queueKey) ?? [];
     return raw.map((itemStr) {
       try {
