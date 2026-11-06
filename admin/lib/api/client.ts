@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Moteur HTTP unifié pour le client API d'administration Poulvia.
  * Inspiré de l'architecture de web/lib/api/client.ts.
  */
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_URL || "https://api.poulvia.com";
 
 // Avertissement de configuration manquante en production côté client
 if (
@@ -12,10 +12,8 @@ if (
   process.env.NODE_ENV === "production" &&
   !process.env.NEXT_PUBLIC_API_URL
 ) {
-  console.warn(
-    "[Poulvia Admin] NEXT_PUBLIC_API_URL non défini en production — " +
-      "les requêtes utilisent le fallback http://127.0.0.1:8000. " +
-      "Définissez cette variable dans votre environnement de déploiement."
+  console.info(
+    "[Poulvia Admin] Utilisation de l'API de production par défaut: https://api.poulvia.com"
   );
 }
 

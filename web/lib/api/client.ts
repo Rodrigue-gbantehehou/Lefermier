@@ -1,15 +1,23 @@
-﻿export function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  // Client-side detection for mobile devices on LAN (ex: smartphone on Wi-Fi hotspot)
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
-      return "/api";
+export function getApiBaseUrl(): string {
+  let url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url) {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        url = '/api';
+      }
     }
   }
-  return "http://127.0.0.1:8000/api";
+  if (!url) {
+    url = 'https://api.poulvia.com/api';
+  }
+  if (url !== '/api') {
+    url = url.replace(/\/+$/, '');
+    if (!url.endsWith('/api')) {
+      url = `${url}/api`;
+    }
+  }
+  return url;
 }
 
 export const API_BASE_URL = getApiBaseUrl();
