@@ -7,19 +7,25 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Determine the RewriteBase automatically and set it as an environment variable.
+    # 1. Redirection HTTPS obligatoire (Supporte SSL direct et reverse proxy O2Switch)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteCond %{HTTP:X-Forwarded-SSL} !on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # 2. Détermination RewriteBase
     RewriteCond %{REQUEST_URI}::$0 ^(/.+)/(.*)::\2$
     RewriteRule .* - [E=BASE:%1]
 
-    # Sets the HTTP_AUTHORIZATION header removed by Apache
+    # 3. Préservation en-tête Authorization
     RewriteCond %{HTTP:Authorization} .+
     RewriteRule ^ - [E=HTTP_AUTHORIZATION:%0]
 
-    # Redirect to URI without front controller to prevent duplicate content
+    # 4. Redirection sans index.php
     RewriteCond %{ENV:REDIRECT_STATUS} =""
     RewriteRule ^index\.php(?:/(.*)|$) %{ENV:BASE}/$1 [R=301,L]
 
-    # If the requested filename exists, simply serve it.
+    # 5. Front controller Symfony
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ %{ENV:BASE}/index.php [L]
 </IfModule>
@@ -28,4 +34,11 @@ DirectoryIndex index.php
     <IfModule mod_alias.c>
         RedirectMatch 307 ^/$ /index.php/
     </IfModule>
+</IfModule>
+
+<IfModule mod_headers.c>
+    # En-tête HSTS strict (1 an, sous-domaines inclus, preload)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    # Protection contre le reniflage de type MIME
+    Header always set X-Content-Type-Options "nosniff"
 </IfModule>
