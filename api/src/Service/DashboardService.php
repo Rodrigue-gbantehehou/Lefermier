@@ -16,6 +16,7 @@ use App\Repository\FlockRepository;
 use App\Repository\HealthTreatmentRepository;
 use App\Repository\InventoryItemRepository;
 use App\Repository\TransactionRepository;
+use App\Security\ApiKeySecurityChecker;
 use App\Security\Permission;
 use App\Service\Admin\CommercialPlanService;
 
@@ -31,6 +32,7 @@ class DashboardService
         private readonly BuildingRepository $buildingRepository,
         private readonly HealthTreatmentRepository $healthTreatmentRepository,
         private readonly CommercialPlanService $commercialPlanService,
+        private readonly ?ApiKeySecurityChecker $apiKeySecurityChecker = null,
     ) {
     }
 
@@ -69,7 +71,12 @@ class DashboardService
             ? $membership->getAssignedBuildings()->toArray()
             : null;
 
-        $activeFlocks = $this->flockRepository->findByFarm($farm, FlockStatus::ACTIVE, $allowedBuildings);
+        $canViewFlocks = $this->apiKeySecurityChecker === null
+            || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::FLOCK_VIEW);
+
+        $activeFlocks = $canViewFlocks
+            ? $this->flockRepository->findByFarm($farm, FlockStatus::ACTIVE, $allowedBuildings)
+            : [];
         $totalFlocksCount = $this->flockRepository->count(['farm' => $farm]);
         $buildingsCount = $this->buildingRepository->count(['farm' => $farm]);
 
@@ -142,9 +149,10 @@ class DashboardService
             ? round(array_sum($mortalityRates) / count($mortalityRates), 2)
             : 0.0;
 
-        // 2. Production d'œufs (conditionnée par le module 'eggs')
-        $hasEggModule = in_array('eggs', $planModules, true);
-        if ($hasEggModule) {
+        // 2. Production d'œufs (conditionnée par le module 'eggs' et les permissions)
+        $hasEggAccess = in_array('eggs', $planModules, true)
+            && ($this->apiKeySecurityChecker === null || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::EGG_VIEW));
+        if ($hasEggAccess) {
             $eggSummary = $this->eggProductionRepository->getFarmSummaryStats($farm, $startDate, $endDate, $allowedBuildings);
             $eggChart = $this->eggProductionRepository->getFarmDailyProductionChart($farm, $startDate, $endDate, $allowedBuildings);
             $todayDate = new \DateTimeImmutable(date('Y-m-d'));
@@ -184,9 +192,10 @@ class DashboardService
             ];
         }
 
-        // 3. Stocks & Alertes (conditionnée par le module 'inventory')
-        $hasInventoryModule = in_array('inventory', $planModules, true);
-        if ($hasInventoryModule) {
+        // 3. Stocks & Alertes (conditionnée par le module 'inventory' et les permissions)
+        $hasInventoryAccess = in_array('inventory', $planModules, true)
+            && ($this->apiKeySecurityChecker === null || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::INVENTORY_VIEW));
+        if ($hasInventoryAccess) {
             $allItems = $this->inventoryItemRepository->findByFarm($farm);
             $lowStockItems = $this->inventoryItemRepository->findLowStockItems($farm);
             $stockValuation = $this->inventoryItemRepository->getInventoryValuation($farm);
@@ -217,12 +226,13 @@ class DashboardService
             ];
         }
 
-        // 4. Santé Animale & Soins (conditionnée par le module 'health')
-        $hasHealthModule = in_array('health', $planModules, true);
-        if ($hasHealthModule) {
-            $upcoming = $this->healthTreatmentRepository->findUpcomingTreatments($farm, 5);
-            $pendingCount = $this->healthTreatmentRepository->countPendingByFarm($farm);
-            $overdue = $this->healthTreatmentRepository->findOverdueTreatments($farm);
+        // 4. Santé Animale & Soins (conditionnée par le module 'health' et les permissions)
+        $hasHealthAccess = in_array('health', $planModules, true)
+            && ($this->apiKeySecurityChecker === null || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::HEALTH_VIEW));
+        if ($hasHealthAccess) {
+            $upcoming = $this->healthTreatmentRepository->findUpcomingTreatments($farm, 5, $allowedBuildings);
+            $pendingCount = $this->healthTreatmentRepository->countPendingByFarm($farm, $allowedBuildings);
+            $overdue = $this->healthTreatmentRepository->findOverdueTreatments($farm, $allowedBuildings);
 
             $healthData = [
                 'hasAccess' => true,
@@ -250,7 +260,11 @@ class DashboardService
         $hasFinanceModule = in_array('finance', $planModules, true);
         $canViewFinances = false;
 
-        if ($hasFinanceModule) {
+        $hasApiKeyFinanceAccess = $this->apiKeySecurityChecker === null
+            || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::FINANCE_VIEW)
+            || $this->apiKeySecurityChecker->isAccessAllowed($farm, Permission::DASHBOARD_FINANCIALS);
+
+        if ($hasFinanceModule && $hasApiKeyFinanceAccess) {
             $membership = $this->membershipRepository->findOneBy([
                 'farm' => $farm,
                 'user' => $user,
@@ -336,6 +350,7 @@ class DashboardService
             ],
             'subscription' => $subscriptionData,
             'flocks' => [
+                'hasAccess' => $canViewFlocks,
                 'activeFlocksCount' => count($activeFlocks),
                 'totalBirds' => $totalBirds,
                 'broilerBirds' => $broilerBirds,

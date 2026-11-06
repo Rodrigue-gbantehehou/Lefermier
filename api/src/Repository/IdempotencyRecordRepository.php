@@ -30,10 +30,53 @@ class IdempotencyRecordRepository extends ServiceEntityRepository
     {
         $cutoff = (new \DateTimeImmutable())->modify(sprintf('-%d days', $daysOld));
 
-        return $this->createQueryBuilder('r')
+        return (int) $this->createQueryBuilder('r')
             ->delete()
             ->andWhere('r.createdAt < :cutoff')
             ->setParameter('cutoff', $cutoff)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
+     * Tente d'acquérir ou renouveler le verrou atomiquement au niveau SQL.
+     * Réussit uniquement si le verrou est expiré (ou null) et que l'opération n'est pas déjà complétée.
+     * Élimine toute course concurrente lors des reprises après expiration.
+     */
+    public function tryAcquireOrRenewLock(string $key, \DateTimeImmutable $newLockedUntil): bool
+    {
+        $now = new \DateTimeImmutable();
+        $updated = $this->createQueryBuilder('r')
+            ->update()
+            ->set('r.lockedUntil', ':newLockedUntil')
+            ->set('r.status', ':pendingStatus')
+            ->andWhere('r.idempotencyKey = :key')
+            ->andWhere('(r.lockedUntil IS NULL OR r.lockedUntil <= :now)')
+            ->andWhere('r.status != :completedStatus')
+            ->setParameter('newLockedUntil', $newLockedUntil)
+            ->setParameter('pendingStatus', IdempotencyRecord::STATUS_PENDING)
+            ->setParameter('completedStatus', IdempotencyRecord::STATUS_COMPLETED)
+            ->setParameter('key', $key)
+            ->setParameter('now', $now)
+            ->getQuery()
+            ->execute();
+
+        return $updated > 0;
+    }
+
+    /**
+     * Enregistre l'échec de l'opération et libère le verrou immédiatement via DQL direct.
+     */
+    public function markFailed(mixed $id, ?string $errorMessage = null): int
+    {
+        return $this->createQueryBuilder('r')
+            ->update()
+            ->set('r.status', ':status')
+            ->set('r.lockedUntil', ':now')
+            ->andWhere('r.id = :id')
+            ->setParameter('status', IdempotencyRecord::STATUS_FAILED)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->setParameter('id', $id)
             ->getQuery()
             ->execute();
     }

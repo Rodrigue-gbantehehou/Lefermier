@@ -85,10 +85,23 @@ class IdempotencyService
 
                 return $response;
             }
-        }
 
-        // 5. Première exécution : réservation du verrou
-        if ($existing === null) {
+            // Verrou expiré : renouvellement atomique au niveau SQL pour éliminer toute course concurrente
+            $newLockUntil = (new \DateTimeImmutable())->modify('+30 seconds');
+            if (!$this->recordRepository->tryAcquireOrRenewLock($cleanKey, $newLockUntil)) {
+                $response = new JsonResponse([
+                    'title' => 'Opération en cours',
+                    'detail' => 'Cette opération est actuellement en cours de traitement. Veuillez réessayer dans quelques secondes.',
+                ], Response::HTTP_CONFLICT);
+                $response->headers->set('Retry-After', '2');
+
+                return $response;
+            }
+
+            $this->entityManager->refresh($existing);
+            $record = $existing;
+        } else {
+            // 5. Première exécution : réservation du verrou
             $record = new IdempotencyRecord(
                 idempotencyKey: $cleanKey,
                 user: $user,
@@ -105,10 +118,6 @@ class IdempotencyService
                 // Course concurrente sur l'insertion
                 throw new ConflictHttpException("Une opération concurrente avec la même clé est déjà en cours.");
             }
-        } else {
-            $record = $existing;
-            $record->renewLock(30);
-            $this->entityManager->flush();
         }
 
         // 6. Exécution de la mutation métier
@@ -127,14 +136,13 @@ class IdempotencyService
 
             return $response;
         } catch (\Throwable $e) {
-            // En cas d'erreur métier ou de validation, enregistrer l'échec sans masquer l'exception d'origine
+            // En cas d'erreur métier ou de validation, enregistrer l'échec et libérer le verrou sans masquer l'exception
             try {
-                if ($this->entityManager->isOpen()) {
-                    $record->setStatus(IdempotencyRecord::STATUS_FAILED);
-                    $this->entityManager->flush();
+                if ($record->getId() !== null) {
+                    $this->recordRepository->markFailed($record->getId(), $e->getMessage());
                 }
             } catch (\Throwable) {
-                // Ignore failure to write status if entity manager is closed/rolled back
+                // Ignore failure to write failure status if connection is broken
             }
 
             throw $e;

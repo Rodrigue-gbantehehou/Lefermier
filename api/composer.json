@@ -57,6 +57,7 @@
         "symfony/polyfill-php84": "*"
     },
     "scripts": {
+        "test": "php bin/console app:audit:verify",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd"

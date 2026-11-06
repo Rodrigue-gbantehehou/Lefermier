@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Building;
 use App\Entity\Farm;
 use App\Entity\Flock;
 use App\Entity\HealthTreatment;
 use App\Enum\HealthTreatmentStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Ulid;
 
 /**
  * @extends ServiceEntityRepository<HealthTreatment>
@@ -29,7 +32,8 @@ class HealthTreatmentRepository extends ServiceEntityRepository
         ?Flock $flock = null,
         ?HealthTreatmentStatus $status = null,
         ?\DateTimeImmutable $from = null,
-        ?\DateTimeImmutable $to = null
+        ?\DateTimeImmutable $to = null,
+        ?array $allowedBuildings = null
     ): array {
         $qb = $this->createQueryBuilder('h')
             ->andWhere('h.farm = :farm')
@@ -59,6 +63,10 @@ class HealthTreatmentRepository extends ServiceEntityRepository
         if ($to !== null) {
             $qb->andWhere('h.scheduledDate <= :to')
                 ->setParameter('to', $to->format('Y-m-d'));
+        }
+
+        if ($allowedBuildings !== null) {
+            $this->applyAllowedBuildingsFilter($qb, $allowedBuildings);
         }
 
         return $qb->orderBy('h.scheduledDate', 'ASC')
@@ -94,11 +102,11 @@ class HealthTreatmentRepository extends ServiceEntityRepository
     /**
      * @return HealthTreatment[]
      */
-    public function findUpcomingTreatments(Farm $farm, int $limit = 5): array
+    public function findUpcomingTreatments(Farm $farm, int $limit = 5, ?array $allowedBuildings = null): array
     {
         $today = new \DateTimeImmutable('today');
 
-        return $this->createQueryBuilder('h')
+        $qb = $this->createQueryBuilder('h')
             ->andWhere('h.farm = :farm')
             ->andWhere('h.status = :status')
             ->andWhere('h.scheduledDate >= :today')
@@ -107,8 +115,13 @@ class HealthTreatmentRepository extends ServiceEntityRepository
             ->setParameter('today', $today->format('Y-m-d'))
             ->leftJoin('h.flock', 'fl')
             ->addSelect('fl')
-            ->orderBy('h.scheduledDate', 'ASC')
-            ->setMaxResults($limit)
+            ->orderBy('h.scheduledDate', 'ASC');
+
+        if ($allowedBuildings !== null) {
+            $this->applyAllowedBuildingsFilter($qb, $allowedBuildings);
+        }
+
+        return $qb->setMaxResults($limit)
             ->getQuery()
             ->getResult();
     }
@@ -116,11 +129,11 @@ class HealthTreatmentRepository extends ServiceEntityRepository
     /**
      * @return HealthTreatment[]
      */
-    public function findOverdueTreatments(Farm $farm): array
+    public function findOverdueTreatments(Farm $farm, ?array $allowedBuildings = null): array
     {
         $today = new \DateTimeImmutable('today');
 
-        return $this->createQueryBuilder('h')
+        $qb = $this->createQueryBuilder('h')
             ->andWhere('h.farm = :farm')
             ->andWhere('h.status = :status')
             ->andWhere('h.scheduledDate < :today')
@@ -129,20 +142,50 @@ class HealthTreatmentRepository extends ServiceEntityRepository
             ->setParameter('today', $today->format('Y-m-d'))
             ->leftJoin('h.flock', 'fl')
             ->addSelect('fl')
-            ->orderBy('h.scheduledDate', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('h.scheduledDate', 'ASC');
+
+        if ($allowedBuildings !== null) {
+            $this->applyAllowedBuildingsFilter($qb, $allowedBuildings);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
-    public function countPendingByFarm(Farm $farm): int
+    public function countPendingByFarm(Farm $farm, ?array $allowedBuildings = null): int
     {
-        return (int) $this->createQueryBuilder('h')
+        $qb = $this->createQueryBuilder('h')
             ->select('COUNT(h.id)')
             ->andWhere('h.farm = :farm')
             ->andWhere('h.status = :status')
             ->setParameter('farm', $farm->getId(), 'ulid')
-            ->setParameter('status', HealthTreatmentStatus::SCHEDULED->value)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('status', HealthTreatmentStatus::SCHEDULED->value);
+
+        if ($allowedBuildings !== null) {
+            $qb->leftJoin('h.flock', 'fl');
+            $this->applyAllowedBuildingsFilter($qb, $allowedBuildings);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    private function applyAllowedBuildingsFilter(QueryBuilder $qb, array $allowedBuildings): void
+    {
+        $buildingIds = [];
+        foreach ($allowedBuildings as $building) {
+            if ($building instanceof Building && $building->getId() !== null) {
+                $buildingIds[] = $building->getId()->toBinary();
+            } elseif ($building instanceof Ulid) {
+                $buildingIds[] = $building->toBinary();
+            } elseif (is_string($building)) {
+                $buildingIds[] = Ulid::isValid($building) ? Ulid::fromString($building)->toBinary() : $building;
+            }
+        }
+
+        if ($buildingIds === []) {
+            $qb->andWhere('1 = 0');
+        } else {
+            $qb->andWhere('IDENTITY(fl.building) IN (:allowedBuildingIds)')
+                ->setParameter('allowedBuildingIds', $buildingIds);
+        }
     }
 }

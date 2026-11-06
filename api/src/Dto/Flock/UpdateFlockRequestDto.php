@@ -26,7 +26,7 @@ final readonly class UpdateFlockRequestDto
         #[Assert\Date(message: "La date effective de clôture doit être au format YYYY-MM-DD.")]
         public ?string $actualEndDate = null,
 
-        public FlockStatus $status = FlockStatus::ACTIVE,
+        public ?FlockStatus $status = null,
 
         public ?string $notes = null,
     ) {

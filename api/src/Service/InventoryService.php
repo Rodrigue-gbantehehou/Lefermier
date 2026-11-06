@@ -166,14 +166,14 @@ class InventoryService
             }
 
             $movementDate = new \DateTimeImmutable($dto->movementDate);
-            $qty = $dto->quantity;
+            $qty = round($dto->quantity, 2);
             $currentStock = $item->getCurrentStock();
             $movementUnit = $dto->unit ?? $item->getUnit();
             $itemUnit = $item->getUnit();
             $bagWeight = $item->getPackageWeightKg();
 
             // Conversion automatique vers l'unité de stockage avec le poids de sac spécifique de l'article si défini
-            $effectiveQtyInItemUnit = $movementUnit->convertTo($qty, $itemUnit, $bagWeight);
+            $effectiveQtyInItemUnit = round($movementUnit->convertTo($qty, $itemUnit, $bagWeight), 2);
 
             // Règle métier : décompte ou ajout
             if (in_array($dto->type, [StockMovementType::FEEDING, StockMovementType::LOSS], true)) {
@@ -184,9 +184,9 @@ class InventoryService
                         $movementUnit->getShortLabel()
                     );
                 }
-                $item->setCurrentStock($currentStock - $effectiveQtyInItemUnit);
+                $item->setCurrentStock(round($currentStock - $effectiveQtyInItemUnit, 2));
             } elseif ($dto->type === StockMovementType::INCOMING) {
-                $item->setCurrentStock($currentStock + $effectiveQtyInItemUnit);
+                $item->setCurrentStock(round($currentStock + $effectiveQtyInItemUnit, 2));
                 if ($dto->unitPrice !== null) {
                     // Calculer le prix unitaire ramené à l'unité de stockage de l'article
                     $costPerItemUnit = ($effectiveQtyInItemUnit > 0.0)

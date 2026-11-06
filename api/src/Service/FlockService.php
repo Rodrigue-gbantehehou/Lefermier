@@ -55,6 +55,9 @@ class FlockService
             if ($building === null || $building->getFarm()->getId()?->toBase32() !== $farm->getId()?->toBase32()) {
                 throw new NotFoundHttpException("Le bâtiment spécifié n'existe pas dans cette exploitation.");
             }
+            if (!$building->isActive()) {
+                throw new UnprocessableEntityHttpException("Le bâtiment sélectionné est inactif.");
+            }
         }
 
         $startDate = new \DateTimeImmutable($dto->startDate);
@@ -91,18 +94,25 @@ class FlockService
             }
 
             $flock->setName($dto->name);
-            $flock->setStrain($dto->strain);
-            $flock->setStatus($dto->status);
-            $flock->setNotes($dto->notes);
+            if ($dto->strain !== null) {
+                $flock->setStrain($dto->strain);
+            }
+            if ($dto->status !== null) {
+                $flock->setStatus($dto->status);
+            }
+            if ($dto->notes !== null) {
+                $flock->setNotes($dto->notes);
+            }
 
             if ($dto->buildingId !== null) {
                 $building = $this->buildingRepository->find(Ulid::fromString($dto->buildingId));
                 if ($building === null || $building->getFarm()->getId()?->toBase32() !== $flock->getFarm()->getId()?->toBase32()) {
                     throw new NotFoundHttpException("Le bâtiment spécifié n'appartient pas à cette exploitation.");
                 }
+                if (!$building->isActive()) {
+                    throw new UnprocessableEntityHttpException("Le bâtiment sélectionné est inactif.");
+                }
                 $flock->setBuilding($building);
-            } else {
-                $flock->setBuilding(null);
             }
 
             if ($dto->estimatedEndDate !== null) {
@@ -131,6 +141,7 @@ class FlockService
             $movementDate = new \DateTimeImmutable($dto->movementDate);
             $qty = $dto->quantity;
             $currentQty = $flock->getCurrentQuantity();
+            $quantityBefore = $currentQty;
 
             $sourceBuilding = null;
             $targetBuilding = null;
@@ -166,11 +177,56 @@ class FlockService
                     throw new UnprocessableEntityHttpException("Le bâtiment de destination doit être différent du bâtiment actuel de la bande.");
                 }
 
-                $flock->setBuilding($targetBuilding);
+                if ($qty === $currentQty) {
+                    // Transfert total : la bande entière déménage vers le nouveau bâtiment
+                    $flock->setBuilding($targetBuilding);
+                } else {
+                    // Transfert partiel : scission d'effectif
+                    // 1. L'effectif de la bande source est réduit (les volailles non transférées restent dans le bâtiment source)
+                    $flock->setCurrentQuantity($currentQty - $qty);
+
+                    // 2. Création d'une bande scindée dans le bâtiment cible
+                    $splitCode = $flock->getCode() . '-T' . substr((string) time(), -4);
+                    $splitName = $flock->getName() . ' (' . $targetBuilding->getName() . ')';
+                    $splitFlock = new Flock(
+                        $flock->getFarm(),
+                        $splitCode,
+                        $splitName,
+                        $qty,
+                        $flock->getStartDate(),
+                        $flock->getPoultryType()
+                    );
+                    $splitFlock->setCurrentQuantity($qty);
+                    $splitFlock->setStrain($flock->getStrain());
+                    $splitFlock->setBuilding($targetBuilding);
+                    $splitFlock->setInitialAgeDays($flock->getInitialAgeDays());
+                    $splitFlock->setNotes("Issu du transfert partiel de {$qty} volailles depuis la bande {$flock->getName()} (Bât. " . ($sourceBuilding?->getName() ?? 'Inconnu') . ").");
+
+                    $this->entityManager->persist($splitFlock);
+
+                    $splitMovement = new FlockMovement(
+                        flock: $splitFlock,
+                        type: FlockMovementType::TRANSFER,
+                        quantity: $qty,
+                        movementDate: $movementDate,
+                        reason: "Transfert partiel depuis " . $flock->getName(),
+                        recordedBy: $recordedBy,
+                        sourceBuilding: $sourceBuilding,
+                        targetBuilding: $targetBuilding,
+                        quantityBefore: 0,
+                        quantityAfter: $qty,
+                    );
+                    $splitFlock->addMovement($splitMovement);
+                    $this->entityManager->persist($splitMovement);
+                }
             } elseif ($dto->type === FlockMovementType::ADJUSTMENT) {
-                // Ajustement d'inventaire : réalignement direct
+                if ($dto->reason === null || trim($dto->reason) === '') {
+                    throw new UnprocessableEntityHttpException("Un motif explicite est obligatoire pour un ajustement d'effectif.");
+                }
                 $flock->setCurrentQuantity($qty);
             }
+
+            $quantityAfter = $flock->getCurrentQuantity();
 
             // Si l'effectif tombe à zéro, clôture automatique de la bande
             if ($flock->getCurrentQuantity() === 0 && $flock->getStatus() === FlockStatus::ACTIVE) {
@@ -189,6 +245,8 @@ class FlockService
                 $recordedBy,
                 $sourceBuilding,
                 $targetBuilding,
+                $quantityBefore,
+                $quantityAfter,
             );
 
             $flock->addMovement($movement);
@@ -258,6 +316,8 @@ class FlockService
             'flockId' => $movement->getFlock()->getId()?->toBase32(),
             'type' => $movement->getType()->value,
             'quantity' => $movement->getQuantity(),
+            'quantityBefore' => $movement->getQuantityBefore(),
+            'quantityAfter' => $movement->getQuantityAfter(),
             'movementDate' => $movement->getMovementDate()->format('Y-m-d'),
             'reason' => $movement->getReason(),
             'sourceBuilding' => $movement->getSourceBuilding() !== null ? [

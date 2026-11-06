@@ -70,24 +70,39 @@ class DeviceAuthService
     {
         $hash = hash('sha256', $rawToken);
 
-        return $this->entityManager->wrapInTransaction(function () use ($hash, $deviceId): array {
+        $this->entityManager->beginTransaction();
+        try {
             $existing = $this->tokenRepository->findByHashWithLock($hash);
 
             if ($existing === null) {
+                if ($this->entityManager->getConnection()->isTransactionActive()) {
+                    $this->entityManager->rollback();
+                }
                 throw new AuthenticationException("Jeton de rafraîchissement non reconnu.");
             }
 
             if ($existing->getDeviceId() !== $deviceId) {
+                if ($this->entityManager->getConnection()->isTransactionActive()) {
+                    $this->entityManager->rollback();
+                }
                 throw new AuthenticationException("Incohérence d'identifiant de terminal.");
             }
 
             // Détection de réutilisation (Jeton déjà révoqué / consommé) -> Attaque potentielle
+            // Sécurité critique : la révocation de famille DOIT être validée et commitée avant de lever l'erreur
             if ($existing->isRevoked()) {
-                $this->tokenRepository->revokeFamily($existing->getFamilyId());
+                $familyId = $existing->getFamilyId();
+                $this->tokenRepository->revokeFamily($familyId);
+                $this->entityManager->flush();
+                $this->entityManager->commit();
+
                 throw new AuthenticationException("Alerte de sécurité : réutilisation de jeton détectée. Session révoquée.");
             }
 
             if ($existing->isExpired()) {
+                if ($this->entityManager->getConnection()->isTransactionActive()) {
+                    $this->entityManager->rollback();
+                }
                 throw new AuthenticationException("Le jeton de rafraîchissement a expiré. Veuillez vous reconnecter.");
             }
 
@@ -112,6 +127,7 @@ class DeviceAuthService
 
             $this->entityManager->persist($newToken);
             $this->entityManager->flush();
+            $this->entityManager->commit();
 
             $user = $existing->getUser();
             $jwt = $this->jwtManager->create($user);
@@ -122,7 +138,12 @@ class DeviceAuthService
                 'user' => $user,
                 'expiresAt' => $expiresAt->format(\DateTimeInterface::ATOM),
             ];
-        });
+        } catch (\Throwable $e) {
+            if ($this->entityManager->getConnection()->isTransactionActive()) {
+                $this->entityManager->rollback();
+            }
+            throw $e;
+        }
     }
 
     /**

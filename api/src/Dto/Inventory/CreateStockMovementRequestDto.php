@@ -15,6 +15,8 @@ final readonly class CreateStockMovementRequestDto
 
         #[Assert\NotNull(message: "La quantité est obligatoire.")]
         #[Assert\Positive(message: "La quantité doit être strictement supérieure à 0.")]
+        #[Assert\GreaterThanOrEqual(value: 0.01, message: "La quantité minimale doit être de 0.01.")]
+        #[Assert\Regex(pattern: '/^\d+(\.\d{1,2})?$/', message: "La quantité ne peut pas comporter plus de 2 décimales.")]
         public float $quantity,
 
         #[Assert\NotBlank(message: "La date du mouvement est obligatoire.")]

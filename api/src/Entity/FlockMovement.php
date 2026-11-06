@@ -47,6 +47,12 @@ class FlockMovement
     #[ORM\JoinColumn(name: 'target_building_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?Building $targetBuilding = null;
 
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $quantityBefore = null;
+
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    private ?int $quantityAfter = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -59,6 +65,8 @@ class FlockMovement
         ?User $recordedBy = null,
         ?Building $sourceBuilding = null,
         ?Building $targetBuilding = null,
+        ?int $quantityBefore = null,
+        ?int $quantityAfter = null,
     ) {
         $this->id = new Ulid();
         $this->flock = $flock;
@@ -69,6 +77,8 @@ class FlockMovement
         $this->recordedBy = $recordedBy;
         $this->sourceBuilding = $sourceBuilding;
         $this->targetBuilding = $targetBuilding;
+        $this->quantityBefore = $quantityBefore;
+        $this->quantityAfter = $quantityAfter;
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -162,6 +172,28 @@ class FlockMovement
     public function setTargetBuilding(?Building $targetBuilding): self
     {
         $this->targetBuilding = $targetBuilding;
+        return $this;
+    }
+
+    public function getQuantityBefore(): ?int
+    {
+        return $this->quantityBefore;
+    }
+
+    public function setQuantityBefore(?int $quantityBefore): self
+    {
+        $this->quantityBefore = $quantityBefore;
+        return $this;
+    }
+
+    public function getQuantityAfter(): ?int
+    {
+        return $this->quantityAfter;
+    }
+
+    public function setQuantityAfter(?int $quantityAfter): self
+    {
+        $this->quantityAfter = $quantityAfter;
         return $this;
     }
 

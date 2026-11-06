@@ -1,0 +1,94 @@
+﻿name: CI Suite Poulvia
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-checks:
+    name: Backend API Hardening & Audit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('api/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Generate JWT Keys for CI
+        run: |
+          mkdir -p config/jwt
+          openssl genrsa -out config/jwt/private.pem 4096
+          openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem
+
+      - name: Lint Symfony container
+        run: php bin/console lint:container
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_long_val
+          JWT_PASSPHRASE: test_passphrase
+
+      - name: Validate Doctrine mapping
+        run: php bin/console doctrine:schema:validate --skip-sync
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_long_val
+          JWT_PASSPHRASE: test_passphrase
+
+      - name: Run Backend Audit Verification Suite (P0/P1/P2)
+        run: php bin/console app:audit:verify
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_test_secret_32_characters_long_val
+          JWT_PASSPHRASE: test_passphrase
+
+  mobile-checks:
+    name: Mobile Flutter Analysis & Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Flutter Analyzer
+        run: flutter analyze
+
+      - name: Run Flutter Unit Tests
+        run: flutter test

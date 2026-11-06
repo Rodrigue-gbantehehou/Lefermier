@@ -18,11 +18,15 @@ use App\Enum\HealthTreatmentStatus;
 use App\Enum\HealthTreatmentType;
 use App\Enum\PoultryType;
 use App\Enum\StockMovementType;
+use App\Exception\InsufficientStockException;
 use App\Repository\FlockRepository;
 use App\Repository\HealthTreatmentRepository;
 use App\Repository\InventoryItemRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Ulid;
 
 class HealthService
@@ -87,64 +91,99 @@ class HealthService
         CompleteHealthTreatmentRequestDto $dto,
         User $user
     ): HealthTreatment {
-        $administeredDate = $dto->administeredDate !== null
-            ? new \DateTimeImmutable($dto->administeredDate)
-            : new \DateTimeImmutable('today');
+        return $this->entityManager->wrapInTransaction(function () use ($treatment, $dto, $user): HealthTreatment {
+            $this->entityManager->lock($treatment, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($treatment)) {
+                $this->entityManager->refresh($treatment, LockMode::PESSIMISTIC_WRITE);
+            }
 
-        $treatment->setStatus(HealthTreatmentStatus::COMPLETED);
-        $treatment->setAdministeredDate($administeredDate);
+            if ($treatment->getStatus() !== HealthTreatmentStatus::SCHEDULED) {
+                throw new ConflictHttpException("Ce soin a déjà été administré ou clôturé (statut actuel : " . $treatment->getStatus()->value . ").");
+            }
 
-        if ($dto->quantityUsed !== null) {
-            $treatment->setQuantityUsed($dto->quantityUsed);
-        }
+            $administeredDate = $dto->administeredDate !== null
+                ? new \DateTimeImmutable($dto->administeredDate)
+                : new \DateTimeImmutable('today');
 
-        if ($dto->costFcfa !== null) {
-            $treatment->setCostFcfa($dto->costFcfa);
-        }
+            // 1. Validation stricte de l'article d'inventaire
+            $item = null;
+            if ($dto->inventoryItemId !== null) {
+                $item = $this->itemRepository->find(Ulid::fromString($dto->inventoryItemId));
+                if ($item === null || $item->getFarm()->getId()?->toBase32() !== $treatment->getFarm()->getId()?->toBase32()) {
+                    throw new NotFoundHttpException("L'article d'inventaire spécifié est introuvable ou n'appartient pas à cette exploitation.");
+                }
+            } else {
+                $item = $treatment->getInventoryItem();
+            }
 
-        if ($dto->veterinarian !== null) {
-            $treatment->setVeterinarian($dto->veterinarian);
-        }
+            // 2. Décompte de stock avec verrouillage pessimiste
+            $quantityUsed = $dto->quantityUsed ?? $treatment->getQuantityUsed();
+            if ($item !== null && $dto->deductFromStock && $quantityUsed !== null) {
+                $qty = round((float) $quantityUsed, 2);
+                if ($qty > 0.0) {
+                    $this->entityManager->lock($item, LockMode::PESSIMISTIC_WRITE);
+                    if ($this->entityManager->contains($item)) {
+                        $this->entityManager->refresh($item, LockMode::PESSIMISTIC_WRITE);
+                    }
 
-        if ($dto->notes !== null) {
-            $treatment->setNotes($dto->notes);
-        }
+                    $currentStock = $item->getCurrentStock();
+                    if ($qty > $currentStock) {
+                        throw new InsufficientStockException(
+                            $qty,
+                            $currentStock,
+                            $item->getUnit()->getShortLabel()
+                        );
+                    }
 
-        $treatment->setRecordedBy($user);
+                    $newStock = round($currentStock - $qty, 2);
+                    $item->setCurrentStock($newStock);
 
-        // Déduction de stock si un article est lié et qu'une quantité est précisée
-        if ($dto->inventoryItemId !== null) {
-            $item = $this->itemRepository->find(Ulid::fromString($dto->inventoryItemId));
-            if ($item !== null && $item->getFarm()->getId()?->toBase32() === $treatment->getFarm()->getId()?->toBase32()) {
+                    $movement = new StockMovement(
+                        item: $item,
+                        type: StockMovementType::FEEDING,
+                        quantity: $qty,
+                        unit: $item->getUnit(),
+                        movementDate: $administeredDate,
+                        reason: 'Traitement sanitaire / vaccin : ' . $treatment->getTitle(),
+                        flock: $treatment->getFlock(),
+                        unitPrice: $item->getUnitPrice(),
+                        recordedBy: $user,
+                    );
+                    $item->addMovement($movement);
+                    $this->entityManager->persist($movement);
+                }
+            }
+
+            // 3. Application des mutations sur le soin une fois la cohérence et les ressources garanties
+            if ($item !== null) {
                 $treatment->setInventoryItem($item);
             }
-        }
 
-        $item = $treatment->getInventoryItem();
-        if ($item !== null && $dto->deductFromStock && $treatment->getQuantityUsed() !== null) {
-            $qty = (float) $treatment->getQuantityUsed();
-            if ($qty > 0.0) {
-                $currentStock = $item->getCurrentStock();
-                $newStock = max(0.0, $currentStock - $qty);
-                $item->setCurrentStock($newStock);
+            $treatment->setStatus(HealthTreatmentStatus::COMPLETED);
+            $treatment->setAdministeredDate($administeredDate);
 
-                $movement = new StockMovement(
-                    item: $item,
-                    type: StockMovementType::FEEDING,
-                    quantity: $qty,
-                    unit: $item->getUnit(),
-                    movementDate: $administeredDate,
-                    flock: $treatment->getFlock(),
-                    reason: 'Traitement sanitaire / vaccin : ' . $treatment->getTitle(),
-                    recordedBy: $user
-                );
-                $this->entityManager->persist($movement);
+            if ($dto->quantityUsed !== null) {
+                $treatment->setQuantityUsed($dto->quantityUsed);
             }
-        }
 
-        $this->entityManager->flush();
+            if ($dto->costFcfa !== null) {
+                $treatment->setCostFcfa($dto->costFcfa);
+            }
 
-        return $treatment;
+            if ($dto->veterinarian !== null) {
+                $treatment->setVeterinarian($dto->veterinarian);
+            }
+
+            if ($dto->notes !== null) {
+                $treatment->setNotes($dto->notes);
+            }
+
+            $treatment->setRecordedBy($user);
+
+            $this->entityManager->flush();
+
+            return $treatment;
+        });
     }
 
     public function updateTreatment(HealthTreatment $treatment, UpdateHealthTreatmentRequestDto $dto): HealthTreatment
@@ -228,10 +267,22 @@ class HealthService
 
         $scheduleTemplates = $isLayer ? $this->getLayerSchedule() : $this->getBroilerSchedule();
 
+        // Récupération des soins existants pour garantir une génération strictement idempotente
+        $existingTreatments = $this->treatmentRepository->findBy(['flock' => $flock]);
+        $existingKeys = [];
+        foreach ($existingTreatments as $et) {
+            $existingKeys[$et->getTitle() . '_' . $et->getTargetAgeDays()] = true;
+        }
+
         $createdTreatments = [];
 
         foreach ($scheduleTemplates as $tpl) {
             $targetAge = $tpl['age'];
+            $key = $tpl['title'] . '_' . $targetAge;
+            if (isset($existingKeys[$key])) {
+                continue; // Déjà planifié : idempotence
+            }
+
             $daysToAdd = max(0, $targetAge - $initialAge);
             $scheduledDate = $startDate->modify('+' . $daysToAdd . ' days');
 
@@ -250,6 +301,7 @@ class HealthService
 
             $this->entityManager->persist($treatment);
             $createdTreatments[] = $treatment;
+            $existingKeys[$key] = true;
         }
 
         $this->entityManager->flush();
