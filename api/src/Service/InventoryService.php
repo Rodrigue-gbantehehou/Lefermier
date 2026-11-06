@@ -96,7 +96,10 @@ class InventoryService
             $oldUnitPrice = $item->getUnitPrice();
 
             $newUnit = $dto->unit ?? $oldUnit;
-            $newBagWeight = $dto->packageWeightKg;
+            // Conserver l'ancien poids si le DTO ne fournit pas explicitement un nouveau poids.
+            // Cela évite de réinitialiser accidentellement le poids de conditionnement lors d'une
+            // modification portant uniquement sur le nom, les notes ou d'autres champs.
+            $newBagWeight = $dto->packageWeightKg ?? $oldBagWeight;
 
             $hasStockOrHistory = $oldStock > 0.0
                 || !$item->getMovements()->isEmpty()

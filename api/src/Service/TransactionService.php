@@ -129,9 +129,15 @@ class TransactionService
             }
 
             $transactionDate = new \DateTimeImmutable($dto->transactionDate);
-            $dueDate = $dto->dueDate !== null
-                ? new \DateTimeImmutable($dto->dueDate)
-                : $transaction->getDueDate();
+            // Résolution de la date d'échéance :
+            // - clearDueDate = true  → effacement explicite (null)
+            // - dueDate fournie      → nouvelle valeur
+            // - sinon               → conserver l'existante
+            $dueDate = match (true) {
+                $dto->clearDueDate => null,
+                $dto->dueDate !== null => new \DateTimeImmutable($dto->dueDate),
+                default => $transaction->getDueDate(),
+            };
 
             $transaction->setType($dto->type);
             $transaction->setCategory($dto->category);

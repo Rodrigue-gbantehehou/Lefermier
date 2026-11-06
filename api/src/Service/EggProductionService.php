@@ -15,6 +15,7 @@ use App\Exception\DuplicateEggProductionSessionException;
 use App\Exception\InactiveFlockEggProductionException;
 use App\Exception\InvalidFlockTypeForEggProductionException;
 use App\Repository\EggProductionRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 
 class EggProductionService
@@ -30,57 +31,69 @@ class EggProductionService
         CreateEggProductionRequestDto $dto,
         ?User $recordedBy = null,
     ): EggProduction {
-        // 1. Règle métier : validation du type avicole
+        // 1. Règle métier : validation du type avicole (hors transaction, lecture seule)
         if ($flock->getPoultryType() === PoultryType::BROILER) {
             throw new InvalidFlockTypeForEggProductionException($flock->getPoultryType());
         }
 
-        // 2. Règle métier : la bande doit être active
+        // 2. Règle métier : la bande doit être active (hors transaction, lecture seule)
         if ($flock->getStatus() !== FlockStatus::ACTIVE) {
             throw new InactiveFlockEggProductionException($flock->getStatus());
         }
 
         $productionDate = new \DateTimeImmutable($dto->productionDate);
 
-        // 3. Règle métier : unicité par bande + date + séance
-        $existing = $this->eggProductionRepository->findOneByFlockDateAndSession(
-            $flock,
-            $productionDate,
-            $dto->session
-        );
-
-        if ($existing !== null) {
-            if ($dto->allowUpdate) {
-                $existing->setGoodEggs($dto->goodEggs);
-                $existing->setCrackedEggs($dto->crackedEggs);
-                $existing->setDirtyEggs($dto->dirtyEggs);
-                $existing->setDeformedEggs($dto->deformedEggs);
-                if ($dto->notes !== null) {
-                    $existing->setNotes($dto->notes);
-                }
-                $this->entityManager->flush();
-                return $existing;
+        // 3. Envelopper dans une transaction avec verrouillage pessimiste de la bande
+        //    pour sérialiser les créations concurrentes (double enregistrement sur la même séance).
+        return $this->entityManager->wrapInTransaction(function () use ($flock, $dto, $productionDate, $recordedBy): EggProduction {
+            // Verrouiller la bande en écriture exclusive pour sérialiser les accès concurrents
+            $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($flock)) {
+                $this->entityManager->refresh($flock, LockMode::PESSIMISTIC_WRITE);
             }
-            throw new DuplicateEggProductionSessionException($dto->productionDate, $dto->session);
-        }
 
-        $production = new EggProduction(
-            $flock,
-            $productionDate,
-            $dto->session,
-            $dto->goodEggs,
-            $dto->crackedEggs,
-            $dto->dirtyEggs,
-            $dto->deformedEggs,
-            $flock->getCurrentQuantity(),
-            $dto->notes,
-            $recordedBy
-        );
+            // 4. Règle métier : unicité par bande + date + séance (sous verrou)
+            $existing = $this->eggProductionRepository->findOneByFlockDateAndSession(
+                $flock,
+                $productionDate,
+                $dto->session
+            );
 
-        $this->entityManager->persist($production);
-        $this->entityManager->flush();
+            if ($existing !== null) {
+                if ($dto->allowUpdate) {
+                    // Verrouiller aussi la collecte existante avant modification
+                    $this->entityManager->lock($existing, LockMode::PESSIMISTIC_WRITE);
+                    $existing->setGoodEggs($dto->goodEggs);
+                    $existing->setCrackedEggs($dto->crackedEggs);
+                    $existing->setDirtyEggs($dto->dirtyEggs);
+                    $existing->setDeformedEggs($dto->deformedEggs);
+                    if ($dto->notes !== null) {
+                        $existing->setNotes($dto->notes);
+                    }
+                    $this->entityManager->flush();
+                    return $existing;
+                }
+                throw new DuplicateEggProductionSessionException($dto->productionDate, $dto->session);
+            }
 
-        return $production;
+            $production = new EggProduction(
+                $flock,
+                $productionDate,
+                $dto->session,
+                $dto->goodEggs,
+                $dto->crackedEggs,
+                $dto->dirtyEggs,
+                $dto->deformedEggs,
+                $flock->getCurrentQuantity(),
+                $dto->notes,
+                $recordedBy
+            );
+
+            $this->entityManager->persist($production);
+            $this->entityManager->flush();
+
+            return $production;
+        });
     }
 
     public function updateEggProduction(

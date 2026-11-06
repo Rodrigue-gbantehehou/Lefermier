@@ -35,6 +35,9 @@ final readonly class UpdateTransactionRequestDto
         #[Assert\Date(message: "La date d'échéance doit être au format YYYY-MM-DD.")]
         public ?string $dueDate = null,
 
+        /** Passer clearDueDate à true pour supprimer explicitement la date d'échéance. */
+        public bool $clearDueDate = false,
+
         #[Assert\Length(max: 100, maxMessage: "La référence ne doit pas dépasser 100 caractères.")]
         public ?string $reference = null,
 
