@@ -100,9 +100,14 @@ class SyncScreen extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           state.lastSyncTime != null
-                              ? "Dernière synchro : ${DateFormat('dd/MM/yyyy HH:mm').format(state.lastSyncTime!)}"
-                              : "Aucune synchronisation effectuée",
+                              ? "Actions envoyées : ${DateFormat('dd/MM/yyyy HH:mm').format(state.lastSyncTime!)}"
+                              : "Aucune action envoyée pour le moment",
                           style: const TextStyle(fontSize: 12, color: AppColors.textMutedLight),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          "↑ Date d'envoi de vos actions locales au serveur. Les données affichées se rafraîchissent indépendamment.",
+                          style: TextStyle(fontSize: 10, color: AppColors.textMutedLight, fontStyle: FontStyle.italic),
                         ),
                       ],
                     ),
