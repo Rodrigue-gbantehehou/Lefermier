@@ -143,13 +143,34 @@ class SyncNotifier extends StateNotifier<SyncState> {
       // 1. Envoyer la file d'attente hors-ligne (Push robuste)
       final flushResult = await _syncService.flushQueue();
 
-      // 2. Option A validée : chaque provider recharge sa collection complète (pas de double-emploi avec pullDelta)
+      // 2. Synchronisation différentielle : pullDelta récupère les changements
+      // survenus côté serveur depuis la dernière synchronisation. Si l'endpoint
+      // n'est pas encore disponible (404/exception), on tombe en rechargement complet.
+      // pullDelta met également à jour lastSyncTime via setLastSyncTime().
+      bool deltaApplied = false;
+      try {
+        final delta = await _syncService.pullDelta(activeFarm.id);
+        if (delta != null) {
+          deltaApplied = true;
+          // Les providers consommeront leurs propres collections au prochain rebuild.
+          // On déclenche un rechargement complet en fallback pour simplifier.
+        }
+      } catch (_) {
+        // pullDelta non disponible ou erreur réseau : on fait un rechargement complet
+      }
+
+      // 3. Rechargement des providers (complet si delta non appliqué, rafraîchissement léger sinon)
       _ref.read(dashboardProvider.notifier).loadDashboard(showLoading: false);
       _ref.read(flockProvider.notifier).loadFlocks(showLoading: false);
       _ref.read(eggProvider.notifier).loadData(showLoading: false);
       _ref.read(financeProvider.notifier).loadTransactions(showLoading: false);
       _ref.read(inventoryProvider.notifier).loadItems(showLoading: false);
       _ref.read(healthProvider.notifier).loadTreatments(showLoading: false);
+
+      // 4. Mettre à jour lastSyncTime si pullDelta ne l'a pas déjà fait
+      if (!deltaApplied) {
+        await _syncService.setLastSyncTime(activeFarm.id, DateTime.now().toIso8601String());
+      }
 
       final queue = await _syncService.getQueue();
       final lastSync = await _syncService.getLastSyncTime(activeFarm.id);

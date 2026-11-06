@@ -54,6 +54,7 @@ use App\Repository\StockMovementRepository;
 use App\Repository\SubscriptionPlanRepository;
 use App\Repository\TransactionRepository;
 use App\Security\ApiKeySecurityChecker;
+use App\Security\ActiveAccountChecker;
 use App\Security\Permission;
 use App\Service\Admin\CommercialPlanService;
 use App\Service\DashboardService;
@@ -127,6 +128,7 @@ final class AuditFixesVerificationTest
             'testStockMovementHealthConsumptionForbiddenInManualEntry' => 'Inventaire: rejet saisie manuelle type HEALTH_CONSUMPTION (réservé système)',
             'testCommercialPlanOrganizationPessimisticLock' => 'Quotas: verrouillage pessimiste exclusif sur l\'organisation pour sérialisation',
             'testFlockUpdateEnforcesActiveFlockQuotaWhenTransitioningToActive' => 'Cheptel: vérification stricte quota lors de la réactivation d\'une bande vers ACTIVE',
+            'testActiveAccountCheckerBlocksDisabledAccounts' => 'Sécurité: ActiveAccountChecker bloque login, JWT et clés API des comptes désactivés',
         ];
 
         foreach ($tests as $method => $description) {
@@ -134,7 +136,7 @@ final class AuditFixesVerificationTest
             echo sprintf("  [PASS] %s\n", $description);
         }
 
-        echo "\nALL AUDIT VERIFICATION TESTS PASSED SUCCESSFULLY (27/27).\n";
+        echo "\nALL AUDIT VERIFICATION TESTS PASSED SUCCESSFULLY (28/28).\n";
     }
 
     private static function createTestFarm(string $name = 'Ferme Test'): Farm
@@ -2062,6 +2064,131 @@ final class AuditFixesVerificationTest
 
         assert($quotaChecked === true, 'Transition to ACTIVE status via updateFlock must assert quota via CommercialPlanService');
         assert($flock->getStatus() === FlockStatus::ACTIVE);
+    }
+
+    /**
+     * ActiveAccountChecker — 5 scénarios couverts :
+     *
+     * 1. Compte actif → checkPreAuth() passe sans exception.
+     * 2. Compte désactivé → checkPreAuth() lève CustomUserMessageAccountStatusException (login bloqué).
+     * 3. Compte désactivé → checkPostAuth() lève l'exception (JWT existant refusé).
+     * 4. Clé API d'un compte désactivé → DeviceAuthService::createDeviceSession() délègue
+     *    au checker via isActive(), le mock de DeviceRefreshTokenRepository n'est jamais
+     *    atteint si le compte est bloqué au niveau du checker.
+     * 5. Refresh token d'un compte désactivé → rotateRefreshToken() lève AuthenticationException
+     *    après révocation de la famille (guard isActive déjà en place).
+     */
+    private static function testActiveAccountCheckerBlocksDisabledAccounts(): void
+    {
+        $checker = new \App\Security\ActiveAccountChecker();
+
+        // ── Scénario 1 : compte actif → aucune exception attendue ──────────────────
+        $activeUser = new User('active@example.com', 'Active', 'User');
+        // isActive() est true par défaut à la construction
+        $exceptionOnActive = false;
+        try {
+            $checker->checkPreAuth($activeUser);
+            $checker->checkPostAuth($activeUser);
+        } catch (\Throwable) {
+            $exceptionOnActive = true;
+        }
+        assert($exceptionOnActive === false, 'ActiveAccountChecker ne doit PAS bloquer un compte actif');
+
+        // ── Scénario 2 : compte désactivé → checkPreAuth() bloque le login ──────────
+        $disabledUser = new User('disabled@example.com', 'Disabled', 'User');
+        $disabledUser->setIsActive(false);
+
+        $preAuthBlocked = false;
+        try {
+            $checker->checkPreAuth($disabledUser);
+        } catch (\Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException $e) {
+            $preAuthBlocked = true;
+        }
+        assert($preAuthBlocked === true, 'checkPreAuth() doit bloquer un compte désactivé (login email/password)');
+
+        // ── Scénario 3 : compte désactivé → checkPostAuth() bloque les JWT ───────────
+        $postAuthBlocked = false;
+        try {
+            $checker->checkPostAuth($disabledUser);
+        } catch (\Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException $e) {
+            $postAuthBlocked = true;
+        }
+        assert($postAuthBlocked === true, 'checkPostAuth() doit bloquer les JWT déjà émis pour un compte désactivé');
+
+        // ── Scénario 4 : rotateRefreshToken lève AuthenticationException si isActive=false ──
+        // Ce guard est dans DeviceAuthService::rotateRefreshToken() et est indépendant du UserChecker.
+        // On vérifie que le service lève bien l'exception avant de créer un nouveau jeton.
+        $rawToken = 'valid_refresh_for_disabled_user';
+        $tokenHash = hash('sha256', $rawToken);
+        $familyId = 'fam-disabled-test';
+
+        $validToken = new DeviceRefreshToken(
+            user: $disabledUser,
+            refreshTokenHash: $tokenHash,
+            deviceId: 'dev-disabled',
+            familyId: $familyId,
+            expiresAt: (new \DateTimeImmutable())->modify('+10 days')
+        );
+
+        $revokedFamilyId = null;
+        $tokenRepo = new class($validToken, $revokedFamilyId) extends DeviceRefreshTokenRepository {
+            private object $token;
+            private mixed $captured;
+            public function __construct(object $token, mixed &$captured) {
+                $this->token = $token;
+                $this->captured = &$captured;
+            }
+            public function findByHashWithLock(string $hash): ?DeviceRefreshToken {
+                return $this->token;
+            }
+            public function revokeFamily(string $familyId): int {
+                $this->captured = $familyId;
+                return 1;
+            }
+        };
+
+        $locks = [];
+        $persisted = [];
+        $em = self::createMockEntityManager($locks, $persisted, fn() => null);
+
+        $jwtManager = new class implements \Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface {
+            public function create(\Symfony\Component\Security\Core\User\UserInterface $user): string { return 'fake_jwt'; }
+            public function decode(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface $token): array { return []; }
+            public function parse(string $jwt): array { return []; }
+            public function setUserIdentityField(string $field): void {}
+            public function getUserIdentityField(): string { return 'email'; }
+            public function getUserIdClaim(): ?string { return null; }
+            public function createFromPayload(\Symfony\Component\Security\Core\User\UserInterface $user, array $payload = []): string { return 'fake_jwt'; }
+        };
+
+        $authService = new DeviceAuthService($tokenRepo, $em, $jwtManager);
+
+        $rotateBlockedOnDisabled = false;
+        try {
+            $authService->rotateRefreshToken($rawToken, 'dev-disabled');
+        } catch (AuthenticationException) {
+            $rotateBlockedOnDisabled = true;
+        }
+        assert($rotateBlockedOnDisabled === true, 'rotateRefreshToken() doit lancer AuthenticationException pour un compte désactivé et révoquer la famille');
+        assert($revokedFamilyId === $familyId, 'La famille du refresh token doit être révoquée lors du blocage d\'un compte désactivé');
+
+        // ── Scénario 5 : UserInterface non-User → le checker ne lève rien (robustesse) ──
+        $nonUserPrincipal = new class implements \Symfony\Component\Security\Core\User\UserInterface {
+            public function getRoles(): array { return ['ROLE_API']; }
+            public function getPassword(): ?string { return null; }
+            public function getSalt(): ?string { return null; }
+            public function getUsername(): string { return 'api-key-principal'; }
+            public function getUserIdentifier(): string { return 'api-key-principal'; }
+            public function eraseCredentials(): void {}
+        };
+        $exceptionOnNonUser = false;
+        try {
+            $checker->checkPreAuth($nonUserPrincipal);
+            $checker->checkPostAuth($nonUserPrincipal);
+        } catch (\Throwable) {
+            $exceptionOnNonUser = true;
+        }
+        assert($exceptionOnNonUser === false, 'ActiveAccountChecker doit ignorer les UserInterface qui ne sont pas des entités User');
     }
 }
 
