@@ -324,6 +324,57 @@ void main() {
       expect(storage.token, isNull);
       expect(platform.data.containsKey('lf_jwt_token'), isFalse);
     });
+
+    test('saveTokens throws SecureStoragePersistenceException with rollbackFailed: true when rollback deletion fails', () async {
+      final platform = _FailingRollbackStoragePlatform();
+      FlutterSecureStoragePlatform.instance = platform;
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+
+      try {
+        await storage.saveTokens(token: 'jwt_to_rollback', refreshToken: 'refresh_fails');
+        fail('Should have thrown SecureStoragePersistenceException');
+      } on SecureStoragePersistenceException catch (e) {
+        expect(e.rollbackFailed, isTrue);
+        expect(e.message, contains('échec critique du rollback'));
+      }
+
+      // Memory caches are cleared
+      expect(storage.token, isNull);
+      expect(storage.refreshToken, isNull);
+
+      // Hardware still has residual JWT because deletion failed
+      expect(platform.data['lf_jwt_token'], 'jwt_to_rollback');
+
+      // But session tombstone is active in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(SecureStorageService.keySessionRevoked), isTrue);
+
+      // Verify that upon app restart (init), the residual token is NOT resurrected!
+      SecureStorageService().resetForTesting();
+      final freshStorage = SecureStorageService();
+      await freshStorage.init();
+
+      expect(freshStorage.token, isNull);
+      expect(freshStorage.hasToken, isFalse);
+    });
+
+    test('init ignores residual tokens when session was revoked by prior failed purge / tombstone', () async {
+      SharedPreferences.setMockInitialValues({
+        SecureStorageService.keySessionRevoked: true,
+      });
+      secureStorageData['lf_jwt_token'] = 'lingering_unwanted_jwt';
+      secureStorageData['lf_refresh_token'] = 'lingering_unwanted_refresh';
+
+      SecureStorageService().resetForTesting();
+      final storage = SecureStorageService();
+      await storage.init();
+
+      expect(storage.token, isNull);
+      expect(storage.refreshToken, isNull);
+      expect(storage.hasToken, isFalse);
+    });
   });
 }
 
@@ -455,6 +506,45 @@ class _FailingDeleteRefreshTokenPlatform extends FlutterSecureStoragePlatform {
   Future<void> write({required String key, required String value, required Map<String, String> options}) async {
     if (key == 'lf_refresh_token') {
       throw Exception('Locked refresh token');
+    }
+    data[key] = value;
+  }
+}
+
+class _FailingRollbackStoragePlatform extends FlutterSecureStoragePlatform {
+  final Map<String, String> data = {};
+  bool _jwtWritten = false;
+
+  @override
+  Future<bool> containsKey({required String key, required Map<String, String> options}) async => data.containsKey(key);
+
+  @override
+  Future<void> delete({required String key, required Map<String, String> options}) async {
+    // Simule un échec de suppression : ne supprime pas la clé
+  }
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async {}
+
+  @override
+  Future<String?> read({required String key, required Map<String, String> options}) async => data[key];
+
+  @override
+  Future<Map<String, String>> readAll({required Map<String, String> options}) async => Map.from(data);
+
+  @override
+  Future<void> write({required String key, required String value, required Map<String, String> options}) async {
+    if (key == 'lf_jwt_token') {
+      if (!_jwtWritten) {
+        _jwtWritten = true;
+        data[key] = value;
+        return;
+      }
+      // Tentative d'écrasement ou réécriture lors du rollback : échoue
+      throw Exception('Simulated locked vault: rollback write failure');
+    }
+    if (key == 'lf_refresh_token') {
+      throw Exception('Simulated refresh token KeyStore write failure');
     }
     data[key] = value;
   }

@@ -8,7 +8,12 @@ import 'package:uuid/uuid.dart';
 /// Exception levée lorsqu'une opération critique sur le coffre-fort matériel échoue
 class SecureStoragePersistenceException implements Exception {
   final String message;
-  const SecureStoragePersistenceException(this.message);
+  final bool rollbackFailed;
+
+  const SecureStoragePersistenceException(
+    this.message, {
+    this.rollbackFailed = false,
+  });
 
   @override
   String toString() => message;
@@ -31,6 +36,10 @@ class SecureStorageService {
   static const String _keyToken = "lf_jwt_token";
   static const String _keyRefreshToken = "lf_refresh_token";
   static const String _keyDeviceId = "lf_device_id_raw";
+  static const String _keySessionRevoked = "lf_session_revoked_marker";
+
+  @visibleForTesting
+  static const String keySessionRevoked = _keySessionRevoked;
 
   // Anciennes clés SharedPreferences à migrer puis purger
   static const String _legacyEncToken = "lf_vault_enc_jwt_token";
@@ -135,12 +144,25 @@ class SecureStorageService {
     }
     _cachedDeviceId = storedDeviceId;
 
-    // 2. Lire les jetons depuis le stockage natif sécurisé
-    _cachedToken = await _readSafe(_keyToken);
-    _cachedRefreshToken = await _readSafe(_keyRefreshToken);
+    // 2. Vérifier si une session antérieure a été révoquée (tombstone anti-résurrection)
+    final isSessionRevoked = prefs.getBool(_keySessionRevoked) ?? false;
+    if (isSessionRevoked) {
+      _cachedToken = null;
+      _cachedRefreshToken = null;
+      // Tentative de rattrapage de purge sur le matériel
+      final tokenDeleted = await _deleteSafe(_keyToken);
+      final refreshDeleted = await _deleteSafe(_keyRefreshToken);
+      if (tokenDeleted && refreshDeleted) {
+        await prefs.remove(_keySessionRevoked);
+      }
+    } else {
+      // Lire les jetons depuis le stockage natif sécurisé
+      _cachedToken = await _readSafe(_keyToken);
+      _cachedRefreshToken = await _readSafe(_keyRefreshToken);
 
-    // 3. Migration transparente et indépendante des jetons depuis les anciens formats
-    await _migrateLegacyKeys(prefs);
+      // 3. Migration transparente et indépendante des jetons depuis les anciens formats
+      await _migrateLegacyKeys(prefs);
+    }
   }
 
   String get deviceId => _cachedDeviceId ?? "dev_default";
@@ -150,7 +172,9 @@ class SecureStorageService {
 
   /// Sauvegarde durablement les jetons dans le stockage natif sécurisé de manière atomique (tout ou rien).
   /// En cas d'échec de la persistance ou de purge du jeton de rafraîchissement, un rollback immédiat
-  /// supprime le jeton d'accès pour éviter toute persistance partielle, puis lève une [SecureStoragePersistenceException].
+  /// supprime le jeton d'accès pour éviter toute persistance partielle.
+  /// Si la suppression de rollback échoue également, lève une [SecureStoragePersistenceException] avec
+  /// [rollbackFailed: true] et active le marqueur de révocation de session pour empêcher la résurrection du secret.
   Future<void> saveTokens({required String token, String? refreshToken}) async {
     final tokenSaved = await _writeSafe(_keyToken, token);
     if (!tokenSaved) {
@@ -164,9 +188,17 @@ class SecureStorageService {
       final refreshSaved = await _writeSafe(_keyRefreshToken, refreshToken);
       if (!refreshSaved) {
         // Rollback atomique : suppression du jeton d'accès précédemment écrit
-        await _deleteSafe(_keyToken);
+        final rollbackTokenDeleted = await _deleteSafe(_keyToken);
         _cachedToken = null;
         _cachedRefreshToken = null;
+        if (!rollbackTokenDeleted) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool(_keySessionRevoked, true);
+          throw const SecureStoragePersistenceException(
+            "Échec de l'enregistrement du refresh token et échec critique du rollback du jeton d'accès sur le terminal. Attention : un secret partiel subsiste dans le stockage natif.",
+            rollbackFailed: true,
+          );
+        }
         throw const SecureStoragePersistenceException(
           "Échec de l'enregistrement sécurisé du jeton de rafraîchissement sur le terminal. Écriture annulée.",
         );
@@ -177,9 +209,17 @@ class SecureStorageService {
       final refreshDeleted = await _deleteSafe(_keyRefreshToken);
       if (!refreshDeleted) {
         // Rollback atomique : si l'ancien refresh token ne peut pas être purgé, annuler l'écriture du token
-        await _deleteSafe(_keyToken);
+        final rollbackTokenDeleted = await _deleteSafe(_keyToken);
         _cachedToken = null;
         _cachedRefreshToken = null;
+        if (!rollbackTokenDeleted) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool(_keySessionRevoked, true);
+          throw const SecureStoragePersistenceException(
+            "Échec de la purge de l'ancien jeton de rafraîchissement et échec critique du rollback du jeton d'accès sur le terminal. Attention : un secret partiel subsiste dans le stockage natif.",
+            rollbackFailed: true,
+          );
+        }
         throw const SecureStoragePersistenceException(
           "Échec de la purge de l'ancien jeton de rafraîchissement sur le terminal. Écriture annulée.",
         );
@@ -187,6 +227,10 @@ class SecureStorageService {
       _cachedToken = token;
       _cachedRefreshToken = null;
     }
+
+    // Réinitialiser tout marqueur de révocation de session suite à une sauvegarde réussie
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keySessionRevoked);
   }
 
   /// Met à jour le jeton d'accès dans le stockage natif sécurisé.
@@ -203,6 +247,8 @@ class SecureStorageService {
 
   /// Efface les jetons de session. Le deviceId est préservé car il identifie le terminal matériel.
   /// Vérifie et confirme la suppression réelle des secrets dans le stockage natif.
+  /// En cas d'échec de suppression matérielle, active un marqueur de session révoquée (tombstone)
+  /// dans SharedPreferences afin d'interdire toute réhydratation lors des prochains lancements.
   /// Retourne `true` si le nettoyage sécurisé est confirmé, `false` sinon.
   /// Lève une [SecureStoragePersistenceException] si [throwOnFailure] est activé et que la suppression échoue.
   Future<bool> clearAuth({bool throwOnFailure = false}) async {
@@ -220,6 +266,12 @@ class SecureStorageService {
     await prefs.remove(_legacyPlainToken);
 
     final success = tokenDeleted && refreshDeleted;
+    if (success) {
+      await prefs.remove(_keySessionRevoked);
+    } else {
+      await prefs.setBool(_keySessionRevoked, true);
+    }
+
     if (!success && throwOnFailure) {
       throw const SecureStoragePersistenceException(
         "Échec de la purge sécurisée des jetons sur le stockage natif.",

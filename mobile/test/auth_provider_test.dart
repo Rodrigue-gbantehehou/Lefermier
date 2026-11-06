@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lefermier/core/api/api_client.dart';
+import 'package:lefermier/core/api/api_endpoints.dart';
 import 'package:lefermier/core/security/secure_storage_service.dart';
 import 'package:lefermier/features/auth/auth_provider.dart';
 
@@ -85,6 +87,127 @@ void main() {
       expect(notifier.state.isAuthenticated, isFalse);
       expect(secureData.containsKey('lf_jwt_token'), isFalse);
       expect(secureData.containsKey('lf_refresh_token'), isFalse);
+    });
+
+    test('logout dispatches HTTP device-logout with deviceId and refreshToken when authenticated', () async {
+      final secureData = <String, String>{};
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform(secureData);
+      SecureStorageService().resetForTesting();
+
+      await SecureStorageService().init();
+      await SecureStorageService().saveTokens(token: 'active_jwt_token', refreshToken: 'active_refresh_token');
+
+      final client = ApiClient();
+      await client.init();
+
+      RequestOptions? capturedOptions;
+      client.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == ApiEndpoints.deviceLogout) {
+              capturedOptions = options;
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {'success': true},
+                ),
+              );
+            }
+            handler.next(options);
+          },
+        ),
+      );
+
+      final notifier = AuthNotifier(client);
+      notifier.setAuthenticatedForTesting(token: 'active_jwt_token');
+
+      final success = await notifier.logout();
+
+      expect(success, isTrue);
+      expect(capturedOptions, isNotNull);
+      expect(capturedOptions!.method, 'POST');
+      expect(capturedOptions!.path, ApiEndpoints.deviceLogout);
+      final data = capturedOptions!.data as Map<String, dynamic>;
+      expect(data['refreshToken'], 'active_refresh_token');
+      expect(data['deviceId'], SecureStorageService().deviceId);
+    });
+
+    test('logout succeeds locally and clears state even when HTTP device-logout fails (network error)', () async {
+      final secureData = <String, String>{};
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform(secureData);
+      SecureStorageService().resetForTesting();
+
+      await SecureStorageService().init();
+      await SecureStorageService().saveTokens(token: 'offline_jwt', refreshToken: 'offline_refresh');
+
+      final client = ApiClient();
+      await client.init();
+
+      client.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == ApiEndpoints.deviceLogout) {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.connectionError,
+                  error: 'Simulated connection error: No internet',
+                ),
+              );
+            }
+            handler.next(options);
+          },
+        ),
+      );
+
+      final notifier = AuthNotifier(client);
+      notifier.setAuthenticatedForTesting(token: 'offline_jwt');
+
+      // Logout should succeed locally despite HTTP failure
+      final success = await notifier.logout();
+
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(secureData.containsKey('lf_jwt_token'), isFalse);
+      expect(secureData.containsKey('lf_refresh_token'), isFalse);
+    });
+
+    test('forced logout places session tombstone so app restart does not resurrect session', () async {
+      final lockedData = <String, String>{
+        'lf_jwt_token': 'stale_jwt_token',
+        'lf_refresh_token': 'stale_refresh_token',
+      };
+      FlutterSecureStoragePlatform.instance = _UnresponsiveDeleteStoragePlatform(lockedData);
+      SecureStorageService().resetForTesting();
+
+      final client = ApiClient();
+      final notifier = AuthNotifier(client);
+      notifier.setAuthenticatedForTesting(token: 'stale_jwt_token');
+
+      // 1. Forced logout when native vault refuses deletion
+      final success = await notifier.logout(force: true);
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isFalse);
+
+      // Verify tombstone is placed
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(SecureStorageService.keySessionRevoked), isTrue);
+
+      // 2. Simulate application restart
+      SecureStorageService().resetForTesting();
+      final freshClient = ApiClient();
+      await freshClient.init();
+
+      // Ensure freshClient did not resurrect the token
+      expect(freshClient.isAuthenticated, isFalse);
+      expect(freshClient.jwtToken, isNull);
+
+      final freshNotifier = AuthNotifier(freshClient);
+      await freshNotifier.checkAuthStatus();
+
+      expect(freshNotifier.state.isAuthenticated, isFalse);
+      expect(freshNotifier.state.token, isNull);
     });
   });
 }
