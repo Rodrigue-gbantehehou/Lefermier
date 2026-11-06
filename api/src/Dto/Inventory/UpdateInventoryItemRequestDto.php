@@ -31,6 +31,13 @@ final readonly class UpdateInventoryItemRequestDto
         #[Assert\Positive(message: "Le poids par sac doit être strictement positif.")]
         public ?float $packageWeightKg = null,
 
+        /**
+         * Passer clearPackageWeight à true pour supprimer explicitement le poids de conditionnement
+         * personnalisé et revenir au calcul standard de l'unité.
+         * Sans ce marqueur, null est interprété comme « conserver l'ancien poids ».
+         */
+        public bool $clearPackageWeight = false,
+
         public ?string $notes = null,
 
         public bool $isActive = true,

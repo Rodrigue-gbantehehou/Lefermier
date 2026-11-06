@@ -146,6 +146,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: ESLint
+        run: npm run lint
       - name: Next.js build
         run: npm run build
         env:
@@ -166,6 +168,8 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: ESLint
+        run: npm run lint
       - name: Next.js build
         run: npm run build
         env:

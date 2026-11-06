@@ -96,10 +96,15 @@ class InventoryService
             $oldUnitPrice = $item->getUnitPrice();
 
             $newUnit = $dto->unit ?? $oldUnit;
-            // Conserver l'ancien poids si le DTO ne fournit pas explicitement un nouveau poids.
-            // Cela évite de réinitialiser accidentellement le poids de conditionnement lors d'une
-            // modification portant uniquement sur le nom, les notes ou d'autres champs.
-            $newBagWeight = $dto->packageWeightKg ?? $oldBagWeight;
+            // Résolution du poids de conditionnement :
+            // - clearPackageWeight = true → suppression explicite du poids personnalisé
+            // - packageWeightKg fourni    → nouvelle valeur
+            // - sinon                    → conserver l'ancien poids (null = absent du DTO)
+            $newBagWeight = match (true) {
+                $dto->clearPackageWeight => null,
+                $dto->packageWeightKg !== null => $dto->packageWeightKg,
+                default => $oldBagWeight,
+            };
 
             $hasStockOrHistory = $oldStock > 0.0
                 || !$item->getMovements()->isEmpty()

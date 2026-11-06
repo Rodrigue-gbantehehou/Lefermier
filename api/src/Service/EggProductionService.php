@@ -31,20 +31,19 @@ class EggProductionService
         CreateEggProductionRequestDto $dto,
         ?User $recordedBy = null,
     ): EggProduction {
-        // 1. Règle métier : validation du type avicole (hors transaction, lecture seule)
+        // Pré-vérification rapide hors transaction (état visible au moment de la requête).
+        // Ces contrôles sont refaits sous verrou après le refresh pour éviter d'agir sur un état obsolète.
         if ($flock->getPoultryType() === PoultryType::BROILER) {
             throw new InvalidFlockTypeForEggProductionException($flock->getPoultryType());
         }
-
-        // 2. Règle métier : la bande doit être active (hors transaction, lecture seule)
         if ($flock->getStatus() !== FlockStatus::ACTIVE) {
             throw new InactiveFlockEggProductionException($flock->getStatus());
         }
 
         $productionDate = new \DateTimeImmutable($dto->productionDate);
 
-        // 3. Envelopper dans une transaction avec verrouillage pessimiste de la bande
-        //    pour sérialiser les créations concurrentes (double enregistrement sur la même séance).
+        // Envelopper dans une transaction avec verrouillage pessimiste de la bande
+        // pour sérialiser les créations concurrentes (double enregistrement sur la même séance).
         return $this->entityManager->wrapInTransaction(function () use ($flock, $dto, $productionDate, $recordedBy): EggProduction {
             // Verrouiller la bande en écriture exclusive pour sérialiser les accès concurrents
             $this->entityManager->lock($flock, LockMode::PESSIMISTIC_WRITE);
@@ -52,7 +51,16 @@ class EggProductionService
                 $this->entityManager->refresh($flock, LockMode::PESSIMISTIC_WRITE);
             }
 
-            // 4. Règle métier : unicité par bande + date + séance (sous verrou)
+            // Refaire les contrôles métier sur l'état rafraîchi sous verrou :
+            // la bande peut avoir été modifiée entre la pré-vérification et le verrouillage.
+            if ($flock->getPoultryType() === PoultryType::BROILER) {
+                throw new InvalidFlockTypeForEggProductionException($flock->getPoultryType());
+            }
+            if ($flock->getStatus() !== FlockStatus::ACTIVE) {
+                throw new InactiveFlockEggProductionException($flock->getStatus());
+            }
+
+            // Unicité par bande + date + séance (sous verrou)
             $existing = $this->eggProductionRepository->findOneByFlockDateAndSession(
                 $flock,
                 $productionDate,
@@ -100,15 +108,20 @@ class EggProductionService
         EggProduction $production,
         UpdateEggProductionRequestDto $dto,
     ): EggProduction {
-        $production->setGoodEggs($dto->goodEggs);
-        $production->setCrackedEggs($dto->crackedEggs);
-        $production->setDirtyEggs($dto->dirtyEggs);
-        $production->setDeformedEggs($dto->deformedEggs);
-        $production->setNotes($dto->notes);
+        return $this->entityManager->wrapInTransaction(function () use ($production, $dto): EggProduction {
+            // Verrouiller la collecte en écriture exclusive avant modification directe
+            $this->entityManager->lock($production, LockMode::PESSIMISTIC_WRITE);
 
-        $this->entityManager->flush();
+            $production->setGoodEggs($dto->goodEggs);
+            $production->setCrackedEggs($dto->crackedEggs);
+            $production->setDirtyEggs($dto->dirtyEggs);
+            $production->setDeformedEggs($dto->deformedEggs);
+            $production->setNotes($dto->notes);
 
-        return $production;
+            $this->entityManager->flush();
+
+            return $production;
+        });
     }
 
     public function deleteEggProduction(EggProduction $production): void

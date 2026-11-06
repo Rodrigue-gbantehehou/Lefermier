@@ -162,7 +162,14 @@ export const inventoryApi = {
     if (data.category !== undefined) payload.category = data.category === "MEDICINE" ? "MEDICATION" : data.category;
     if (data.customCategory !== undefined) payload.customCategory = data.customCategory;
     if (data.unit !== undefined) payload.unit = data.unit;
-    if (data.packageWeightKg !== undefined) payload.packageWeightKg = data.packageWeightKg ? Number(data.packageWeightKg) : null;
+    if (data.packageWeightKg !== undefined) {
+      if (data.packageWeightKg === null || data.packageWeightKg === 0) {
+        // Effacement explicite du poids de conditionnement personnalisé
+        payload.clearPackageWeight = true;
+      } else {
+        payload.packageWeightKg = Number(data.packageWeightKg);
+      }
+    }
     if (data.alertThreshold !== undefined) payload.alertThreshold = Number(data.alertThreshold);
     else if (data.minThreshold !== undefined) payload.alertThreshold = Number(data.minThreshold);
     if (data.unitPrice !== undefined) payload.unitPrice = Number(data.unitPrice);
