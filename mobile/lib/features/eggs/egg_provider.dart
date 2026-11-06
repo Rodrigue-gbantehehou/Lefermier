@@ -280,6 +280,7 @@ class EggNotifier extends StateNotifier<EggState> {
           method: "POST",
           endpoint: ApiEndpoints.flockEggs(flockId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;

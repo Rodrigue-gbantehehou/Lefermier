@@ -213,6 +213,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
           method: "POST",
           endpoint: ApiEndpoints.flockMovements(flockId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
@@ -280,6 +281,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
           method: "POST",
           endpoint: ApiEndpoints.farmFlocks(activeFarm.id),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
@@ -340,6 +342,7 @@ class FlockNotifier extends StateNotifier<FlockState> {
           method: "PUT",
           endpoint: ApiEndpoints.flockDetails(flockId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;

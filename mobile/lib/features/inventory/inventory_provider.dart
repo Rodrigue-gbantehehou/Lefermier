@@ -332,6 +332,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
           method: "POST",
           endpoint: ApiEndpoints.inventoryMovements(itemId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
@@ -400,6 +401,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
           method: "POST",
           endpoint: ApiEndpoints.farmInventory(activeFarm.id),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;

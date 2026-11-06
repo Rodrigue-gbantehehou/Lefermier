@@ -225,6 +225,7 @@ class HealthNotifier extends StateNotifier<HealthState> {
           method: "PUT",
           endpoint: ApiEndpoints.completeHealthTreatment(treatmentId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
@@ -289,6 +290,7 @@ class HealthNotifier extends StateNotifier<HealthState> {
           method: "POST",
           endpoint: ApiEndpoints.farmHealth(activeFarm.id),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;

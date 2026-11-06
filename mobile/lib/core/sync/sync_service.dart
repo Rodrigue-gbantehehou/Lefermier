@@ -149,6 +149,12 @@ class SyncService {
     final queue = await getQueue();
     if (queue.isEmpty) return const FlushResult();
 
+    // Capture l'ensemble des IDs présents au début du flush.
+    // Les items réussis sont retirés de updatedQueue mais restent dans
+    // latestQueue jusqu'à la sauvegarde. Sans ce snapshot initial, la fusion
+    // post-traitement les voit comme « nouveaux » et les réintroduit en file.
+    final initialIds = queue.map((e) => e.id).toSet();
+
     int sentCount = 0;
     int pendingCount = 0;
     int failedCount = 0;
@@ -318,8 +324,9 @@ class SyncService {
     // On relit la file depuis SharedPreferences et on fusionne les nouveaux éléments.
     final prefs = await SharedPreferences.getInstance();
     final latestQueue = await getQueue();
-    final processedIds = updatedQueue.map((e) => e.id).toSet();
-    final newEntries = latestQueue.where((e) => !processedIds.contains(e.id)).toList();
+    // Filtre avec initialIds (snapshot initial) et non processedIds (updatedQueue):
+    // les réussites retirées de updatedQueue ne doivent pas être réintroduites.
+    final newEntries = latestQueue.where((e) => !initialIds.contains(e.id)).toList();
     final mergedQueue = [...updatedQueue, ...newEntries];
 
     await _saveQueue(prefs, mergedQueue);

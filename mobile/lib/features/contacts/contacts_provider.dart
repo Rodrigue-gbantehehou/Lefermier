@@ -173,6 +173,7 @@ class ContactsNotifier extends StateNotifier<ContactsState> {
           method: "POST",
           endpoint: ApiEndpoints.farmContacts(activeFarm.id),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
@@ -234,6 +235,7 @@ class ContactsNotifier extends StateNotifier<ContactsState> {
           method: "PUT",
           endpoint: ApiEndpoints.contactDetails(contactId),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;

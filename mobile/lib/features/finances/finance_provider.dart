@@ -240,6 +240,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
           method: "POST",
           endpoint: ApiEndpoints.farmTransactions(activeFarm.id),
           payload: payload,
+          idempotencyKey: e.requestOptions.headers['X-Idempotency-Key'] as String?,
         );
         state = state.copyWith(isSubmitting: false);
         return true;
