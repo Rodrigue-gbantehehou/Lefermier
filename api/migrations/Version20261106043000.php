@@ -41,8 +41,16 @@ final class Version20261106043000 extends AbstractMigration
         $this->addSql('ALTER TABLE subscription_upgrade_requests DROP FOREIGN KEY FK_D858AB222FFD4FD3');
         $this->addSql('DROP TABLE subscription_upgrade_requests');
         $this->addSql('DROP TABLE subscription_plans');
+        // Supprimer l'index et la FK avant de supprimer la table admin_roles référencée
+        $this->addSql('DROP INDEX IDX_1483A5E9123FA025 ON users');
         $this->addSql('ALTER TABLE users DROP FOREIGN KEY FK_1483A5E9123FA025');
         $this->addSql('DROP TABLE admin_roles');
         $this->addSql('DROP TABLE admin_audit_logs');
+        // Colonnes ajoutées aux tables existantes — absentes du down() original
+        $this->addSql('ALTER TABLE users DROP password_reset_token, DROP password_reset_expires_at, DROP admin_role_id');
+        $this->addSql('ALTER TABLE farms DROP phone, DROP email, DROP address, DROP ifu, DROP rccm, DROP description');
+        $this->addSql('ALTER TABLE inventory_items DROP custom_category, DROP package_weight_kg');
+        $this->addSql('ALTER TABLE organizations DROP subscription_billing_cycle, DROP subscription_renewal_date, DROP subscription_trial_ends_at');
+        $this->addSql('ALTER TABLE transactions DROP payment_status, DROP paid_amount, DROP due_date');
     }
 }

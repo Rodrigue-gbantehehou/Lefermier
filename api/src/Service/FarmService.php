@@ -52,61 +52,66 @@ class FarmService
 
     public function createFarm(User $user, CreateFarmRequestDto $dto): Farm
     {
-        // 0. Contrôle d'accès et des quotas de la formule commerciale
-        $this->commercialPlanService->assertCanCreateFarm($user);
+        // Toute la logique de création est sérialisée dans une transaction InnoDB.
+        // assertCanCreateFarm() y est appelé à l'intérieur pour que son verrou pessimiste
+        // sur l'organisation soit effectif (isTransactionActive() = true).
+        return $this->entityManager->wrapInTransaction(function () use ($user, $dto): Farm {
+            // 0. Contrôle de quota avec verrou pessimiste sur l'organisation (si elle existe)
+            $this->commercialPlanService->assertCanCreateFarm($user);
 
-        // 1. Déterminer l'organisation de rattachement du propriétaire
-        $organization = null;
-        foreach ($user->getFarmMemberships() as $membership) {
-            $existingOrg = $membership->getFarm()->getOrganization();
-            if ($existingOrg !== null) {
-                $organization = $existingOrg;
-                break;
+            // 1. Déterminer l'organisation de rattachement du propriétaire
+            $organization = null;
+            foreach ($user->getFarmMemberships() as $membership) {
+                $existingOrg = $membership->getFarm()->getOrganization();
+                if ($existingOrg !== null) {
+                    $organization = $existingOrg;
+                    break;
+                }
             }
-        }
 
-        // Si l'utilisateur n'a pas encore d'organisation, en créer une
-        if ($organization === null) {
-            $baseSlug = $this->slugger->slug($dto->name)->lower()->toString();
-            if ($baseSlug === '') {
-                $baseSlug = 'organisation';
+            // Si l'utilisateur n'a pas encore d'organisation, en créer une
+            if ($organization === null) {
+                $baseSlug = $this->slugger->slug($dto->name)->lower()->toString();
+                if ($baseSlug === '') {
+                    $baseSlug = 'organisation';
+                }
+                $uniqueSlug = $baseSlug;
+                $counter = 1;
+                while ($this->organizationRepository->findOneBy(['slug' => $uniqueSlug]) !== null) {
+                    $uniqueSlug = sprintf('%s-%d', $baseSlug, $counter++);
+                }
+                $organization = new Organization($dto->name, $uniqueSlug);
+                $this->entityManager->persist($organization);
             }
-            $uniqueSlug = $baseSlug;
-            $counter = 1;
-            while ($this->organizationRepository->findOneBy(['slug' => $uniqueSlug]) !== null) {
-                $uniqueSlug = sprintf('%s-%d', $baseSlug, $counter++);
+
+            // 2. Instanciation de la nouvelle exploitation
+            $farm = new Farm($organization, $dto->name, $dto->productionType);
+
+            $cleanCode = $dto->code;
+            if (!$cleanCode) {
+                $cleanCode = sprintf('FRM-%s-%03d', strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $dto->name) ?: 'FARM', 0, 4)), rand(100, 999));
             }
-            $organization = new Organization($dto->name, $uniqueSlug);
-            $this->entityManager->persist($organization);
-        }
+            $farm->setCode($cleanCode);
+            $farm->setLocationCity($dto->locationCity);
+            $farm->setLocationCountry($dto->locationCountry);
+            $farm->setCurrency($dto->currency ?? 'XOF');
+            $farm->setPhone($dto->phone);
+            $farm->setEmail($dto->email);
+            $farm->setAddress($dto->address);
+            $farm->setIfu($dto->ifu);
+            $farm->setRccm($dto->rccm);
+            $farm->setDescription($dto->description);
 
-        // 2. Instanciation de la nouvelle exploitation
-        $farm = new Farm($organization, $dto->name, $dto->productionType);
+            $this->entityManager->persist($farm);
 
-        $cleanCode = $dto->code;
-        if (!$cleanCode) {
-            $cleanCode = sprintf('FRM-%s-%03d', strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $dto->name) ?: 'FARM', 0, 4)), rand(100, 999));
-        }
-        $farm->setCode($cleanCode);
-        $farm->setLocationCity($dto->locationCity);
-        $farm->setLocationCountry($dto->locationCountry);
-        $farm->setCurrency($dto->currency ?? 'XOF');
-        $farm->setPhone($dto->phone);
-        $farm->setEmail($dto->email);
-        $farm->setAddress($dto->address);
-        $farm->setIfu($dto->ifu);
-        $farm->setRccm($dto->rccm);
-        $farm->setDescription($dto->description);
+            // 3. Attribution automatique du rôle OWNER au créateur
+            $membership = new FarmMembership($farm, $user, FarmRole::OWNER);
+            $this->entityManager->persist($membership);
 
-        $this->entityManager->persist($farm);
+            $this->entityManager->flush();
 
-        // 3. Attribution automatique du rôle OWNER au créateur
-        $membership = new FarmMembership($farm, $user, FarmRole::OWNER);
-        $this->entityManager->persist($membership);
-
-        $this->entityManager->flush();
-
-        return $farm;
+            return $farm;
+        });
     }
 
     public function updateFarm(Farm $farm, UpdateFarmRequestDto $dto): Farm

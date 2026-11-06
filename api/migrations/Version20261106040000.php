@@ -22,7 +22,10 @@ final class Version20261106040000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $this->addSql("UPDATE stock_movements SET type = 'FEEDING' WHERE type = 'HEALTH_CONSUMPTION'");
+        // On reconvertit uniquement les mouvements qui ont été convertis par up() :
+        // ceux dont le motif correspond aux raisons sanitaires connues.
+        // Cela évite de reclasser en FEEDING les HEALTH_CONSUMPTION créés après la migration.
+        $this->addSql("UPDATE stock_movements SET type = 'FEEDING' WHERE type = 'HEALTH_CONSUMPTION' AND (reason LIKE 'Traitement sanitaire / vaccin : %' OR reason LIKE 'Traitement sanitaire : %')");
         $this->addSql('ALTER TABLE idempotency_records DROP lock_token');
     }
 }

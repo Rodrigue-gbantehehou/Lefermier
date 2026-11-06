@@ -184,3 +184,39 @@ export async function downloadApiFile(
   document.body.removeChild(a);
 }
 
+/**
+ * Génère une clé d'idempotence unique.
+ * À appeler UNE SEULE FOIS par action métier (au clic initial, au montage du formulaire),
+ * puis réutiliser la même clé pour toutes les reprises réseau de cette même opération.
+ *
+ * Contrairement à la génération automatique dans apiRequest() (clé différente à chaque
+ * appel HTTP), cette clé stable permet au backend de détecter les doublons issus de
+ * doubles-clics ou de reprises après erreur réseau.
+ */
+export function generateIdempotencyKey(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+}
+
+/**
+ * Effectue un appel API mutatif avec une clé d'idempotence fournie explicitement.
+ * Utiliser cette fonction depuis les handlers de formulaire lorsqu'une clé stable
+ * a été générée au niveau de l'action métier.
+ *
+ * @example
+ * const key = generateIdempotencyKey(); // généré au montage ou au clic initial
+ * // Sur reprise réseau, réutiliser le même `key`
+ * await apiRequestWithKey('/api/transactions', { method: 'POST', body: JSON.stringify(data) }, key);
+ */
+export async function apiRequestWithKey<T = any>(
+  endpoint: string,
+  options: RequestInit = {},
+  idempotencyKey: string
+): Promise<T> {
+  const explicitHeaders: Record<string, string> = {
+    ...((options.headers as Record<string, string>) || {}),
+    "Idempotency-Key": idempotencyKey,
+  };
+  return apiRequest<T>(endpoint, { ...options, headers: explicitHeaders });
+}

@@ -316,14 +316,30 @@ class HealthService
 
     public function deleteTreatment(HealthTreatment $treatment): void
     {
-        if ($treatment->getStatus() === HealthTreatmentStatus::COMPLETED) {
+        // Validation optimiste préalable (évite d'ouvrir une transaction inutile)
+        if ($treatment->isFinalized()) {
             throw new ConflictHttpException(
-                "Impossible de supprimer un soin déjà administré afin de préserver la traçabilité des consommations de stock et des dépenses. Vous pouvez l'annuler avant réalisation ou ajuster les notes."
+                "Impossible de supprimer un soin déjà clôturé (statut : {$treatment->getStatus()->value}) afin de préserver la traçabilité des consommations de stock et des dépenses."
             );
         }
 
-        $this->entityManager->remove($treatment);
-        $this->entityManager->flush();
+        $this->entityManager->wrapInTransaction(function () use ($treatment): void {
+            // Verrou pessimiste : empêche une complétion concurrente de finaliser le soin
+            // pendant que cette suppression est en cours (SELECT FOR UPDATE InnoDB)
+            $this->entityManager->lock($treatment, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($treatment)) {
+                $this->entityManager->refresh($treatment, LockMode::PESSIMISTIC_WRITE);
+            }
+
+            // Re-vérification post-verrou : le statut peut avoir changé sous concurrence
+            if ($treatment->isFinalized()) {
+                throw new ConflictHttpException(
+                    "Impossible de supprimer un soin déjà clôturé (statut : {$treatment->getStatus()->value}) afin de préserver la traçabilité des consommations de stock et des dépenses."
+                );
+            }
+
+            $this->entityManager->remove($treatment);
+        });
     }
 
     /**

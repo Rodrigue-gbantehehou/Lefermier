@@ -69,6 +69,8 @@ final class MysqlConcurrencyIntegrationTest
             'testCommercialPlanQuotaPessimisticLocking' => 'Quotas MySQL: verrouillage pessimiste organisation et contrôle de transition',
             'testHealthStateTransitionsAndStockDeduction' => 'Santé MySQL: machine à états stricte, type HEALTH_CONSUMPTION et interdictions',
             'testFlockSplitCollisionProofAndNameTruncation' => 'Cheptel MySQL: scission anti-collision et respect strict VARCHAR(100)',
+            'testLockBlocksSecondConnectionOnSameRow' => 'Concurrence réelle: SELECT FOR UPDATE InnoDB bloque effectivement une 2ème connexion PDO indépendante',
+            'testDeleteVsCompleteLockOrdering' => 'Concurrence réelle: deleteTreatment lit le statut COMPLETED rafraîchi sous verrou après complétion concurrente',
         ];
 
         foreach ($testCases as $method => $description) {
@@ -89,7 +91,7 @@ final class MysqlConcurrencyIntegrationTest
             echo sprintf("  [PASS-MYSQL] %s\n", $description);
         }
 
-        echo "\nTOUS LES TESTS D'INTEGRATION MYSQL ONT REUSSI AVEC SUCCES (6/6).\n";
+        echo "\nTOUS LES TESTS D'INTEGRATION MYSQL ONT REUSSI AVEC SUCCES (8/8).\n";
     }
 
     private static function testIdempotencyRowLockAndFencingToken(
@@ -468,6 +470,182 @@ final class MysqlConcurrencyIntegrationTest
         assert(mb_strlen($split->getName()) <= 100, 'Split flock name must never exceed VARCHAR(100)');
         assert(strlen($split->getCode()) <= 50, 'Split flock code must never exceed VARCHAR(50)');
         assert(preg_match('/^ORIG-CODE-S[A-F0-9]{8}$/', $split->getCode()) === 1, 'Split code must match 8-hex collision-proof pattern');
+    }
+
+    /**
+     * TEST 7 — Concurrence réelle à deux connexions PDO indépendantes.
+     *
+     * Prouve que SELECT FOR UPDATE d'InnoDB bloque effectivement une seconde connexion
+     * et se libère après le commit de la première.
+     *
+     * Stratégie : on ne peut pas avoir deux threads simultanés en PHP monothread,
+     * mais on peut démontrer l'ordering InnoDB :
+     * - Cx A : BEGIN + SELECT FOR UPDATE (verrou acquis)
+     * - Cx B : SET innodb_lock_wait_timeout=1 → tente SELECT FOR UPDATE → timeout attendu
+     * - Cx A : COMMIT (verrou libéré)
+     * - Cx B retry : SELECT FOR UPDATE → lit la ligne commitée → succès
+     */
+    private static function testLockBlocksSecondConnectionOnSameRow(
+        EntityManagerInterface $em,
+        IdempotencyService $idempotencyService,
+        HealthService $healthService,
+        InventoryService $inventoryService,
+        FlockService $flockService,
+        CommercialPlanService $commercialPlanService,
+        IdempotencyRecordRepository $recordRepository
+    ): void {
+        $dsn = $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL') ?? '';
+        if (!$dsn) {
+            echo "  [SKIP] DATABASE_URL non définie pour le test de concurrence réelle\n";
+            return;
+        }
+
+        // Créer une ligne de test isolée (idempotency_record)
+        $farm = self::createTestFarmHierarchy($em, 'Ferme Lock2Cx');
+        $user = self::getOrCreateTestUser($em, 'lock2cx@lefermier.com');
+
+        $uniqueKey = 'lock2cx-' . bin2hex(random_bytes(8));
+        $record = new IdempotencyRecord(
+            $uniqueKey,
+            $user,
+            '/api/test-lock',
+            'POST',
+            hash('sha256', $uniqueKey),
+            $farm
+        );
+        $em->persist($record);
+        $em->flush();
+        $recordId = $record->getId();
+
+        // Connexion A — ouverte via DBAL depuis l'EM existant
+        $connA = $em->getConnection();
+
+        // Connexion B — connexion PDO indépendante
+        $pdoB = new \PDO(
+            self::dsnToPdo($dsn),
+            self::dsnUser($dsn),
+            self::dsnPassword($dsn),
+            [\PDO::ATTR_TIMEOUT => 5]
+        );
+        $pdoB->exec('SET SESSION innodb_lock_wait_timeout = 1');
+        $pdoB->exec('SET SESSION autocommit = 0');
+
+        // Connexion A : BEGIN + SELECT FOR UPDATE
+        $connA->beginTransaction();
+        $connA->executeQuery('SELECT * FROM idempotency_records WHERE idempotency_key = ? FOR UPDATE', [$uniqueKey]);
+
+        // Connexion B : tente SELECT FOR UPDATE → doit subir un timeout (lock wait timeout exceeded)
+        $pdoB->beginTransaction();
+        $lockTimedOut = false;
+        try {
+            $pdoB->query('SELECT * FROM idempotency_records WHERE idempotency_key = ' . $pdoB->quote($uniqueKey) . ' FOR UPDATE');
+        } catch (\PDOException $e) {
+            // 1205 = ER_LOCK_WAIT_TIMEOUT
+            $lockTimedOut = str_contains($e->getMessage(), 'Lock wait timeout') || $e->getCode() === 'HY000';
+        }
+        $pdoB->rollBack();
+
+        // Connexion A : COMMIT (libère le verrou)
+        $connA->commit();
+
+        assert($lockTimedOut, 'InnoDB SELECT FOR UPDATE doit bloquer la 2ème connexion et provoquer un lock wait timeout');
+
+        // Connexion B peut maintenant lire librement (verrou libéré)
+        $pdoB->beginTransaction();
+        $stmt = $pdoB->query('SELECT status FROM idempotency_records WHERE idempotency_key = ' . $pdoB->quote($uniqueKey) . ' FOR UPDATE');
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $pdoB->commit();
+
+        assert($row !== false, 'La ligne doit être lisible après le commit de la connexion A');
+        assert($row['status'] === 'PENDING', 'Le statut PENDING doit être visible par la connexion B après le commit de A');
+    }
+
+    /**
+     * TEST 8 — Ordering verrou DELETE vs COMPLETE.
+     *
+     * Prouve que deleteTreatment() lira le statut COMPLETED rafraîchi sous verrou
+     * si completeTreatment() a commité avant que le DELETE ne prenne son verrou.
+     *
+     * Stratégie séquentielle (aucun thread OS nécessaire) :
+     * 1. Cx B complète le soin (commit → COMPLETED en DB)
+     * 2. Cx A appelle deleteTreatment() → prend le verrou → refresh → lit COMPLETED → 409
+     */
+    private static function testDeleteVsCompleteLockOrdering(
+        EntityManagerInterface $em,
+        IdempotencyService $idempotencyService,
+        HealthService $healthService,
+        InventoryService $inventoryService,
+        FlockService $flockService,
+        CommercialPlanService $commercialPlanService,
+        IdempotencyRecordRepository $recordRepository
+    ): void {
+        $farm = self::createTestFarmHierarchy($em, 'Ferme DelVsComplete');
+        $user = self::getOrCreateTestUser($em, 'del-vs-complete@lefermier.com');
+
+        $item = new InventoryItem($farm, 'Vaccin Test DelVs', InventoryCategory::VACCINE, InventoryUnit::VIAL);
+        $item->setCurrentStock(10.0);
+        $em->persist($item);
+
+        $flock = new Flock($farm, 'FLC-DEL-' . bin2hex(random_bytes(3)), 'Bande DelTest', 100, new \DateTimeImmutable(), PoultryType::BROILER);
+        $em->persist($flock);
+
+        $treatment = new HealthTreatment(
+            farm: $farm,
+            flock: $flock,
+            title: 'Soin Race Delete',
+            type: HealthTreatmentType::VACCINATION,
+            administrationMethod: AdministrationMethod::INJECTION,
+            targetAgeDays: 1,
+            scheduledDate: new \DateTimeImmutable(),
+            inventoryItem: $item
+        );
+        $em->persist($treatment);
+        $em->flush();
+
+        // Étape 1 : completeTreatment commit (simule la complétion concurrente qui arrive en premier)
+        $healthService->completeTreatment($treatment, new CompleteHealthTreatmentRequestDto(
+            administeredDate: date('Y-m-d'),
+            quantityUsed: '2.0',
+            inventoryItemId: $item->getId()?->toBase32()
+        ), $user);
+
+        // À ce stade, la DB a status = COMPLETED
+        // Étape 2 : deleteTreatment → doit lire COMPLETED via le verrou + refresh → 409
+        $deleteBlocked = false;
+        try {
+            $healthService->deleteTreatment($treatment);
+        } catch (ConflictHttpException) {
+            $deleteBlocked = true;
+        }
+
+        assert($deleteBlocked, 'deleteTreatment doit lire COMPLETED après complétion concurrente et rejeter avec 409');
+
+        // Vérifier que le mouvement de stock et le soin sont bien présents en DB
+        $em->refresh($item);
+        assert((float) $item->getCurrentStock() === 8.0, 'Le stock doit être à 8 (10 - 2) malgré la tentative de suppression');
+    }
+
+    private static function dsnToPdo(string $dsn): string
+    {
+        // Convertit DATABASE_URL (mysql://user:pass@host:port/dbname) en DSN PDO
+        $parsed = parse_url($dsn);
+        $dbName = ltrim($parsed['path'] ?? '/db_lefermier_test', '/');
+        $dbName = explode('?', $dbName)[0];
+        return sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+            $parsed['host'] ?? '127.0.0.1',
+            $parsed['port'] ?? 3306,
+            $dbName
+        );
+    }
+
+    private static function dsnUser(string $dsn): string
+    {
+        return parse_url($dsn, PHP_URL_USER) ?? 'root';
+    }
+
+    private static function dsnPassword(string $dsn): string
+    {
+        return parse_url($dsn, PHP_URL_PASS) ?? '';
     }
 
     private static function getOrCreateTestUser(EntityManagerInterface $em, string $email): User

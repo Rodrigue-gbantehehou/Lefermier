@@ -144,9 +144,18 @@ class CommercialPlanService
             }
         }
 
-        // Première ferme : l'organisation sera créée avec son 1er quota
+        // Première ferme : l'organisation sera créée juste après ce contrôle
         if ($organization === null) {
             return;
+        }
+
+        // Verrou pessimiste sur l'organisation pour sérialiser les créations concurrentes.
+        // Ce verrou n'est pris que si une transaction est déjà active (appelé depuis createFarm).
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            $this->entityManager->lock($organization, LockMode::PESSIMISTIC_WRITE);
+            if ($this->entityManager->contains($organization)) {
+                $this->entityManager->refresh($organization, LockMode::PESSIMISTIC_WRITE);
+            }
         }
 
         $planSku = strtoupper($organization->getSubscriptionPlan());
@@ -157,7 +166,15 @@ class CommercialPlanService
             return;
         }
 
-        $currentCount = count($organization->getFarms());
+        // Comptage SQL direct (pas la collection ORM en mémoire, qui peut être périmée)
+        $currentCount = (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(f.id)')
+            ->from(\App\Entity\Farm::class, 'f')
+            ->where('f.organization = :org')
+            ->setParameter('org', $organization)
+            ->getQuery()
+            ->getSingleScalarResult();
+
         if ($currentCount >= $maxFarms) {
             throw new PlanQuotaExceededException('max_farms', $currentCount, $maxFarms, $plan['name']);
         }
@@ -253,7 +270,7 @@ class CommercialPlanService
      *
      * @throws PlanQuotaExceededException
      */
-    public function assertCanAddMember(Farm $farm): void
+    public function assertCanAddMember(Farm $farm, ?User $candidate = null): void
     {
         $org = $farm->getOrganization();
 
@@ -272,6 +289,7 @@ class CommercialPlanService
             return;
         }
 
+        // Comptage des utilisateurs actifs distincts dans toute l'organisation
         $membersSet = [];
         foreach ($org->getFarms() as $f) {
             foreach ($f->getFarmMemberships() as $m) {
@@ -282,6 +300,17 @@ class CommercialPlanService
             }
         }
         $membersCount = count($membersSet);
+
+        // Si l'utilisateur candidat est déjà membre actif d'une ferme de l'organisation,
+        // son rattachement n'augmente pas le nombre de collaborateurs distincts.
+        // On permet l'opération même si le quota est atteint dans ce cas.
+        if ($candidate !== null) {
+            $candidateId = (string) $candidate->getId();
+            if (isset($membersSet[$candidateId])) {
+                // Déjà compté : pas de nouvel utilisateur → autoriser sans vérification quota
+                return;
+            }
+        }
 
         if ($membersCount >= $maxMembers) {
             throw new PlanQuotaExceededException('max_members', $membersCount, $maxMembers, $plan['name']);

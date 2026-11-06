@@ -48,12 +48,10 @@ class MemberService
     public function addMember(Farm $farm, CreateMemberRequestDto $dto): FarmMembership
     {
         return $this->entityManager->wrapInTransaction(function () use ($farm, $dto): FarmMembership {
-            // 0. Contrôle d'accès et des quotas de la formule commerciale sous verrou de l'organisation
-            $this->commercialPlanService->assertCanAddMember($farm);
-
             $normalizedEmail = mb_strtolower(trim($dto->email));
 
             // 1. Rechercher si l'utilisateur existe déjà ou le créer
+            // (fait avant le contrôle de quota pour pouvoir passer le candidat à assertCanAddMember)
             $user = $this->userRepository->findOneBy(['email' => $normalizedEmail]);
             if ($user === null) {
                 $user = new User(
@@ -72,7 +70,12 @@ class MemberService
                 $this->entityManager->persist($user);
             }
 
-            // 2. Vérifier si l'utilisateur est déjà rattaché à cette exploitation
+            // 0. Contrôle de quota sous verrou de l'organisation.
+            // Le candidat est passé pour exclure les utilisateurs déjà membres de l'organisation
+            // (ajout à une 2ème ferme sans nouveau collaborateur distinct → autoriser même si quota atteint).
+            $this->commercialPlanService->assertCanAddMember($farm, $user->getId() !== null ? $user : null);
+
+            // 2. Vérifier si l'utilisateur est déjà rattaché à cette exploitation spécifique
             $existing = $this->membershipRepository->findOneBy([
                 'farm' => $farm,
                 'user' => $user,
