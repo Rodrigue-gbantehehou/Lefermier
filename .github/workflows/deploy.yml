@@ -32,11 +32,11 @@ jobs:
             set -e
             echo "📦 Déploiement API Symfony..."
 
-            cd ~/public_html/api
-
-            # Mise à jour du code
+            cd ~/Poulvia
             git fetch origin main
             git reset --hard origin/main
+
+            cd api
 
             # Dépendances PHP (sans dev, optimisé)
             composer install --no-dev --optimize-autoloader --no-interaction --no-progress
@@ -109,11 +109,11 @@ jobs:
             set -e
             echo "📦 Déploiement Web App éleveurs..."
 
-            cd ~/public_html/app
-
-            # Mise à jour du code
+            cd ~/Poulvia
             git fetch origin main
             git reset --hard origin/main
+
+            cd web
 
             # Installation des dépendances
             npm ci --omit=dev
@@ -149,11 +149,11 @@ jobs:
             set -e
             echo "📦 Déploiement Admin Console..."
 
-            cd ~/public_html/admin
-
-            # Mise à jour du code
+            cd ~/Poulvia
             git fetch origin main
             git reset --hard origin/main
+
+            cd admin
 
             # Installation des dépendances
             npm ci --omit=dev
@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-api, deploy-landing, deploy-web, deploy-admin]
     if: always()
-
+  
     steps:
       - name: Résumé du déploiement
         run: |
