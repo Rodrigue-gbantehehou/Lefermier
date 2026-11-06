@@ -23,7 +23,13 @@ final class Version20261106043000 extends AbstractMigration
         // en fin de down(). Elle liste exactement les éléments créés par ce up(),
         // ce qui permet au down() de ne détruire QUE ce que cette migration a ajouté,
         // et de ne jamais toucher aux colonnes/tables qui préexistaient.
+        //
+        // TRUNCATE immédiat après CREATE : garantit un état propre même en cas de
+        // relance après une exécution interrompue. Les entrées de la tentative
+        // précédente sont effacées ; la nouvelle exécution repart d'une ardoise vierge
+        // et enregistre uniquement les éléments qu'elle crée réellement.
         $this->addSql('CREATE TABLE IF NOT EXISTS _mig_43000_state (item VARCHAR(255) NOT NULL, PRIMARY KEY (item)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $this->addSql('TRUNCATE TABLE _mig_43000_state');
 
         // ── Tables : CREATE TABLE IF NOT EXISTS ──────────────────────────────────
         // On note dans _mig_43000_state uniquement les tables qui n'existaient PAS.
@@ -130,10 +136,32 @@ final class Version20261106043000 extends AbstractMigration
         $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
         $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'idx:users:IDX_1483A5E9123FA025' WHERE @sql != 'SELECT 1'");
 
-        $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2265FCFA0D FOREIGN KEY (farm_id) REFERENCES farms (id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2232C8A3DE FOREIGN KEY (organization_id) REFERENCES organizations (id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB22A76ED395 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB222FFD4FD3 FOREIGN KEY (processed_by_id) REFERENCES users (id) ON DELETE SET NULL');
+        // ── FK de subscription_upgrade_requests : chaque contrainte vérifiée ────
+        // individuellement dans information_schema avant ajout, et enregistrée
+        // dans _mig_43000_state uniquement si elle a été créée par ce up().
+        $subFks = [
+            'FK_D858AB2265FCFA0D' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2265FCFA0D FOREIGN KEY (farm_id) REFERENCES farms (id) ON DELETE CASCADE',
+            'FK_D858AB2232C8A3DE' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB2232C8A3DE FOREIGN KEY (organization_id) REFERENCES organizations (id) ON DELETE CASCADE',
+            'FK_D858AB22A76ED395' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB22A76ED395 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE',
+            'FK_D858AB222FFD4FD3' => 'ALTER TABLE subscription_upgrade_requests ADD CONSTRAINT FK_D858AB222FFD4FD3 FOREIGN KEY (processed_by_id) REFERENCES users (id) ON DELETE SET NULL',
+        ];
+
+        foreach ($subFks as $fkName => $fkSql) {
+            $escapedFkSql = str_replace("'", "''", $fkSql);
+            $this->addSql("
+                SELECT IF(
+                    NOT EXISTS (
+                        SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                        WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'subscription_upgrade_requests'
+                          AND CONSTRAINT_NAME = '$fkName' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                    ),
+                    '$escapedFkSql',
+                    'SELECT 1'
+                ) INTO @sql
+            ");
+            $this->addSql('PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt');
+            $this->addSql("INSERT IGNORE INTO _mig_43000_state (item) SELECT 'fk:subscription_upgrade_requests:$fkName' WHERE @sql != 'SELECT 1'");
+        }
     }
 
     public function down(Schema $schema): void
@@ -154,13 +182,20 @@ final class Version20261106043000 extends AbstractMigration
             WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '_mig_43000_state'
         ");
 
-        // ── FK de subscription_upgrade_requests ───────────────────────────────
-        // Ces FK sont toujours liées aux tables créées par cette migration ; on les
-        // supprime si la table subscription_upgrade_requests existe encore.
+        // ── FK de subscription_upgrade_requests : vérifiées individuellement ─────
+        // dans _mig_43000_state via PREPARE, cohérent avec tous les autres éléments.
         foreach (['FK_D858AB2265FCFA0D', 'FK_D858AB2232C8A3DE', 'FK_D858AB22A76ED395', 'FK_D858AB222FFD4FD3'] as $fk) {
             $this->addSql("
+                SET @check_stmt = IF(
+                    @state_exists > 0,
+                    CONCAT('SELECT COUNT(*) INTO @was_created FROM _mig_43000_state WHERE item = ''fk:subscription_upgrade_requests:$fk'''),
+                    'SELECT 0 INTO @was_created'
+                )
+            ");
+            $this->addSql('PREPARE chk FROM @check_stmt; EXECUTE chk; DEALLOCATE PREPARE chk');
+            $this->addSql("
                 SELECT IF(
-                    @state_exists > 0 AND EXISTS (
+                    @was_created > 0 AND EXISTS (
                         SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
                         WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = 'subscription_upgrade_requests'
                           AND CONSTRAINT_NAME = '$fk' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
