@@ -37,7 +37,7 @@ class EggProductionController extends AbstractController
     }
 
     #[Route('/api/farms/{id}/egg-productions', name: 'api_farms_egg_productions_list', methods: ['GET'])]
-    #[IsGranted(FarmVoter::VIEW, subject: 'farm')]
+    #[IsGranted(EggProductionVoter::VIEW, subject: 'farm')]
     public function listByFarm(
         Farm $farm,
         Request $request,

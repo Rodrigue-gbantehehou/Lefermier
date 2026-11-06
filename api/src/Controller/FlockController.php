@@ -44,7 +44,7 @@ class FlockController extends AbstractController
     }
 
     #[Route('/api/farms/{id}/flocks', name: 'api_farms_flocks_list', methods: ['GET'])]
-    #[IsGranted(FarmVoter::VIEW, subject: 'farm')]
+    #[IsGranted(FlockVoter::VIEW, subject: 'farm')]
     public function list(
         Farm $farm,
         Request $request,

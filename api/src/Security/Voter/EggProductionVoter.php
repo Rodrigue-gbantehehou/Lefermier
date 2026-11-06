@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Security\Voter;
 
 use App\Entity\EggProduction;
+use App\Entity\Farm;
 use App\Entity\FarmMembership;
 use App\Entity\Flock;
 use App\Entity\User;
@@ -15,7 +16,7 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
- * @extends Voter<string, EggProduction|Flock>
+ * @extends Voter<string, EggProduction|Flock|Farm>
  */
 class EggProductionVoter extends Voter
 {
@@ -36,7 +37,7 @@ class EggProductionVoter extends Voter
             return false;
         }
 
-        return $subject instanceof EggProduction || $subject instanceof Flock;
+        return $subject instanceof EggProduction || $subject instanceof Flock || $subject instanceof Farm;
     }
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, #[\SensitiveParameter] mixed $vote = null): bool
@@ -49,6 +50,7 @@ class EggProductionVoter extends Voter
         $farm = match (true) {
             $subject instanceof EggProduction => $subject->getFlock()->getFarm(),
             $subject instanceof Flock => $subject->getFarm(),
+            $subject instanceof Farm => $subject,
             default => null,
         };
 

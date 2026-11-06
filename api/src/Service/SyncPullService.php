@@ -57,27 +57,45 @@ class SyncPullService
             ? $membership->hasPermission(Permission::HEALTH_VIEW)
             : in_array('ROLE_ADMIN', $user->getRoles(), true);
 
+        $canViewFlocks = $membership instanceof FarmMembership
+            ? $membership->hasPermission(Permission::FLOCK_VIEW)
+            : in_array('ROLE_ADMIN', $user->getRoles(), true);
+
+        $canViewEggs = $membership instanceof FarmMembership
+            ? $membership->hasPermission(Permission::EGG_VIEW)
+            : in_array('ROLE_ADMIN', $user->getRoles(), true);
+
+        $canViewInventory = $membership instanceof FarmMembership
+            ? $membership->hasPermission(Permission::INVENTORY_VIEW)
+            : in_array('ROLE_ADMIN', $user->getRoles(), true);
+
         $hasBuildingRestrictions = $membership instanceof FarmMembership && $membership->hasBuildingRestrictions();
 
         // 1. Lots (Flocks)
-        $flocks = $this->flockRepository->findUpdatedSince($farm, $since);
-        if ($hasBuildingRestrictions) {
-            $flocks = array_values(array_filter($flocks, fn ($f) => $membership->isBuildingAssigned($f->getBuilding())));
+        $serializedFlocks = [];
+        if ($canViewFlocks) {
+            $flocks = $this->flockRepository->findUpdatedSince($farm, $since);
+            if ($hasBuildingRestrictions) {
+                $flocks = array_values(array_filter($flocks, fn ($f) => $membership->isBuildingAssigned($f->getBuilding())));
+            }
+            $serializedFlocks = array_map(
+                fn ($f) => $this->flockService->serializeFlock($f),
+                $flocks
+            );
         }
-        $serializedFlocks = array_map(
-            fn ($f) => $this->flockService->serializeFlock($f),
-            $flocks
-        );
 
         // 2. Pontes d'œufs (EggProductions)
-        $eggProductions = $this->eggProductionRepository->findUpdatedSince($farm, $since);
-        if ($hasBuildingRestrictions) {
-            $eggProductions = array_values(array_filter($eggProductions, fn ($p) => $membership->isBuildingAssigned($p->getFlock()->getBuilding())));
+        $serializedEggProductions = [];
+        if ($canViewEggs) {
+            $eggProductions = $this->eggProductionRepository->findUpdatedSince($farm, $since);
+            if ($hasBuildingRestrictions) {
+                $eggProductions = array_values(array_filter($eggProductions, fn ($p) => $membership->isBuildingAssigned($p->getFlock()->getBuilding())));
+            }
+            $serializedEggProductions = array_map(
+                fn ($p) => $this->eggProductionService->serializeEggProduction($p),
+                $eggProductions
+            );
         }
-        $serializedEggProductions = array_map(
-            fn ($p) => $this->eggProductionService->serializeEggProduction($p),
-            $eggProductions
-        );
 
         // 3. Bâtiments
         $buildings = $this->farmService->getBuildingsForFarm($farm, onlyActive: false);
@@ -90,11 +108,14 @@ class SyncPullService
         }
 
         // 4. Articles d'inventaire
-        $inventoryItems = $this->inventoryItemRepository->findUpdatedSince($farm, $since);
-        $serializedInventory = array_map(
-            fn ($i) => $this->inventoryService->serializeItem($i),
-            $inventoryItems
-        );
+        $serializedInventory = [];
+        if ($canViewInventory) {
+            $inventoryItems = $this->inventoryItemRepository->findUpdatedSince($farm, $since);
+            $serializedInventory = array_map(
+                fn ($i) => $this->inventoryService->serializeItem($i),
+                $inventoryItems
+            );
+        }
 
         // 5. Calendrier sanitaire & soins
         $serializedHealth = [];
