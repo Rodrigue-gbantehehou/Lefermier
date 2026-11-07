@@ -103,7 +103,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
 
         {/* Barre avec fond protecteur opaque qui masque le défilement sous le bottombar */}
         <div
-          className="w-full bg-surface border-t border-border/70 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-8px_24px_rgba(0,0,0,0.35)]"
+          className="w-full bg-surface border-t border-border/70 "
           style={{ height: "calc(4.75rem + env(safe-area-inset-bottom, 0px))" }}
         />
       </div>
@@ -114,7 +114,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
         className="fixed bottom-2.5 left-3 right-3 sm:left-1/2 sm:-translate-x-1/2 sm:w-[430px] z-40 lg:hidden pointer-events-none"
         style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        <div className="pointer-events-auto flex h-16 items-center justify-between px-2.5 rounded-[26px] bg-gradient-to-r from-[#1d4d38] via-primary to-[#184431] dark:from-[#1b4331] dark:via-primary dark:to-[#143627] backdrop-blur-2xl border border-white/20 shadow-[0_16px_40px_-6px_rgba(20,55,38,0.55),0_4px_16px_rgba(0,0,0,0.2)] text-white">
+        <div className="pointer-events-auto flex h-16 items-center justify-between px-2.5 rounded-[26px] bg-gradient-to-r from-[#1d4d38] via-primary to-[#184431] dark:from-[#1b4331] dark:via-primary dark:to-[#143627] backdrop-blur-2xl border border-white/20 text-white">
           {/* 1. Accueil */}
           <Link
             href="/"
@@ -129,7 +129,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-2xl transition-all duration-200",
                 isHomeActive
-                  ? "bg-white/20 text-accent scale-110 shadow-2xs ring-1 ring-white/30"
+                  ? "bg-white/20 text-accent scale-110 ring-1 ring-white/30"
                   : "bg-transparent text-white/75 group-hover:bg-white/10 group-hover:text-white"
               )}
             >
@@ -144,7 +144,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               Accueil
             </span>
             {isHomeActive && (
-              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 shadow-[0_0_6px_rgba(221,166,75,0.9)] animate-in zoom-in-50" />
+              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 animate-in zoom-in-50" />
             )}
           </Link>
 
@@ -162,7 +162,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-2xl transition-all duration-200",
                 isFlocksActive
-                  ? "bg-white/20 text-accent scale-110 shadow-2xs ring-1 ring-white/30"
+                  ? "bg-white/20 text-accent scale-110 ring-1 ring-white/30"
                   : "bg-transparent text-white/75 group-hover:bg-white/10 group-hover:text-white"
               )}
             >
@@ -177,7 +177,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               Bandes
             </span>
             {isFlocksActive && (
-              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 shadow-[0_0_6px_rgba(221,166,75,0.9)] animate-in zoom-in-50" />
+              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 animate-in zoom-in-50" />
             )}
           </Link>
 
@@ -191,15 +191,15 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
             >
               <div
                 className={cn(
-                  "flex h-13 w-13 items-center justify-center rounded-full text-white shadow-lg border-[3.5px] border-[#1d4d38] ring-2 ring-white/25 transition-all duration-300",
+                  "flex h-13 w-13 items-center justify-center rounded-full text-white border-[3.5px] border-[#1d4d38] ring-2 ring-white/20 transition-all duration-300",
                   sheetOpen
-                    ? "rotate-45 bg-danger shadow-danger/50"
-                    : "bg-accent shadow-[0_8px_20px_-2px_rgba(221,166,75,0.65)] group-hover:scale-105 group-hover:bg-accent-hover"
+                    ? "rotate-45 bg-danger"
+                    : "bg-accent group-hover:scale-105 group-hover:bg-accent-hover"
                 )}
               >
                 <Plus className="h-6 w-6 stroke-[2.5]" />
               </div>
-              <span className="text-[9px] font-extrabold text-white mt-0.5 uppercase tracking-wider drop-shadow-xs">
+              <span className="text-[9px] font-extrabold text-white mt-0.5 uppercase tracking-wider">
                 Action
               </span>
             </button>
@@ -219,7 +219,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-2xl transition-all duration-200",
                 dynamicTab.active
-                  ? "bg-white/20 text-accent scale-110 shadow-2xs ring-1 ring-white/30"
+                  ? "bg-white/20 text-accent scale-110 ring-1 ring-white/30"
                   : "bg-transparent text-white/75 group-hover:bg-white/10 group-hover:text-white"
               )}
             >
@@ -234,7 +234,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
               {dynamicTab.label}
             </span>
             {dynamicTab.active && (
-              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 shadow-[0_0_6px_rgba(221,166,75,0.9)] animate-in zoom-in-50" />
+              <span className="h-1 w-1 rounded-full bg-accent mt-0.5 animate-in zoom-in-50" />
             )}
           </Link>
 
@@ -278,9 +278,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span>Saisie rapide</span>
                 </h3>
-                <p className="text-xs text-muted">
-                  Opérations autorisées pour votre compte sur cette exploitation
-                </p>
+
               </div>
               <button
                 type="button"
@@ -294,7 +292,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
             {/* Grille d'actions tactiles strictement filtrées */}
             {!hasAnyAction ? (
               <div className="py-8 text-center text-xs text-muted">
-                Aucune action d'écriture autorisée avec vos accès actuels.
+                Aucune action
               </div>
             ) : (
               <div className="mt-4 grid grid-cols-2 gap-2.5">
@@ -305,7 +303,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("egg")}
                     className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5 text-left transition-all active:scale-95 hover:bg-amber-500/10"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 border border-amber-500/20 shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 border border-amber-500/20">
                       <Egg className="h-5 w-5" />
                     </div>
                     <div>
@@ -322,7 +320,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("feed")}
                     className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 text-left transition-all active:scale-95 hover:bg-emerald-500/10"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-600 border border-emerald-500/20 shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">
                       <Utensils className="h-5 w-5" />
                     </div>
                     <div>
@@ -339,7 +337,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("movement")}
                     className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-3.5 text-left transition-all active:scale-95 hover:bg-rose-500/10"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-600 border border-rose-500/20 shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-600 border border-rose-500/20">
                       <AlertTriangle className="h-5 w-5" />
                     </div>
                     <div>
@@ -356,7 +354,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("income")}
                     className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3.5 text-left transition-all active:scale-95 hover:bg-primary/10"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary border border-primary/20 shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary border border-primary/20">
                       <ArrowUpRight className="h-5 w-5" />
                     </div>
                     <div>
@@ -373,7 +371,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("expense")}
                     className="flex items-center gap-3 rounded-2xl border border-border bg-surface-muted/60 p-3.5 text-left transition-all active:scale-95 hover:bg-surface-muted"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface-muted text-foreground border border-border shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface-muted text-foreground border border-border">
                       <ArrowDownRight className="h-5 w-5" />
                     </div>
                     <div>
@@ -390,7 +388,7 @@ export function BottomNav({ onOpenMenu }: BottomNavProps) {
                     onClick={() => triggerAction("health")}
                     className="flex items-center gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 p-3.5 text-left transition-all active:scale-95 hover:bg-sky-500/10"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-600 border border-sky-500/20 shadow-2xs">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-600 border border-sky-500/20">
                       <HeartPulse className="h-5 w-5" />
                     </div>
                     <div>
