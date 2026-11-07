@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  // Export statique pour déploiement O2Switch (fichiers HTML/CSS/JS purs)
-  output: "export",
-  trailingSlash: true,
   typescript: {
     ignoreBuildErrors: true,
   },
