@@ -202,13 +202,14 @@ export async function apiRequestFull<T = any>(
         errorMsg = "Adresse e-mail ou mot de passe incorrect. Veuillez vérifier vos identifiants.";
       } else {
         errorMsg = "Votre session a expiré. Veuillez vous reconnecter.";
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("Poulvia_token");
-        if (
-          !window.location.pathname.startsWith("/login") &&
-          !window.location.pathname.startsWith("/register")
-        ) {
-          setTimeout(() => { window.location.href = "/login?expired=1"; }, 1200);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("Poulvia_token");
+          if (
+            !window.location.pathname.startsWith("/login") &&
+            !window.location.pathname.startsWith("/register")
+          ) {
+            setTimeout(() => { window.location.href = "/login?expired=1"; }, 1200);
+          }
         }
       }
     } else if (response.status === 403) {
