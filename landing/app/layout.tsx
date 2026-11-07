@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,12 +23,12 @@ export const metadata: Metadata = {
   authors: [{ name: "Poulvia" }],
   creator: "Poulvia",
   publisher: "Poulvia",
-  metadataBase: new URL("https://Poulvia.app"),
+  metadataBase: new URL("https://poulvia.com"),
   openGraph: {
     title: "Poulvia — Logiciel de Gestion Avicole en Afrique de l'Ouest",
     description:
       "Suivi complet des élevages de volailles : ponte, provende, prophylaxie et caisse en FCFA.",
-    url: "https://Poulvia.app",
+    url: "https://poulvia.com",
     siteName: "Poulvia",
     locale: "fr_FR",
     type: "website",

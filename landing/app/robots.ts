@@ -1,4 +1,6 @@
-﻿import { MetadataRoute } from "next";
+import { MetadataRoute } from "next";
+
+export const dynamic = "force-static";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -7,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/api/"],
     },
-    sitemap: "https://Poulvia.app/sitemap.xml",
+    sitemap: "https://poulvia.com/sitemap.xml",
   };
 }
