@@ -26,7 +26,7 @@ export function HowItWorks() {
     },
   ];
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   return (
     <section id="how-it-works" className="py-20 md:py-28 bg-background">

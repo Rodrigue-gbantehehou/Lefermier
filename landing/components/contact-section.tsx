@@ -78,8 +78,8 @@ export function ContactSection() {
                 </div>
                 <div>
                   <span className="text-[10px] text-muted block">Email officiel</span>
-                  <a href="mailto:contact@Poulvia.app" className="font-bold hover:text-primary transition-colors">
-                    contact@Poulvia.app
+                  <a href="mailto:contact@poulvia.com" className="font-bold hover:text-primary transition-colors">
+                    contact@poulvia.com
                   </a>
                 </div>
               </div>

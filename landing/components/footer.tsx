@@ -4,7 +4,7 @@ import { Bird, ShieldCheck, Heart } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   return (
     <footer className="border-t border-border bg-surface py-14 text-xs text-muted">
@@ -17,7 +17,7 @@ export function Footer() {
                 <Bird className="h-5 w-5" />
               </div>
               <span className="text-lg font-extrabold font-mono text-foreground">
-                Le<span className="text-primary">fermier</span>
+                Poul<span className="text-primary">via</span>
               </span>
             </div>
             <p className="text-xs text-muted max-w-sm leading-relaxed">

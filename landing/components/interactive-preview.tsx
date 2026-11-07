@@ -30,7 +30,7 @@ export function InteractivePreview() {
     return `${t} plateau${t > 1 ? "x" : ""} + ${l} œuf${l > 1 ? "s" : ""}`;
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   return (
     <section id="preview" className="py-20 bg-surface border-y border-border">

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 export function Hero() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   return (
     <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 bg-background border-b border-border">

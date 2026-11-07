@@ -2,7 +2,7 @@ import React from "react";
 import { Check, ArrowRight, Shield } from "lucide-react";
 
 export function Pricing() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   return (
     <section id="pricing" className="py-16 md:py-24 bg-background border-b border-border">

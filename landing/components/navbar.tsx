@@ -8,7 +8,7 @@ export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.poulvia.com";
 
   useEffect(() => {
     function handleScroll() {
@@ -35,7 +35,7 @@ export function Navbar() {
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-foreground">
-                Le<span className="text-primary">fermier</span>
+                Poul<span className="text-primary">via</span>
               </span>
             </div>
           </Link>
