@@ -147,7 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(credentials: { email: string; password: string }) {
     setIsLoading(true);
     try {
-      const res = await api.auth.login(credentials);
+      const res = await api.auth.login({
+        email: credentials.email.trim().toLowerCase(),
+        password: credentials.password,
+      });
       localStorage.setItem("Poulvia_token", res.token);
       setToken(res.token);
       await loadCurrentUser();
@@ -165,7 +168,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) {
     setIsLoading(true);
     try {
-      const res = await api.auth.register(data);
+      const res = await api.auth.register({
+        ...data,
+        email: data.email.trim().toLowerCase(),
+      });
       localStorage.setItem("Poulvia_token", res.token);
       setToken(res.token);
       await loadCurrentUser();
