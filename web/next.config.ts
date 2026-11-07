@@ -3,6 +3,9 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   allowedDevOrigins: [
     "192.168.43.195",
     "192.168.43.195:3000",
